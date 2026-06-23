@@ -1,15 +1,17 @@
 /* Aldewaniah App — service worker (offline shell cache) */
-const CACHE = 'aldewaniah-v1';
+const CACHE = 'aldewaniah-v2';
 const ASSETS = [
   './',
   './index.html',
   './css/styles.css',
   './js/i18n.js',
   './js/store.js',
+  './js/content.js',
   './js/app.js',
-  './js/modules/feed.js',
-  './js/modules/events.js',
-  './js/modules/members.js',
+  './js/modules/home.js',
+  './js/modules/tournaments.js',
+  './js/modules/gallery.js',
+  './js/modules/contact.js',
   './manifest.json',
   './assets/icon.svg'
 ];

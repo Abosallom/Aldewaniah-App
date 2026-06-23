@@ -32,12 +32,15 @@
   <!-- Core scripts (order matters) -->
   <script src="js/i18n.js"></script>
   <script src="js/store.js"></script>
+  <script src="js/content.js"></script>
   <script src="js/app.js"></script>
 
-  <!-- Feature modules: add a new <script> line here to plug in a feature -->
-  <script src="js/modules/feed.js"></script>
-  <script src="js/modules/events.js"></script>
-  <script src="js/modules/members.js"></script>
+  <!-- Feature modules: add a new <script> line here to plug in a feature.
+       Order here sets the order in the bottom navigation. -->
+  <script src="js/modules/home.js"></script>
+  <script src="js/modules/tournaments.js"></script>
+  <script src="js/modules/gallery.js"></script>
+  <script src="js/modules/contact.js"></script>
 
   <!-- Boot the app after all modules have registered -->
   <script>App.start();</script>

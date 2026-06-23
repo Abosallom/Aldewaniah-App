@@ -1,97 +1,50 @@
-# الديوانية · Al Dewaniah App
+# الديوانية · Al Dewaniah
 
-A bilingual (Arabic RTL / English LTR) Progressive Web App for the Aldewaniah group of friends and relatives. Built to be **extended easily** — new features and services plug in without touching existing code.
+A bilingual (Arabic RTL / English) Progressive Web App that mirrors **aldewaniah.com** — one codebase for both the website and the installable app. Theme colors come from the site: cream `#F5F0E6`, navy `#1A2744`, maroon `#722F37`, gold `#C2A050`.
 
-Theme colors are taken live from [aldewaniah.com](https://aldewaniah.com): cream `#F5F0E6`, navy `#1A2744`, maroon `#722F37`, gold `#C2A050`, ink `#1D1E20`.
+## Sections (mirrors the website)
+
+- **Home** — welcome hero (`حياك الله في الديوانية`), tagline, and the "share your idea" form.
+- **Tournaments** — the Ramadan Baloot tournaments. Each one embeds its **live** bracket from Challonge / BracketHQ, so standings stay in sync with the bracket service.
+- **Gallery** — members-only photo area (locked until phone-number login is added).
+- **Contact** — email and footer.
+
+## Editing content (no coding needed)
+
+Almost everything you'd change day-to-day lives in **`js/content.js`**:
+
+- **Add / edit a tournament:** copy a block in `tournaments`, set the name and the bracket's embed URL (from Challonge or BracketHQ). It appears automatically with its own card.
+- **Change the contact email:** edit `contact.email`.
 
 ## Running it
 
-It's a static web app — no build step.
+Static site, no build step. Open `index.html`, or serve the folder:
 
-- **Quick look:** open `index.html` in a browser.
-- **Proper way (enables install + offline):** serve the folder over HTTP, e.g.
-  ```
-  cd "Aldewaniah App"
-  python3 -m http.server 8080
-  ```
-  then visit `http://localhost:8080`. On a phone, use "Add to Home Screen" to install it like an app.
+```
+cd "Aldewaniah App"
+python3 -m http.server 8080
+```
 
-## What's inside (v1)
-
-- **Updates** — announcements / news feed for the group.
-- **Events** — gatherings with date, location, and RSVP count.
-- **Members** — directory with name, mobile (tap to call), and role, plus search.
-
-Each member can switch the whole interface between Arabic and English with the toggle in the top bar. Data is saved on the device (localStorage) for now — see "Connecting a backend" to share data across members.
+Hosted free on GitHub Pages. To publish updates: in GitHub Desktop, **Commit to main** → **Push origin**. The live site refreshes about a minute later.
 
 ## Project structure
 
 ```
 index.html            App shell + script load order
-manifest.json         PWA metadata (name, icon, colors)
+manifest.json         PWA metadata
 sw.js                 Service worker (offline cache)
-assets/icon.svg       App icon (dallah — coffee pot)
 css/styles.css        Theme + layout
-js/i18n.js            Bilingual strings + RTL/LTR switching
-js/store.js           Swappable data layer (localStorage today)
+js/i18n.js            Bilingual strings + RTL/LTR
+js/content.js         >>> EDIT THIS <<< tournaments, contact, form
+js/store.js           Swappable local data layer (used later)
 js/app.js             Core: module registry, router, UI helpers
-js/modules/           One file per feature (feed, events, members)
+js/modules/           One file per section: home, tournaments, gallery, contact
 ```
 
-## Adding a new feature (the important part)
+## Adding a new section
 
-Every feature is a self-contained module. To add one — say a "Suggestions box":
+Create `js/modules/yourthing.js`, call `App.registerModule({ id, title:{ar,en}, icon, render(view){…} })`, then add a `<script>` line in `index.html` and the path to `ASSETS` in `sw.js`. It appears in the bottom navigation automatically.
 
-1. Create `js/modules/suggestions.js`:
-   ```js
-   (function () {
-     App.registerModule({
-       id: 'suggestions',
-       title: { ar: 'المقترحات', en: 'Suggestions' },
-       icon: '<svg viewBox="0 0 24 24" ...></svg>',   // bottom-nav icon
-       strings: {
-         ar: { sug_title: 'المقترحات' },
-         en: { sug_title: 'Suggestions' }
-       },
-       render(view) {
-         view.appendChild(UI.pageTitle(I18n.t('sug_title')));
-         // ...build the screen using UI.* helpers and Store.*
-       }
-     });
-   })();
-   ```
-2. Add one line to `index.html`:
-   ```html
-   <script src="js/modules/suggestions.js"></script>
-   ```
-3. Add it to the `ASSETS` list in `sw.js` so it caches offline.
+## Coming next: member login (OTP) + active directory
 
-The feature now appears automatically in the bottom navigation and routing. Nothing else changes.
-
-### Helpers available to modules
-
-- `UI.el(tag, attrs, children)` — build DOM nodes.
-- `UI.pageTitle(text, subtitle)` — standard page header.
-- `UI.modal(title, fields, onSubmit)` — pop a form (`fields: [{name,label,type,required,options}]`).
-- `UI.empty(text)`, `UI.confirm(text, onYes)`, `UI.fmtDate(ts)`, `UI.initials(name)`.
-- `I18n.t(key)`, `I18n.pick({ar,en})`, `I18n.lang`, `I18n.dir`.
-- `Store.list / get / add / update / remove / subscribe / seedIfEmpty` (all async).
-
-## Connecting a backend (to share data between members)
-
-Right now data lives on each device. To sync it across everyone, replace the internals of `js/store.js` with a real service (Firebase, Supabase, or your own API) while keeping the **same 6 method names**: `list, get, add, update, remove, subscribe`. Because every feature only talks to `Store`, no module code needs to change.
-
-Example sketch with Supabase:
-```js
-window.Store = {
-  async list(c)         { const {data} = await sb.from(c).select('*').order('createdAt',{ascending:false}); return data; },
-  async add(c, rec)     { const {data} = await sb.from(c).insert(rec).select().single(); return data; },
-  async update(c,id,p)  { const {data} = await sb.from(c).update(p).eq('id',id).select().single(); return data; },
-  async remove(c, id)   { await sb.from(c).delete().eq('id', id); },
-  // ...get, subscribe
-};
-```
-
-## Notes & possible next features
-
-Ideas that drop in cleanly with the module pattern: Suggestions box (matching the website form), Photo album, Polls/voting, Contributions/dues tracker, Push notifications for events.
+Planned with **Firebase**: phone-number login via one-time SMS code, and an admin-managed allowlist ("active directory") of approved members. Login will gate member-only areas (starting with the Gallery). The `gallery.js` module already checks an `Auth.isMember()` hook, so wiring auth in won't disturb the public pages.
