@@ -197,5 +197,18 @@ textarea.fld { min-height: 110px; resize: vertical; }
 .site-footer { text-align: center; color: var(--ink-soft); font-size: .8rem; margin: 28px 0 8px; }
 
 /* fade */
+/* ---------- Auth (header) ---------- */
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.auth-box { display: inline-flex; }
+.auth-btn {
+  background: var(--gold); color: var(--navy-d); border: none;
+  border-radius: 999px; padding: 6px 14px; font: inherit; font-weight: 700;
+  font-size: .82rem; cursor: pointer; max-width: 46vw; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.auth-btn:active { transform: scale(.96); }
+.auth-err { color: var(--maroon); font-size: .85rem; margin: 6px 0 0; min-height: 1em; }
+#recaptcha-container { position: fixed; bottom: 0; left: 0; }
+
 .fade-in { animation: fade .25s ease; }
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

@@ -1,5 +1,5 @@
 /* Aldewaniah App — service worker (offline shell cache) */
-const CACHE = 'aldewaniah-v2';
+const CACHE = 'aldewaniah-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -8,6 +8,8 @@ const ASSETS = [
   './js/store.js',
   './js/content.js',
   './js/app.js',
+  './js/firebase-config.js',
+  './js/auth.js',
   './js/modules/home.js',
   './js/modules/tournaments.js',
   './js/modules/gallery.js',

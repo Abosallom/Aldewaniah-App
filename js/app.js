@@ -33,6 +33,9 @@
       else { this._render(id); }
     },
 
+    /** Re-render the current view (e.g. after login state changes). */
+    refresh() { if (current) this._render(current); },
+
     _render(id) {
       const mod = modules.find((m) => m.id === id) || modules[0];
       if (!mod) return;

@@ -20,7 +20,10 @@
       <img src="assets/icon.svg" alt="" class="brand-logo" />
       <span class="brand-name" data-i18n="appName">الديوانية</span>
     </div>
-    <button id="langToggle" class="lang-toggle" aria-label="Toggle language">EN</button>
+    <div class="header-actions">
+      <span id="authBox" class="auth-box"></span>
+      <button id="langToggle" class="lang-toggle" aria-label="Toggle language">EN</button>
+    </div>
   </header>
 
   <!-- Module content renders here -->
@@ -28,6 +31,15 @@
 
   <!-- Bottom navigation (built dynamically from registered modules) -->
   <nav id="nav" class="bottom-nav" aria-label="Main"></nav>
+
+  <!-- Invisible reCAPTCHA target for phone login -->
+  <div id="recaptcha-container"></div>
+
+  <!-- Firebase SDK (compat) for phone OTP login + members directory -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="js/firebase-config.js"></script>
 
   <!-- Core scripts (order matters) -->
   <script src="js/i18n.js"></script>
@@ -44,6 +56,9 @@
 
   <!-- Boot the app after all modules have registered -->
   <script>App.start();</script>
+
+  <!-- Member login (after App so it can refresh views on sign-in) -->
+  <script src="js/auth.js"></script>
 
   <script>
     if ('serviceWorker' in navigator) {
