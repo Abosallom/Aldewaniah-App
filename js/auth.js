@@ -1,33 +1,52 @@
 /* ===========================================================
-   Auth — member login via phone number + SMS OTP (Firebase).
-   Only phone numbers present in the Firestore "members" collection
-   (the "active directory") are allowed in. Login gates member-only
-   areas via Auth.isMember().
+   Auth — member login via phone + SMS OTP (Firebase) with
+   self-service join requests and an admin role.
+
+   members/{phone(E.164)} = {
+     name: string,
+     status: 'pending' | 'approved',
+     admin: boolean,
+     createdAt: timestamp
+   }
+   - isMember()  -> status == 'approved'
+   - isAdmin()   -> approved && admin == true
+   New users verify their phone, enter a name, and a 'pending'
+   request is created for an admin to approve/decline.
    =========================================================== */
 (function () {
   let fbAuth = null, db = null, confirmation = null, recaptcha = null;
-  let _isMember = false, _member = null;
+  let _status = null;      // null | 'pending' | 'approved'
+  let _isAdmin = false;
+  let _member = null;      // { phone, name, status, admin }
 
   I18n.extend({
     ar: {
       auth_login: 'دخول الأعضاء', auth_logout: 'خروج',
       auth_title: 'دخول الأعضاء', auth_phone: 'رقم الجوال', auth_send: 'إرسال الرمز',
-      auth_code: 'رمز التحقق', auth_verify: 'تأكيد', auth_resend: 'إعادة الإرسال',
+      auth_code: 'رمز التحقق', auth_verify: 'تأكيد',
       auth_sent: 'أرسلنا رمز تحقق إلى جوالك',
-      auth_denied: 'هذا الرقم غير مسجل ضمن أعضاء الديوانية',
       auth_bad_code: 'الرمز غير صحيح، حاول مرة أخرى',
-      auth_welcome: 'حياك الله',
-      auth_disabled: 'لم يتم إعداد تسجيل الدخول بعد'
+      auth_welcome: 'حياك الله', auth_disabled: 'لم يتم إعداد تسجيل الدخول بعد',
+      auth_name: 'الاسم', auth_name_q: 'أدخل اسمك لطلب الانضمام',
+      auth_submit_req: 'إرسال طلب الانضمام',
+      auth_req_sent: 'تم إرسال طلبك، بانتظار موافقة المشرف ✅',
+      auth_pending: 'قيد المراجعة',
+      auth_pending_full: 'طلب انضمامك قيد مراجعة المشرف',
+      auth_req_err: 'تعذّر إرسال الطلب، حاول مرة أخرى'
     },
     en: {
       auth_login: 'Member login', auth_logout: 'Sign out',
       auth_title: 'Member login', auth_phone: 'Mobile number', auth_send: 'Send code',
-      auth_code: 'Verification code', auth_verify: 'Verify', auth_resend: 'Resend',
+      auth_code: 'Verification code', auth_verify: 'Verify',
       auth_sent: 'We sent a code to your phone',
-      auth_denied: 'This number is not registered as an Al Dewaniah member',
       auth_bad_code: 'Incorrect code, please try again',
-      auth_welcome: 'Welcome',
-      auth_disabled: 'Login is not set up yet'
+      auth_welcome: 'Welcome', auth_disabled: 'Login is not set up yet',
+      auth_name: 'Name', auth_name_q: 'Enter your name to request to join',
+      auth_submit_req: 'Send join request',
+      auth_req_sent: 'Request sent — awaiting admin approval ✅',
+      auth_pending: 'Pending',
+      auth_pending_full: 'Your join request is awaiting admin approval',
+      auth_req_err: 'Could not send the request, please try again'
     }
   });
 
@@ -47,8 +66,12 @@
   }
 
   const Auth = {
-    isMember() { return _isMember; },
+    isMember() { return _status === 'approved'; },
+    isAdmin() { return _isAdmin; },
+    status() { return _status; },
     member() { return _member; },
+    getDb() { return db; },
+    phone() { return (fbAuth && fbAuth.currentUser && fbAuth.currentUser.phoneNumber) || null; },
 
     init() {
       if (!isConfigured() || !window.firebase) { this.renderBox(); return; }
@@ -57,15 +80,12 @@
         fbAuth = firebase.auth();
         db = firebase.firestore();
         fbAuth.onAuthStateChanged(async (user) => {
-          if (user && user.phoneNumber) {
-            await verifyMembership(user.phoneNumber);
-          } else {
-            _isMember = false; _member = null;
-          }
+          if (user && user.phoneNumber) await resolve(user.phoneNumber);
+          else reset();
           Auth.renderBox();
           if (window.App && App.refresh) App.refresh();
         });
-      } catch (e) { /* already initialized or config error */ }
+      } catch (e) { /* already initialized */ }
       this.renderBox();
     },
 
@@ -73,10 +93,13 @@
       const box = document.getElementById('authBox');
       if (!box) return;
       box.innerHTML = '';
-      if (_isMember) {
+      if (_status === 'approved') {
         const name = (_member && (_member.name || _member.phone)) || I18n.t('auth_welcome');
         box.appendChild(UI.el('button', { class: 'auth-btn', onclick: () => Auth.logout() },
           I18n.pick(name) + ' · ' + I18n.t('auth_logout')));
+      } else if (_status === 'pending') {
+        box.appendChild(UI.el('button', { class: 'auth-btn auth-btn-pending', onclick: () => Auth.logout() },
+          I18n.t('auth_pending') + ' · ' + I18n.t('auth_logout')));
       } else {
         box.appendChild(UI.el('button', { class: 'auth-btn', onclick: () => Auth.openLogin() },
           I18n.t('auth_login')));
@@ -85,7 +108,7 @@
 
     logout() {
       if (fbAuth) fbAuth.signOut();
-      _isMember = false; _member = null;
+      reset();
       this.renderBox();
       if (window.App && App.refresh) App.refresh();
     },
@@ -96,14 +119,30 @@
       const close = () => { backdrop.remove(); cleanupRecaptcha(); };
       backdrop.onclick = (e) => { if (e.target === backdrop) close(); };
       const body = UI.el('div');
-      const modal = UI.el('div', { class: 'modal' }, [
-        UI.el('h3', null, I18n.t('auth_title')), body
-      ]);
+      const modal = UI.el('div', { class: 'modal' }, [UI.el('h3', null, I18n.t('auth_title')), body]);
       backdrop.appendChild(modal);
       document.body.appendChild(backdrop);
       phoneStep(body, close);
     }
   };
+
+  function reset() { _status = null; _isAdmin = false; _member = null; }
+
+  async function resolve(phone) {
+    try {
+      const doc = await db.collection('members').doc(phone).get();
+      if (doc.exists) {
+        const d = doc.data();
+        const approved = d.status === 'approved' || d.approved === true;
+        _status = approved ? 'approved' : (d.status || 'pending');
+        _isAdmin = approved && d.admin === true;
+        _member = Object.assign({ phone }, d);
+        return _status;
+      }
+    } catch (e) {}
+    reset();
+    return null;
+  }
 
   function cleanupRecaptcha() {
     try { if (recaptcha) { recaptcha.clear(); recaptcha = null; } } catch (e) {}
@@ -116,8 +155,7 @@
     const err = UI.el('p', { class: 'auth-err' });
     const btn = UI.el('button', { class: 'btn btn-block', style: 'margin-top:10px' }, I18n.t('auth_send'));
     body.appendChild(UI.el('div', { class: 'field' }, [input]));
-    body.appendChild(err);
-    body.appendChild(btn);
+    body.appendChild(err); body.appendChild(btn);
     btn.onclick = async () => {
       err.textContent = '';
       const phone = normalizePhone(input.value);
@@ -138,27 +176,24 @@
   function codeStep(body, close, phone) {
     body.innerHTML = '';
     body.appendChild(UI.el('p', { class: 'muted' }, I18n.t('auth_sent') + ' (' + phone + ')'));
-    const input = UI.el('input', { class: 'fld', type: 'text', inputmode: 'numeric',
-      placeholder: I18n.t('auth_code') });
+    const input = UI.el('input', { class: 'fld', type: 'text', inputmode: 'numeric', placeholder: I18n.t('auth_code') });
     const err = UI.el('p', { class: 'auth-err' });
     const btn = UI.el('button', { class: 'btn btn-block', style: 'margin-top:10px' }, I18n.t('auth_verify'));
     body.appendChild(UI.el('div', { class: 'field' }, [input]));
-    body.appendChild(err);
-    body.appendChild(btn);
+    body.appendChild(err); body.appendChild(btn);
     btn.onclick = async () => {
       err.textContent = '';
       btn.disabled = true; btn.textContent = '…';
       try {
         const cred = await confirmation.confirm(input.value.trim());
-        const ok = await verifyMembership(cred.user.phoneNumber);
-        if (ok) {
+        const status = await resolve(cred.user.phoneNumber);
+        if (status === 'approved' || status === 'pending') {
+          // already known member or pending request
           close(); Auth.renderBox();
           if (window.App && App.refresh) App.refresh();
         } else {
-          err.textContent = I18n.t('auth_denied');
-          await fbAuth.signOut();
-          _isMember = false; _member = null;
-          btn.disabled = false; btn.textContent = I18n.t('auth_verify');
+          // brand new -> ask for name, create a pending request
+          nameStep(body, close, cred.user.phoneNumber);
         }
       } catch (e) {
         err.textContent = I18n.t('auth_bad_code');
@@ -167,18 +202,36 @@
     };
   }
 
-  async function verifyMembership(phone) {
-    if (!db) return false;
-    try {
-      const doc = await db.collection('members').doc(phone).get();
-      if (doc.exists && doc.data().approved !== false) {
-        _isMember = true;
-        _member = Object.assign({ phone }, doc.data());
-        return true;
+  function nameStep(body, close, phone) {
+    body.innerHTML = '';
+    body.appendChild(UI.el('p', { class: 'muted' }, I18n.t('auth_name_q')));
+    const input = UI.el('input', { class: 'fld', type: 'text', placeholder: I18n.t('auth_name') });
+    const err = UI.el('p', { class: 'auth-err' });
+    const btn = UI.el('button', { class: 'btn btn-block', style: 'margin-top:10px' }, I18n.t('auth_submit_req'));
+    body.appendChild(UI.el('div', { class: 'field' }, [input]));
+    body.appendChild(err); body.appendChild(btn);
+    setTimeout(() => input.focus(), 50);
+    btn.onclick = async () => {
+      const name = input.value.trim();
+      if (!name) { input.focus(); return; }
+      btn.disabled = true; btn.textContent = '…';
+      try {
+        await db.collection('members').doc(phone).set({
+          name: name, status: 'pending', admin: false,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        _status = 'pending';
+        _member = { phone, name, status: 'pending', admin: false };
+        body.innerHTML = '';
+        body.appendChild(UI.el('p', { class: 'auth-ok' }, I18n.t('auth_req_sent')));
+        body.appendChild(UI.el('button', { class: 'btn btn-block', style: 'margin-top:10px',
+          onclick: () => { close(); Auth.renderBox(); if (window.App && App.refresh) App.refresh(); } },
+          I18n.t('close')));
+      } catch (e) {
+        err.textContent = I18n.t('auth_req_err');
+        btn.disabled = false; btn.textContent = I18n.t('auth_submit_req');
       }
-    } catch (e) {}
-    _isMember = false; _member = null;
-    return false;
+    };
   }
 
   window.Auth = Auth;

@@ -37,8 +37,9 @@
     refresh() { if (current) this._render(current); },
 
     _render(id) {
-      const mod = modules.find((m) => m.id === id) || modules[0];
+      let mod = modules.find((m) => m.id === id) || modules[0];
       if (!mod) return;
+      if (mod.adminOnly && !(window.Auth && Auth.isAdmin())) mod = modules[0];
       current = mod.id;
       const view = document.getElementById('view');
       view.innerHTML = '';
@@ -53,7 +54,9 @@
     _paintNav() {
       const nav = document.getElementById('nav');
       nav.innerHTML = '';
-      modules.forEach((m) => {
+      modules
+        .filter((m) => !(m.adminOnly && !(window.Auth && Auth.isAdmin())))
+        .forEach((m) => {
         const btn = document.createElement('button');
         btn.className = 'nav-item' + (m.id === current ? ' active' : '');
         btn.innerHTML = `${m.icon}<span>${I18n.pick(m.title)}</span>`;

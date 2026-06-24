@@ -208,6 +208,8 @@ textarea.fld { min-height: 110px; resize: vertical; }
 }
 .auth-btn:active { transform: scale(.96); }
 .auth-err { color: var(--maroon); font-size: .85rem; margin: 6px 0 0; min-height: 1em; }
+.auth-btn-pending { background: rgba(194,160,80,.25); color: var(--navy); }
+.auth-ok { color: #2e7d32; font-weight: 600; margin: 6px 0 0; }
 #recaptcha-container { position: fixed; bottom: 0; left: 0; }
 
 .fade-in { animation: fade .25s ease; }
