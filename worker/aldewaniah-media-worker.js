@@ -1,0 +1,220 @@
+/* Aldewaniah media Worker — private gallery storage on Cloudflare R2.
+ *
+ * Auth model: the caller sends their Firebase ID token (Authorization: Bearer ...).
+ * We read the phone from the token, then fetch the member's Firestore doc WITH that
+ * token. Firestore validates the token's signature and its own rules (a user may
+ * only read their own member doc), so a forged or non-member token gets rejected.
+ * Only an "approved" member is allowed to upload / list / delete.
+ *
+ * Files are served through short-lived HMAC-signed URLs (so <img>/<video> can load
+ * them without sending headers, while the bucket itself stays private).
+ *
+ * Bindings expected (set in the dashboard):
+ *   - BUCKET           : R2 bucket binding  -> aldewaniah-media
+ *   - FIREBASE_PROJECT : plain var          -> aldewaniah-45158
+ *   - SIGN_SECRET      : secret             -> (random string)
+ */
+
+const PREFIX = "gallery/";
+const URL_TTL = 6 * 60 * 60; // signed file URLs valid 6 hours
+const MAX_BYTES = 100 * 1024 * 1024; // 100 MB per file
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+  "Access-Control-Allow-Headers": "Authorization,Content-Type,X-File-Name,X-File-Type",
+  "Access-Control-Max-Age": "86400",
+};
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const path = url.pathname;
+
+    if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
+
+    try {
+      if (path === "/file" && request.method === "GET") return serveFile(request, env, url);
+      if (path === "/list" && request.method === "GET") return listFiles(request, env, url);
+      if (path === "/upload" && request.method === "POST") return uploadFile(request, env);
+      if (path === "/delete" && request.method === "POST") return deleteFile(request, env);
+      if (path === "/" || path === "/health") return json({ ok: true });
+      return json({ error: "not found" }, 404);
+    } catch (e) {
+      return json({ error: String(e && e.message || e) }, 500);
+    }
+  },
+};
+
+/* ---------- helpers ---------- */
+
+function json(obj, status = 200) {
+  return new Response(JSON.stringify(obj), {
+    status,
+    headers: { "Content-Type": "application/json", ...CORS },
+  });
+}
+
+function b64url(bytes) {
+  let s = btoa(String.fromCharCode(...new Uint8Array(bytes)));
+  return s.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function b64urlToStr(s) {
+  s = s.replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+  return atob(s);
+}
+
+function decodeTokenPhone(idToken) {
+  try {
+    const payload = JSON.parse(b64urlToStr(idToken.split(".")[1]));
+    return payload.phone_number || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getToken(request) {
+  const h = request.headers.get("Authorization") || "";
+  return h.startsWith("Bearer ") ? h.slice(7) : null;
+}
+
+// Returns { phone, name, admin } for an approved member, else null.
+async function getMember(request, env) {
+  const idToken = getToken(request);
+  if (!idToken) return null;
+  const phone = decodeTokenPhone(idToken);
+  if (!phone) return null;
+  const docUrl =
+    "https://firestore.googleapis.com/v1/projects/" +
+    env.FIREBASE_PROJECT +
+    "/databases/(default)/documents/members/" +
+    encodeURIComponent(phone);
+  const r = await fetch(docUrl, { headers: { Authorization: "Bearer " + idToken } });
+  if (!r.ok) return null;
+  const doc = await r.json();
+  const f = (doc && doc.fields) || {};
+  const status = f.status && f.status.stringValue;
+  const approvedLegacy = f.approved && f.approved.booleanValue === true;
+  if (status !== "approved" && !approvedLegacy) return null;
+  return {
+    phone,
+    name: (f.name && f.name.stringValue) || "",
+    admin: !!(f.admin && f.admin.booleanValue === true),
+  };
+}
+
+async function sign(env, data) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(env.SIGN_SECRET),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
+  return b64url(sig);
+}
+
+async function signedUrl(env, origin, key) {
+  const exp = Math.floor(Date.now() / 1000) + URL_TTL;
+  const sig = await sign(env, key + "\n" + exp);
+  return (
+    origin +
+    "/file?key=" +
+    encodeURIComponent(key) +
+    "&exp=" +
+    exp +
+    "&sig=" +
+    encodeURIComponent(sig)
+  );
+}
+
+/* ---------- routes ---------- */
+
+async function serveFile(request, env, url) {
+  const key = url.searchParams.get("key");
+  const exp = url.searchParams.get("exp");
+  const sig = url.searchParams.get("sig");
+  if (!key || !exp || !sig) return json({ error: "bad request" }, 400);
+  if (Number(exp) < Math.floor(Date.now() / 1000)) return json({ error: "expired" }, 403);
+  const expected = await sign(env, key + "\n" + exp);
+  if (expected !== sig) return json({ error: "bad signature" }, 403);
+
+  const obj = await env.BUCKET.get(key);
+  if (!obj) return json({ error: "not found" }, 404);
+  const headers = new Headers();
+  obj.writeHttpMetadata(headers);
+  headers.set("Cache-Control", "private, max-age=21600");
+  headers.set("Access-Control-Allow-Origin", "*");
+  return new Response(obj.body, { headers });
+}
+
+async function listFiles(request, env, url) {
+  const member = await getMember(request, env);
+  if (!member) return json({ error: "unauthorized" }, 401);
+  const origin = url.origin;
+  const out = [];
+  let cursor;
+  do {
+    const page = await env.BUCKET.list({ prefix: PREFIX, cursor, include: ["customMetadata"] });
+    for (const o of page.objects) {
+      const m = o.customMetadata || {};
+      out.push({
+        key: o.key,
+        url: await signedUrl(env, origin, o.key),
+        type: m.type || "",
+        name: m.name || "",
+        by: m.by || "",
+        byPhone: m.byPhone || "",
+        uploaded: o.uploaded,
+        size: o.size,
+      });
+    }
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  // newest first
+  out.sort((a, b) => new Date(b.uploaded) - new Date(a.uploaded));
+  return json({ items: out });
+}
+
+async function uploadFile(request, env) {
+  const member = await getMember(request, env);
+  if (!member) return json({ error: "unauthorized" }, 401);
+
+  const type = request.headers.get("X-File-Type") || "application/octet-stream";
+  const rawName = decodeURIComponent(request.headers.get("X-File-Name") || "file");
+  const safe = rawName.replace(/[^\w.\-]+/g, "_").slice(-80) || "file";
+  const key = PREFIX + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "_" + safe;
+
+  const body = await request.arrayBuffer();
+  if (body.byteLength === 0) return json({ error: "empty" }, 400);
+  if (body.byteLength > MAX_BYTES) return json({ error: "too large" }, 413);
+
+  await env.BUCKET.put(key, body, {
+    httpMetadata: { contentType: type },
+    customMetadata: {
+      type,
+      name: rawName.slice(0, 120),
+      by: member.name,
+      byPhone: member.phone,
+    },
+  });
+  return json({ key });
+}
+
+async function deleteFile(request, env) {
+  const member = await getMember(request, env);
+  if (!member) return json({ error: "unauthorized" }, 401);
+  const { key } = await request.json().catch(() => ({}));
+  if (!key || !key.startsWith(PREFIX)) return json({ error: "bad request" }, 400);
+
+  const obj = await env.BUCKET.head(key);
+  if (!obj) return json({ error: "not found" }, 404);
+  const owner = (obj.customMetadata || {}).byPhone;
+  if (!member.admin && owner !== member.phone) return json({ error: "forbidden" }, 403);
+
+  await env.BUCKET.delete(key);
+  return json({ ok: true });
+}

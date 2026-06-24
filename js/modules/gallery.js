@@ -1,12 +1,23 @@
 /* ===========================================================
    Feature module: Gallery (مكتبة الصور) — members only.
-   Members upload photos/videos; view them in a full-screen
-   swipeable viewer (arrows / swipe / keyboard). Uploader or
-   admin can delete. Storage + Firestore rules enforce access.
+   Photos/videos are stored on the group's own Cloudflare R2
+   bucket via a Worker (js: worker/aldewaniah-media-worker.js).
+   Members upload + view in a full-screen swipeable viewer
+   (arrows / swipe / keyboard). Uploader or admin can delete.
+   Access is enforced by the Worker (Firebase token + member
+   check) — the bucket itself is private.
    =========================================================== */
 (function () {
-  const COLLECTION = 'gallery';
+  const WORKER = 'https://aldewaniah-media.mulhaqdb.workers.dev';
   const MAX_BYTES = 100 * 1024 * 1024; // 100 MB
+
+  async function authToken() {
+    try {
+      const u = firebase.auth().currentUser;
+      return u ? await u.getIdToken() : null;
+    } catch (e) { return null; }
+  }
+  const isVideo = (t) => (t || '').indexOf('video') === 0;
 
   App.registerModule({
     id: 'gallery',
@@ -50,8 +61,6 @@
         return;
       }
 
-      const db = Auth.getDb();
-      const storage = firebase.storage();
       let items = [];
 
       // ---- Upload control ----
@@ -60,31 +69,29 @@
       const progress = UI.el('p', { class: 'muted', style: 'text-align:center;margin:8px 0 0' });
       view.appendChild(UI.el('div', { class: 'add-fab-wrap' }, [upBtn, fileInput, progress]));
 
-      fileInput.onchange = () => {
+      fileInput.onchange = async () => {
         const file = fileInput.files && fileInput.files[0];
         if (!file) return;
         if (file.size > MAX_BYTES) { alert(I18n.t('gal_too_big')); fileInput.value = ''; return; }
-        const type = (file.type || '').startsWith('video') ? 'video' : 'image';
-        const safe = file.name.replace(/[^\w.\-]/g, '_');
-        const path = 'gallery/' + Date.now() + '_' + safe;
+        const tk = await authToken();
+        if (!tk) { progress.textContent = I18n.t('gal_err'); return; }
         upBtn.disabled = true;
-        const task = storage.ref().child(path).put(file, { contentType: file.type });
-        task.on('state_changed',
-          (s) => { progress.textContent = I18n.t('gal_uploading') + ' ' + Math.round((s.bytesTransferred / s.totalBytes) * 100) + '%'; },
-          () => { progress.textContent = I18n.t('gal_err'); upBtn.disabled = false; fileInput.value = ''; },
-          async () => {
-            try {
-              const url = await task.snapshot.ref.getDownloadURL();
-              const m = (Auth.member && Auth.member()) || {};
-              await db.collection(COLLECTION).add({
-                url: url, path: path, type: type, name: file.name,
-                by: m.name || '', byPhone: Auth.phone() || '',
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-              });
-            } catch (e) { progress.textContent = I18n.t('gal_err'); }
-            progress.textContent = ''; upBtn.disabled = false; fileInput.value = '';
-            load();
-          });
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', WORKER + '/upload');
+        xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
+        xhr.setRequestHeader('X-File-Name', encodeURIComponent(file.name));
+        xhr.setRequestHeader('X-File-Type', file.type || 'application/octet-stream');
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) progress.textContent = I18n.t('gal_uploading') + ' ' + Math.round((e.loaded / e.total) * 100) + '%';
+        };
+        xhr.onload = () => {
+          progress.textContent = ''; upBtn.disabled = false; fileInput.value = '';
+          if (xhr.status >= 200 && xhr.status < 300) load();
+          else progress.textContent = I18n.t('gal_err');
+        };
+        xhr.onerror = () => { progress.textContent = I18n.t('gal_err'); upBtn.disabled = false; fileInput.value = ''; };
+        xhr.send(file);
       };
 
       const grid = UI.el('div', { class: 'gal-grid' });
@@ -95,8 +102,11 @@
         grid.innerHTML = '<div class="muted" style="text-align:center;grid-column:1/-1">…</div>';
         items = [];
         try {
-          const snap = await db.collection(COLLECTION).orderBy('createdAt', 'desc').get();
-          snap.forEach((d) => items.push(Object.assign({ id: d.id }, d.data())));
+          const tk = await authToken();
+          const res = await fetch(WORKER + '/list', { headers: { Authorization: 'Bearer ' + tk } });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          items = (data.items || []);
         } catch (e) {
           grid.innerHTML = '';
           grid.appendChild(UI.el('p', { class: 'auth-err', style: 'grid-column:1/-1' }, e.message || 'Error'));
@@ -109,7 +119,7 @@
 
       function card(it, i) {
         let media;
-        if (it.type === 'video') {
+        if (isVideo(it.type)) {
           media = UI.el('div', { class: 'gal-media-wrap', onclick: () => openViewer(i) }, [
             UI.el('video', { src: it.url + '#t=0.1', muted: 'true', playsinline: 'true', preload: 'metadata', class: 'gal-media' }),
             UI.el('div', { class: 'gal-play', html: '<svg viewBox="0 0 24 24" fill="#fff"><circle cx="12" cy="12" r="11" fill="rgba(0,0,0,.45)"/><path d="M10 8l6 4-6 4z" fill="#fff"/></svg>' })
@@ -119,7 +129,7 @@
         }
         const canDel = (Auth.isAdmin && Auth.isAdmin()) || it.byPhone === Auth.phone();
         const cap = UI.el('div', { class: 'gal-cap' }, [
-          UI.el('span', { class: 'card-meta' }, it.by ? (I18n.t('gal_by') + ' ' + I18n.pick(it.by)) : ''),
+          UI.el('span', { class: 'card-meta' }, it.by ? (I18n.t('gal_by') + ' ' + it.by) : ''),
           canDel ? UI.el('button', { class: 'gal-del', title: I18n.t('gal_del_confirm'),
             onclick: (e) => { e.stopPropagation(); UI.confirm(I18n.t('gal_del_confirm'), () => del(it)); } }, '×') : null
         ]);
@@ -127,8 +137,14 @@
       }
 
       async function del(it) {
-        try { await db.collection(COLLECTION).doc(it.id).delete(); } catch (e) {}
-        try { if (it.path) await firebase.storage().ref().child(it.path).delete(); } catch (e) {}
+        try {
+          const tk = await authToken();
+          await fetch(WORKER + '/delete', {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: it.key })
+          });
+        } catch (e) {}
         load();
       }
 
@@ -146,7 +162,7 @@
         function paint() {
           stage.innerHTML = '';
           const it = items[idx];
-          stage.appendChild(it.type === 'video'
+          stage.appendChild(isVideo(it.type)
             ? UI.el('video', { src: it.url, controls: 'true', autoplay: 'true', playsinline: 'true', class: 'gal-stage-media' })
             : UI.el('img', { src: it.url, class: 'gal-stage-media' }));
           prev.style.visibility = idx > 0 ? 'visible' : 'hidden';
