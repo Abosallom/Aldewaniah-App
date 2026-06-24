@@ -196,6 +196,16 @@ textarea.fld { min-height: 110px; resize: vertical; }
 .contact-email { display: inline-block; margin-top: 6px; font-size: 1.1rem; font-weight: 700; color: var(--maroon); text-decoration: none; }
 .site-footer { text-align: center; color: var(--ink-soft); font-size: .8rem; margin: 28px 0 8px; }
 
+/* ---------- Gallery grid ---------- */
+.gal-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (min-width: 560px) { .gal-grid { grid-template-columns: repeat(3, 1fr); } }
+.gal-item { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+.gal-media { width: 100%; height: 150px; object-fit: cover; display: block; background: #000; cursor: pointer; }
+video.gal-media { cursor: default; }
+.gal-cap { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 10px; }
+.gal-del { border: none; background: none; color: var(--maroon); cursor: pointer; font-size: 1.15rem; line-height: 1; }
+.gal-lightbox { max-width: 92vw; max-height: 88vh; border-radius: 12px; }
+
 /* fade */
 /* ---------- Auth (header) ---------- */
 .header-actions { display: flex; align-items: center; gap: 8px; }
