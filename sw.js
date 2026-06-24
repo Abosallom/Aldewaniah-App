@@ -1,5 +1,5 @@
 /* Aldewaniah App — service worker (offline shell cache) */
-const CACHE = 'aldewaniah-v10';
+const CACHE = 'aldewaniah-v11';
 const ASSETS = [
   './',
   './index.html',
@@ -32,6 +32,10 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  // Only cache our own app shell. Never cache cross-origin calls
+  // (Cloudflare media Worker, Firebase, fonts) so the gallery always
+  // shows the latest uploads.
+  try { if (new URL(e.request.url).origin !== self.location.origin) return; } catch (e2) { return; }
   e.respondWith(
     caches.match(e.request).then((cached) =>
       cached || fetch(e.request).then((res) => {

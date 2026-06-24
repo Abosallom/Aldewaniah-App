@@ -103,7 +103,7 @@
         items = [];
         try {
           const tk = await authToken();
-          const res = await fetch(WORKER + '/list', { headers: { Authorization: 'Bearer ' + tk } });
+          const res = await fetch(WORKER + '/list', { cache: 'no-store', headers: { Authorization: 'Bearer ' + tk } });
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
           items = (data.items || []);
