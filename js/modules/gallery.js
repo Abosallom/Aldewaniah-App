@@ -19,9 +19,10 @@
   }
   const isVideo = (t) => (t || '').indexOf('video') === 0;
 
-  App.registerModule({
+  Sections.add({
     id: 'gallery',
     title: { ar: 'مكتبة الصور', en: 'Gallery' },
+    subtitle: { ar: 'صور ومقاطع المجموعة', en: 'Group photos & clips' },
     memberOnly: true,
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="M21 16l-5-5L5 19"/></svg>',
     strings: {
