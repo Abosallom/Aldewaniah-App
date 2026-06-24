@@ -31,6 +31,13 @@
     const cred = await auth.signInAnonymously();
     return cred.user;
   }
+  // Per-tab identity (Firebase auth is shared across tabs in one browser, so we
+  // can't use the uid to tell two participants apart — use a per-session id).
+  function myId() {
+    let id = sessionStorage.getItem('bz_id');
+    if (!id) { id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36); sessionStorage.setItem('bz_id', id); }
+    return id;
+  }
   function defaultName() {
     try { const m = window.Auth && Auth.isMember && Auth.isMember() && Auth.member(); return (m && m.name) || ''; } catch (e) { return ''; }
   }
@@ -120,13 +127,13 @@
         const code = code4();
         const roomRef = db.ref('buzz/' + code);
         const connsRef = roomRef.child('conns');
-        await roomRef.child('host').set({ name: hostName, uid: me.uid, at: firebase.database.ServerValue.TIMESTAMP });
+        const hostUid = myId();
+        await roomRef.child('host').set({ name: hostName, uid: hostUid, at: firebase.database.ServerValue.TIMESTAMP });
         roomRef.onDisconnect().remove();
 
-        const peers = {};            // uid -> {pc, ch, name, open}
+        const peers = {};            // id -> {pc, ch, name, open}
         let phase = 'idle', round = 0, armedAt = 0;
-        const buzzes = {};           // uid -> ms (relative to armedAt)
-        const hostUid = me.uid;
+        const buzzes = {};           // id -> ms (relative to armedAt)
         const nameFor = (uid) => uid === hostUid ? hostName + ' (' + I18n.t('bz_host') + ')' : (peers[uid] && peers[uid].name) || '—';
 
         function broadcast(msg) {
@@ -239,7 +246,7 @@
         const hostSnap = await roomRef.child('host').get();
         if (!hostSnap.exists()) { status.textContent = I18n.t('bz_no_room'); root.appendChild(UI.el('button', { class: 'btn btn-block', style: 'margin-top:10px', onclick: lobby }, I18n.t('bz_leave'))); return; }
 
-        const myRef = roomRef.child('conns').child(me.uid);
+        const myRef = roomRef.child('conns').child(myId());
         const pc = new RTCPeerConnection(RTC);
         const ch = pc.createDataChannel('buzz');
         let phase = 'idle', round = 0, order = [], connected = false, buzzed = false;
