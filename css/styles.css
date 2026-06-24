@@ -372,3 +372,11 @@ html[lang="en"] .blt-arrow.them svg { transform: scaleX(-1); }
 .bz-kick { background: none; border: none; color: var(--maroon); font-size: 1.3rem; cursor: pointer; line-height: 1; }
 .bz-empty { padding: 14px; text-align: center; color: var(--ink-soft); }
 .bz-leave { display: block; margin: 4px auto 0; background: none; border: none; color: var(--maroon); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+
+/* ---------- Check-in (home, signed in) ---------- */
+.checkin-done { font-size: 1.3rem; font-weight: 800; color: #2e7d5b; padding: 6px 0; }
+.checkin-list { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+.checkin-h { background: rgba(26,39,68,.05); font-weight: 800; color: var(--navy); padding: 11px 14px; }
+.checkin-row { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-top: 1px solid var(--line); }
+.checkin-name { flex: 1; color: var(--navy); font-weight: 600; }
+.checkin-time { color: var(--ink-soft); font-size: .82rem; }

@@ -83,6 +83,10 @@
         try { fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) {}
         db = firebase.firestore();
         fbAuth.onAuthStateChanged(async (user) => {
+          // Guests use anonymous sign-in for the local buzzer — that is NOT a
+          // member login, so ignore it (don't reset member state or re-render,
+          // which would kick them out of whatever screen they're on).
+          if (user && user.isAnonymous) return;
           if (user && user.phoneNumber) await resolve(user.phoneNumber);
           else reset();
           Auth.renderBox();
