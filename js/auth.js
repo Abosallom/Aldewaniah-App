@@ -58,6 +58,7 @@
   function normalizePhone(raw) {
     let p = (raw || '').replace(/[\s-()]/g, '');
     if (p.startsWith('00')) p = '+' + p.slice(2);
+    if (p.startsWith('966')) p = '+' + p;
     if (!p.startsWith('+')) {
       if (p.startsWith('0')) p = p.slice(1);
       p = (window.DEFAULT_COUNTRY_CODE || '+966') + p;
@@ -150,8 +151,8 @@
 
   function phoneStep(body, close) {
     body.innerHTML = '';
-    const input = UI.el('input', { class: 'fld', type: 'tel',
-      placeholder: I18n.t('auth_phone'), value: window.DEFAULT_COUNTRY_CODE || '+966' });
+    const input = UI.el('input', { class: 'fld', type: 'tel', inputmode: 'numeric',
+      placeholder: '05XXXXXXXX', value: '' });
     const err = UI.el('p', { class: 'auth-err' });
     const btn = UI.el('button', { class: 'btn btn-block', style: 'margin-top:10px' }, I18n.t('auth_send'));
     body.appendChild(UI.el('div', { class: 'field' }, [input]));

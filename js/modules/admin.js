@@ -9,6 +9,7 @@
   function normalizePhone(raw) {
     let p = (raw || '').replace(/[\s-()]/g, '');
     if (p.startsWith('00')) p = '+' + p.slice(2);
+    if (p.startsWith('966')) p = '+' + p;
     if (!p.startsWith('+')) {
       if (p.startsWith('0')) p = p.slice(1);
       p = (window.DEFAULT_COUNTRY_CODE || '+966') + p;
@@ -132,7 +133,7 @@
 
       function openAdd() {
         UI.modal(I18n.t('adm_add'), [
-          { name: 'phone', label: I18n.t('adm_phone'), type: 'tel', required: true, value: window.DEFAULT_COUNTRY_CODE || '+966' },
+          { name: 'phone', label: I18n.t('adm_phone') + ' (05XXXXXXXX)', type: 'tel', required: true, value: '' },
           { name: 'name', label: I18n.t('adm_name'), required: true }
         ], async (data) => {
           const phone = normalizePhone(data.phone);
