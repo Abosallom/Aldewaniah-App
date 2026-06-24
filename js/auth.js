@@ -79,6 +79,8 @@
       try {
         firebase.initializeApp(window.FIREBASE_CONFIG);
         fbAuth = firebase.auth();
+        // Keep members signed in across app restarts / home-screen launches.
+        try { fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL); } catch (e) {}
         db = firebase.firestore();
         fbAuth.onAuthStateChanged(async (user) => {
           if (user && user.phoneNumber) await resolve(user.phoneNumber);
