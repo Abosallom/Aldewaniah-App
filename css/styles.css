@@ -341,3 +341,34 @@ html[lang="en"] .blt-arrow.them svg { transform: scaleX(-1); }
   font-size: 1.3rem; font-weight: 600; color: var(--navy); }
 .blt-srow:first-child { border-top: none; }
 .blt-shead { background: rgba(26,39,68,.05); font-size: 1.05rem; font-weight: 800; }
+
+/* ---------- Buzzer (البازر) ---------- */
+.bz-codecard { background: var(--navy); color: var(--cream); border-radius: var(--radius); padding: 16px; text-align: center; box-shadow: var(--shadow); margin-bottom: 12px; }
+.bz-codecard.small { padding: 10px; }
+.bz-code-label { font-size: .8rem; opacity: .8; margin-bottom: 4px; }
+.bz-code { font-size: 2.4rem; font-weight: 800; letter-spacing: 8px; color: var(--gold); }
+.bz-codecard.small .bz-code { font-size: 1.6rem; letter-spacing: 5px; }
+.bz-round { font-size: .85rem; opacity: .85; margin-top: 4px; }
+.bz-hostctrl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.bz-buzz-wrap { display: flex; flex-direction: column; align-items: center; margin: 6px 0 16px; }
+.bz-buzz { width: min(46vw, 200px); height: min(46vw, 200px); border-radius: 50%; border: none; cursor: pointer;
+  font: inherit; font-weight: 800; font-size: 1.6rem; background: var(--line); color: var(--ink-soft); box-shadow: var(--shadow); }
+.bz-buzz.big { width: min(64vw, 280px); height: min(64vw, 280px); font-size: 2.2rem; }
+.bz-buzz.live { background: var(--gold); color: var(--navy-d); animation: bzpulse 1s infinite; }
+.bz-buzz.done { background: var(--navy); color: var(--cream); }
+.bz-buzz:disabled { cursor: default; }
+@keyframes bzpulse { 0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(194,160,80,.5); } 50% { transform: scale(1.03); box-shadow: 0 0 0 14px rgba(194,160,80,0); } }
+.bz-results { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); margin-bottom: 12px; }
+.bz-results-h, .bz-roster-h { background: rgba(26,39,68,.05); font-weight: 800; color: var(--navy); padding: 10px 14px; }
+.bz-resrow { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--line); }
+.bz-resrow.first { background: rgba(194,160,80,.14); }
+.bz-resrow.me .bz-rname { font-weight: 800; }
+.bz-rank { width: 28px; height: 28px; border-radius: 50%; background: var(--navy); color: var(--cream); display: grid; place-items: center; font-weight: 700; font-size: .85rem; }
+.bz-resrow.first .bz-rank { background: var(--gold); color: var(--navy-d); }
+.bz-rname { color: var(--navy); font-weight: 600; }
+.bz-rms { color: var(--ink-soft); font-size: .8rem; }
+.bz-roster { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); margin-bottom: 12px; }
+.bz-rosrow { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-top: 1px solid var(--line); color: var(--navy); }
+.bz-kick { background: none; border: none; color: var(--maroon); font-size: 1.3rem; cursor: pointer; line-height: 1; }
+.bz-empty { padding: 14px; text-align: center; color: var(--ink-soft); }
+.bz-leave { display: block; margin: 4px auto 0; background: none; border: none; color: var(--maroon); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }

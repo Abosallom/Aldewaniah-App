@@ -10,7 +10,8 @@ window.FIREBASE_CONFIG = {
   projectId: "aldewaniah-45158",
   storageBucket: "aldewaniah-45158.firebasestorage.app",
   messagingSenderId: "1002479285436",
-  appId: "1:1002479285436:web:841e3da933cc94943cccb9"
+  appId: "1:1002479285436:web:841e3da933cc94943cccb9",
+  databaseURL: "https://aldewaniah-45158-default-rtdb.firebaseio.com"
 };
 
 // Default country code for phone numbers (Saudi Arabia = +966).
