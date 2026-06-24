@@ -177,11 +177,21 @@
   function codeStep(body, close, phone) {
     body.innerHTML = '';
     body.appendChild(UI.el('p', { class: 'muted' }, I18n.t('auth_sent') + ' (' + phone + ')'));
-    const input = UI.el('input', { class: 'fld', type: 'text', inputmode: 'numeric', placeholder: I18n.t('auth_code') });
+    const input = UI.el('input', { class: 'fld', type: 'text', inputmode: 'numeric',
+      autocomplete: 'one-time-code', name: 'otp', maxlength: '6', placeholder: I18n.t('auth_code') });
     const err = UI.el('p', { class: 'auth-err' });
     const btn = UI.el('button', { class: 'btn btn-block', style: 'margin-top:10px' }, I18n.t('auth_verify'));
     body.appendChild(UI.el('div', { class: 'field' }, [input]));
     body.appendChild(err); body.appendChild(btn);
+    // Android: auto-read the SMS code via the WebOTP API (best-effort; harmless if unsupported)
+    if ('OTPCredential' in window) {
+      try {
+        const _ac = new AbortController();
+        navigator.credentials.get({ otp: { transport: ['sms'] }, signal: _ac.signal })
+          .then((otp) => { if (otp && otp.code) { input.value = otp.code; btn.click(); } })
+          .catch(() => {});
+      } catch (e) {}
+    }
     btn.onclick = async () => {
       err.textContent = '';
       btn.disabled = true; btn.textContent = '…';
