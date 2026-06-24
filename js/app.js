@@ -39,7 +39,7 @@
     _render(id) {
       let mod = modules.find((m) => m.id === id) || modules[0];
       if (!mod) return;
-      if (mod.adminOnly && !(window.Auth && Auth.isAdmin())) mod = modules[0];
+      if (mod.adminOnly && !(window.Auth && Auth.isStaff && Auth.isStaff())) mod = modules[0];
       current = mod.id;
       const view = document.getElementById('view');
       view.innerHTML = '';
@@ -55,7 +55,7 @@
       const nav = document.getElementById('nav');
       nav.innerHTML = '';
       modules
-        .filter((m) => !(m.adminOnly && !(window.Auth && Auth.isAdmin())))
+        .filter((m) => !(m.adminOnly && !(window.Auth && Auth.isStaff && Auth.isStaff())))
         .forEach((m) => {
         const btn = document.createElement('button');
         btn.className = 'nav-item' + (m.id === current ? ' active' : '');

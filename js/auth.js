@@ -17,7 +17,11 @@
   let fbAuth = null, db = null, confirmation = null, recaptcha = null;
   let _status = null;      // null | 'pending' | 'approved'
   let _isAdmin = false;
-  let _member = null;      // { phone, name, status, admin }
+  let _perms = {};         // co-admin permissions, e.g. { requests: true }
+  let _member = null;      // { phone, name, status, admin, perms }
+
+  // Permissions an admin can grant to a Co-Admin (extend this list later).
+  const PERMS = ['requests'];
 
   I18n.extend({
     ar: {
@@ -69,6 +73,13 @@
   const Auth = {
     isMember() { return _status === 'approved'; },
     isAdmin() { return _isAdmin; },
+    /** True if the signed-in member may do `perm` (admins can do everything). */
+    can(perm) { return _isAdmin || (_status === 'approved' && _perms[perm] === true); },
+    /** Admin OR a co-admin with at least one permission (sees the admin tab). */
+    isStaff() { return _isAdmin || (_status === 'approved' && PERMS.some((p) => _perms[p] === true)); },
+    role() { return _isAdmin ? 'admin' : (this.isStaff() ? 'coadmin' : (_status === 'approved' ? 'member' : null)); },
+    perms() { return Object.assign({}, _perms); },
+    permKeys() { return PERMS.slice(); },
     status() { return _status; },
     member() { return _member; },
     getDb() { return db; },
@@ -133,7 +144,7 @@
     }
   };
 
-  function reset() { _status = null; _isAdmin = false; _member = null; }
+  function reset() { _status = null; _isAdmin = false; _perms = {}; _member = null; }
 
   async function resolve(phone) {
     try {
@@ -143,6 +154,7 @@
         const approved = d.status === 'approved' || d.approved === true;
         _status = approved ? 'approved' : (d.status || 'pending');
         _isAdmin = approved && d.admin === true;
+        _perms = approved ? (d.perms || {}) : {};
         _member = Object.assign({ phone }, d);
         return _status;
       }
