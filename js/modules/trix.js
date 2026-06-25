@@ -29,13 +29,13 @@
     strings: {
       ar: {
         tx_title: 'حاسبة تركس', tx_sub: 'اختر المشروع وأدخل النتيجة وتُحسب النقاط تلقائياً',
-        tx_king: 'ملك الكبة', tx_queens: 'البنات', tx_diamonds: 'الديناري', tx_tricks: 'اللطوش', tx_trix: 'تركس',
-        tx_who_king: 'من أخذ ملك الكبة؟', tx_count_q: 'كم بنت أخذ كل لاعب؟', tx_count_d: 'كم ديناري أخذ كل لاعب؟',
+        tx_king: 'شايب الهاص', tx_queens: 'بنات', tx_diamonds: 'الديمن', tx_tricks: 'لطوش', tx_trix: 'تركس',
+        tx_who_king: 'من أخذ شايب الهاص؟', tx_count_q: 'كم بنت أخذ كل لاعب؟', tx_count_d: 'كم ديمن أخذ كل لاعب؟',
         tx_count_t: 'كم لطشة أخذ كل لاعب؟', tx_trix_order: 'ترتيب الخروج (١=الأول)',
         tx_add: 'إضافة', tx_cancel: 'إلغاء', tx_round: 'المشروع',
         tx_undo: 'تراجع', tx_new: 'لعبة جديدة', tx_confirm_new: 'بدء لعبة جديدة؟ ستُمسح النتائج.',
         tx_rename: 'اسم اللاعب', tx_total: 'كم المجموع؟',
-        tx_legend: 'ملك −٧٥ • بنت −٢٥ • ديناري −١٠ • لطشة −١٥ • تركس +٢٠٠/١٥٠/١٠٠/٥٠'
+        tx_legend: 'شايب −٧٥ • بنت −٢٥ • ديمن −١٠ • لطشة −١٥ • تركس +٢٠٠/١٥٠/١٠٠/٥٠'
       },
       en: {
         tx_title: 'Trix Calculator', tx_sub: 'Pick a contract, enter the result, points auto-calc',

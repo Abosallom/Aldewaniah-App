@@ -1,5 +1,5 @@
 /* Aldewaniah App — service worker (offline shell cache) */
-const CACHE = 'aldewaniah-v25';
+const CACHE = 'aldewaniah-v26';
 const ASSETS = [
   './',
   './index.html',
