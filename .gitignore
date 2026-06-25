@@ -1,4 +1,4 @@
-.DS_Store
-node_modules/
-Thumbs.db
-*.log
+QA-TEST-REPORT.md
+QA-Test-Report.pdf
+SECURITY-REPORT.md
+Security-Report.pdf

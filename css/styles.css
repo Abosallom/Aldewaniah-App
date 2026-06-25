@@ -383,3 +383,19 @@ html[lang="en"] .blt-arrow.them svg { transform: scaleX(-1); }
 
 /* ---------- Brand lockup on hero ---------- */
 .hero-logo-full { width: min(88%, 360px); height: auto; display: block; margin: 6px auto 4px; }
+
+/* ---------- Install banner ---------- */
+.install-bar { position: fixed; left: 12px; right: 12px; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 10px);
+  z-index: 40; display: flex; align-items: center; gap: 10px; background: var(--navy); color: var(--cream);
+  border: 1px solid rgba(194,160,80,.5); border-radius: 14px; padding: 10px 12px; box-shadow: var(--shadow); }
+.install-ic svg { width: 24px; height: 24px; color: var(--gold); }
+.install-ic { flex: 0 0 auto; display: flex; }
+.install-text { flex: 1; font-size: .9rem; font-weight: 600; line-height: 1.35; }
+.install-go { background: var(--gold); color: var(--navy-d); border: none; border-radius: 999px; padding: 7px 14px;
+  font: inherit; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.install-go:active { transform: scale(.97); }
+.install-x { background: transparent; border: none; color: var(--cream); font-size: 1.35rem; cursor: pointer; line-height: 1; padding: 0 2px; }
+.install-steps { margin: 4px 0; }
+.install-steps-h { margin: 10px 0 4px; color: var(--maroon); font-size: .98rem; }
+.install-steps ol { margin: 0; padding-inline-start: 20px; }
+.install-steps li { margin: 3px 0; line-height: 1.55; }
