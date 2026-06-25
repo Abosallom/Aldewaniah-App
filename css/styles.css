@@ -497,3 +497,19 @@ html[lang="en"] .blt-arrow.them svg { transform: scaleX(-1); }
 .trix-rrow { border-top: 1px solid var(--line); }
 .trix-rc { font-weight: 700; color: var(--maroon); font-size: .78rem; }
 .trix-legend { color: var(--ink-soft); font-size: .78rem; text-align: center; margin: 8px 0; line-height: 1.6; }
+
+/* ---------- Trix kingdom flow ---------- */
+.trix-flow { margin-bottom: 12px; }
+.trix-flowmsg { text-align: center; color: var(--navy); font-weight: 600; margin: 6px 0 10px; }
+.trix-col.owner { background: var(--maroon); }
+.trix-turn { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px;
+  text-align: center; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; }
+.trix-turn b { color: var(--maroon); font-size: 1.05rem; }
+.trix-king { background: rgba(194,160,80,.18); color: var(--gold-d); border-radius: 999px; padding: 3px 10px; font-size: .8rem; font-weight: 700; }
+.trix-ct.used { opacity: .35; text-decoration: line-through; }
+.trix-gameover { text-align: center; font-weight: 800; color: var(--navy); font-size: 1.2rem; margin: 6px 0; }
+.trix-rolled { text-align: center; font-weight: 800; color: var(--maroon); font-size: 1.3rem; padding: 16px; }
+.trix-qrow { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; margin: 7px 0; }
+.trix-qlbl { font-weight: 700; color: var(--navy); }
+.trix-qrow select { padding: 8px; border: 1px solid var(--line); border-radius: 10px; font: inherit; }
+.trix-dbl { display: inline-flex; align-items: center; gap: 4px; font-size: .82rem; color: var(--maroon); white-space: nowrap; }
