@@ -170,13 +170,22 @@
       function openAdd() {
         UI.modal(I18n.t('adm_add'), [
           { name: 'phone', label: I18n.t('adm_phone') + ' (05XXXXXXXX)', type: 'tel', required: true, value: '' },
-          { name: 'name', label: I18n.t('adm_name'), required: true }
+          { name: 'name', label: I18n.t('adm_name'), required: true },
+          { name: 'role', label: I18n.t('adm_role'), type: 'select', value: 'member', options: [
+            { value: 'member', label: I18n.t('adm_role_member') },
+            { value: 'coadmin', label: I18n.t('adm_role_coadmin') },
+            { value: 'admin', label: I18n.t('adm_role_admin') }
+          ] },
+          { name: 'p_requests', label: I18n.t('adm_perm_requests') + ' (' + I18n.t('adm_role_coadmin') + ')', type: 'select',
+            value: 'no', options: yn() }
         ], async (data) => {
           const phone = normalizePhone(data.phone);
-          await db.collection('members').doc(phone).set({
-            name: data.name, status: 'approved', admin: false, perms: {},
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
+          const rec = { name: data.name, status: 'approved',
+            createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+          if (data.role === 'admin') { rec.admin = true; rec.perms = {}; }
+          else if (data.role === 'coadmin') { rec.admin = false; rec.perms = { requests: data.p_requests === 'yes' }; }
+          else { rec.admin = false; rec.perms = {}; }
+          await db.collection('members').doc(phone).set(rec);
           load();
         });
       }
