@@ -104,4 +104,13 @@
   // initial paint (and again shortly after, in case beforeinstallprompt is slow)
   render();
   setTimeout(render, 1200);
+
+  // Shareable install link: opening the app with ?install=1 (or #install)
+  // immediately triggers the native install prompt (Android) or the guide (iOS).
+  function autoOpen() {
+    const wants = /[?&]install=1\b/.test(location.search) || /(^|[#&])install\b/.test(location.hash);
+    if (!wants) return;
+    setTimeout(() => { if (deferredPrompt) doInstall(); else guide(); }, 900);
+  }
+  autoOpen();
 })();
