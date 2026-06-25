@@ -513,3 +513,19 @@ html[lang="en"] .blt-arrow.them svg { transform: scaleX(-1); }
 .trix-qlbl { font-weight: 700; color: var(--navy); }
 .trix-qrow select { padding: 8px; border: 1px solid var(--line); border-radius: 10px; font: inherit; }
 .trix-dbl { display: inline-flex; align-items: center; gap: 4px; font-size: .82rem; color: var(--maroon); white-space: nowrap; }
+
+/* ---------- Trix seating blueprint ---------- */
+.trix-table { position: relative; width: 100%; max-width: 380px; height: min(88vw, 360px); margin: 8px auto 6px; }
+.trix-felt { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 42%; height: 40%;
+  background: #2e7d5b; border: 3px solid var(--gold); border-radius: 18px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4px; box-shadow: inset 0 0 0 6px rgba(255,255,255,.07), var(--shadow); }
+.trix-felt-logo { width: 34px; height: 34px; border-radius: 8px; }
+.trix-felt-title { color: var(--cream); font-weight: 800; letter-spacing: 1px; }
+.trix-seat { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.trix-seat.bottom { bottom: 0; left: 50%; transform: translateX(-50%); width: 54%; }
+.trix-seat.top { top: 0; left: 50%; transform: translateX(-50%); width: 54%; }
+.trix-seat.left { left: 0; top: 50%; transform: translateY(-50%); width: 30%; }
+.trix-seat.right { right: 0; top: 50%; transform: translateY(-50%); width: 30%; }
+.trix-seat-no { width: 22px; height: 22px; border-radius: 50%; background: var(--navy); color: var(--cream);
+  display: grid; place-items: center; font-size: .72rem; font-weight: 700; }
+.trix-seat-input { text-align: center; padding: 8px 6px; }

@@ -119,15 +119,26 @@
         if (s.starter == null && !s.setup) {
           flow.appendChild(UI.el('p', { class: 'trix-flowmsg' }, I18n.t('tx_setup')));
           flow.appendChild(UI.el('p', { class: 'trix-legend', style: 'margin-top:0' }, I18n.t('tx_seat_hint')));
-          const inputs = s.players.map((p, i) => {
-            const inp = UI.el('input', { class: 'fld', value: p, maxlength: '16', placeholder: I18n.t('tx_player') + ' ' + (i + 1) });
-            return { inp, row: UI.el('div', { class: 'field' }, [inp]) };
+          const seats = ['bottom', 'right', 'top', 'left'];
+          const inputs = [];
+          const table = UI.el('div', { class: 'trix-table' }, [
+            UI.el('div', { class: 'trix-felt' }, [
+              UI.el('img', { class: 'trix-felt-logo', src: 'assets/icon-192.png', alt: '' }),
+              UI.el('div', { class: 'trix-felt-title' }, I18n.t('tx_trix'))
+            ])
+          ]);
+          s.players.forEach((p, i) => {
+            const inp = UI.el('input', { class: 'fld trix-seat-input', value: p, maxlength: '16', placeholder: I18n.t('tx_player') + ' ' + (i + 1) });
+            inputs.push(inp);
+            table.appendChild(UI.el('div', { class: 'trix-seat ' + seats[i] }, [
+              UI.el('div', { class: 'trix-seat-no' }, String(i + 1)), inp
+            ]));
           });
-          inputs.forEach((x) => flow.appendChild(x.row));
-          const nerr = UI.el('p', { class: 'auth-err' });
+          flow.appendChild(table);
+          const nerr = UI.el('p', { class: 'auth-err', style: 'text-align:center' });
           flow.appendChild(nerr);
           flow.appendChild(UI.el('button', { class: 'btn btn-green btn-block', onclick: () => {
-            const vals = inputs.map((x) => (x.inp.value || '').trim());
+            const vals = inputs.map((x) => (x.value || '').trim());
             if (vals.some((v) => !v)) { nerr.textContent = I18n.t('tx_need_names'); return; }
             vals.forEach((v, i) => { s.players[i] = v; });
             s.setup = true; paint();
