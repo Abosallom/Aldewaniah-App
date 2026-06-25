@@ -162,7 +162,7 @@
           clock.textContent = new Intl.DateTimeFormat(lang() === 'ar' ? 'ar-SA' : 'en-GB',
             { timeZone: tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }).format(now);
           hijri.textContent = new Intl.DateTimeFormat((lang() === 'ar' ? 'ar-SA' : 'en-US') + '-u-ca-islamic-umalqura',
-            { timeZone: tz, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(now) + ' ' + (lang() === 'ar' ? 'هـ' : 'AH');
+            { timeZone: tz, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', era: 'short' }).format(now);
           greg.textContent = new Intl.DateTimeFormat(lang() === 'ar' ? 'ar' : 'en-GB',
             { timeZone: tz, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(now);
         } catch (e) { clock.textContent = now.toLocaleTimeString(); }
