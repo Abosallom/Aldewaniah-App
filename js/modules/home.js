@@ -45,11 +45,12 @@
 
     render(view) {
       const isMember = window.Auth && Auth.isMember && Auth.isMember();
-      view.appendChild(UI.el('section', { class: 'hero' }, [
-        UI.el('img', { class: 'hero-logo', src: 'assets/icon.svg', alt: I18n.t('appName') }),
-        UI.el('h1', { class: 'hero-title' }, isMember ? (I18n.t('home_hi') + ' ' + I18n.pick((Auth.member() || {}).name || '')) : I18n.t('home_welcome')),
-        UI.el('p', { class: 'hero-tagline' }, isMember ? I18n.t('home_checkin_sub') : I18n.t('tagline'))
-      ]));
+      const hero = [UI.el('img', { class: 'hero-logo-full', src: 'assets/ALDEWANYAar.png', alt: I18n.t('appName') })];
+      if (isMember) {
+        hero.push(UI.el('h1', { class: 'hero-title' }, I18n.t('home_hi') + ' ' + I18n.pick((Auth.member() || {}).name || '')));
+        hero.push(UI.el('p', { class: 'hero-tagline' }, I18n.t('home_checkin_sub')));
+      }
+      view.appendChild(UI.el('section', { class: 'hero' }, hero));
 
       if (!isMember) {
         view.appendChild(UI.el('div', { class: 'card', style: 'text-align:center' }, [

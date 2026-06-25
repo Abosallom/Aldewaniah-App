@@ -55,7 +55,7 @@ a { color: var(--maroon); }
   box-shadow: var(--shadow);
 }
 .brand { display: flex; align-items: center; gap: 10px; }
-.brand-logo { width: 30px; height: 30px; }
+.brand-logo { width: 32px; height: 32px; border-radius: 8px; object-fit: cover; }
 .brand-name { font-weight: 700; font-size: 1.15rem; color: var(--cream); }
 .lang-toggle {
   background: rgba(245,240,230,.12); color: var(--cream); border: 1px solid rgba(194,160,80,.6);
@@ -380,3 +380,6 @@ html[lang="en"] .blt-arrow.them svg { transform: scaleX(-1); }
 .checkin-row { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-top: 1px solid var(--line); }
 .checkin-name { flex: 1; color: var(--navy); font-weight: 600; }
 .checkin-time { color: var(--ink-soft); font-size: .82rem; }
+
+/* ---------- Brand lockup on hero ---------- */
+.hero-logo-full { width: min(88%, 360px); height: auto; display: block; margin: 6px auto 4px; }

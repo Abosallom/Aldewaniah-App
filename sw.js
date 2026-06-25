@@ -1,5 +1,5 @@
 /* Aldewaniah App — service worker (offline shell cache) */
-const CACHE = 'aldewaniah-v19';
+const CACHE = 'aldewaniah-v20';
 const ASSETS = [
   './',
   './index.html',
@@ -18,7 +18,12 @@ const ASSETS = [
   './js/modules/buzzer.js',
   './js/modules/admin.js',
   './manifest.json',
-  './assets/icon.svg'
+  './assets/ALDEWANYAar.png',
+  './assets/icon-192.png',
+  './assets/icon-512.png',
+  './assets/icon-maskable-512.png',
+  './assets/apple-touch-icon.png',
+  './assets/favicon-32.png'
 ];
 
 self.addEventListener('install', (e) => {
