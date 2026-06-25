@@ -1,16 +1,8 @@
 /* ===========================================================
    Times (الأوقات) — live clock + Umm al-Qura (Hijri) & Gregorian
-   date + prayer times + a Qibla (Kaaba) compass. City selectable.
-
-   - Clock & dates: browser Intl (islamic-umalqura calendar), in
-     the chosen city's timezone. Works offline.
-   - Prayer times: free Aladhan API (method 4 = Umm Al-Qura). Last
-     result cached for instant/offline display.
-   - Qibla compass: bearing to the Kaaba computed from the chosen
-     city's coordinates (offline, no network), with the device
-     compass sensor rotating the needle. If no sensor, shows the
-     bearing from North and how to use it.
-   Open to everyone. A Sections sub-section.
+   date + prayer times + a dynamic Qibla (Kaaba) compass. City
+   selectable.  Clock/date/Qibla work offline; prayer times via
+   Aladhan API (method 4 = Umm Al-Qura), cached for offline.
    =========================================================== */
 (function () {
   const CITY_KEY = 'aldewaniah.prayerCity';
@@ -52,11 +44,12 @@
   };
   const rad = (d) => d * Math.PI / 180, deg = (r) => r * 180 / Math.PI;
   function qibla(lat, lon) {
-    const φ1 = rad(lat), φ2 = rad(KAABA.lat), Δλ = rad(KAABA.lon - lon);
-    const y = Math.sin(Δλ);
-    const x = Math.cos(φ1) * Math.tan(φ2) - Math.sin(φ1) * Math.cos(Δλ);
+    const f1 = rad(lat), f2 = rad(KAABA.lat), dL = rad(KAABA.lon - lon);
+    const y = Math.sin(dL);
+    const x = Math.cos(f1) * Math.tan(f2) - Math.sin(f1) * Math.cos(dL);
     return (deg(Math.atan2(y, x)) + 360) % 360;
   }
+  const norm180 = (a) => { a = ((a % 360) + 360) % 360; return a > 180 ? a - 360 : a; };
 
   Sections.add({
     id: 'times',
@@ -68,17 +61,19 @@
         tm_title: 'الأوقات والمواقيت', tm_sub: 'الوقت والتاريخ الهجري ومواقيت الصلاة والقبلة',
         tm_city: 'المدينة', tm_loading: 'جارٍ تحميل المواقيت…',
         tm_err: 'تعذّر تحميل مواقيت الصلاة (تحقق من الاتصال)',
-        tm_qibla: 'اتجاه القبلة', tm_enable: 'تفعيل البوصلة',
-        tm_from_north: 'من الشمال', tm_hint: 'وجّه أعلى الجهاز نحو السهم للوصول إلى القبلة',
-        tm_hint_north: 'وجّه أعلى الجهاز نحو الشمال، ثم اتبع السهم', tm_kaaba: 'الكعبة'
+        tm_qibla: 'القبلة', tm_enable: 'تفعيل البوصلة',
+        tm_from_north: 'من الشمال', tm_heading: 'اتجاهك',
+        tm_hint: 'لُف بجهازك حتى يشير سهم الكعبة للأعلى', tm_hint_north: 'وجّه أعلى الجهاز نحو الشمال ثم اتبع السهم',
+        tm_aligned: 'أنت متجه نحو القبلة'
       },
       en: {
         tm_title: 'Time & Prayer', tm_sub: 'Clock, Hijri date, prayer times & Qibla',
         tm_city: 'City', tm_loading: 'Loading times…',
         tm_err: 'Could not load prayer times (check connection)',
-        tm_qibla: 'Qibla direction', tm_enable: 'Enable compass',
-        tm_from_north: 'from North', tm_hint: 'Turn the top of your device toward the arrow to face the Qibla',
-        tm_hint_north: 'Point the top of the device North, then follow the arrow', tm_kaaba: 'Kaaba'
+        tm_qibla: 'Qibla', tm_enable: 'Enable compass',
+        tm_from_north: 'from North', tm_heading: 'Heading',
+        tm_hint: 'Turn until the Kaaba arrow points straight up', tm_hint_north: 'Point the top of the device North, then follow the arrow',
+        tm_aligned: 'You are facing the Qibla'
       }
     },
 
@@ -90,56 +85,64 @@
       const root = UI.el('div', { class: 'tm' });
       view.appendChild(root);
 
-      let tz = 'Asia/Riyadh', timings = null, heading = null;
+      let tz = 'Asia/Riyadh', timings = null, heading = null, wasAligned = false;
       const lang = () => (I18n.lang === 'ar' ? 'ar' : 'en');
 
-      // ---- city selector ----
       const sel = UI.el('select');
       CITIES.forEach((c) => sel.appendChild(UI.el('option', { value: c.id }, I18n.pick(c))));
       sel.value = getCity().id;
       sel.onchange = () => { try { localStorage.setItem(CITY_KEY, sel.value); } catch (e) {} load(); paintQibla(); };
       root.appendChild(UI.el('div', { class: 'tm-cityrow' }, [UI.el('label', null, I18n.t('tm_city')), sel]));
 
-      // ---- clock + dates ----
       const clock = UI.el('div', { class: 'tm-clock' });
       const greg = UI.el('div', { class: 'tm-greg' });
       const hijri = UI.el('div', { class: 'tm-hijri' });
       root.appendChild(UI.el('div', { class: 'tm-clockcard' }, [clock, hijri, greg]));
 
-      // ---- prayer list ----
       const pray = UI.el('div', { class: 'tm-pray' });
       root.appendChild(pray);
 
-      // ---- Qibla compass ----
-      const dial = UI.el('div', { class: 'qibla-dial' }, [
+      // ---- Qibla compass (dynamic) ----
+      const rose = UI.el('div', { class: 'qibla-rose' }, [
         UI.el('span', { class: 'qibla-tick n' }, I18n.lang === 'ar' ? 'ش' : 'N'),
         UI.el('span', { class: 'qibla-tick e' }, I18n.lang === 'ar' ? 'ق' : 'E'),
         UI.el('span', { class: 'qibla-tick s' }, I18n.lang === 'ar' ? 'ج' : 'S'),
-        UI.el('span', { class: 'qibla-tick w' }, I18n.lang === 'ar' ? 'غ' : 'W'),
-        UI.el('div', { class: 'qibla-needle', html: '<svg viewBox="0 0 40 120" width="40" height="120"><polygon points="20,4 30,34 20,26 10,34" fill="#722F37"/><rect x="16" y="30" width="8" height="9" rx="1.5" fill="#1A2744"/><rect x="14.5" y="38" width="11" height="3" fill="#C2A050"/></svg>' })
+        UI.el('span', { class: 'qibla-tick w' }, I18n.lang === 'ar' ? 'غ' : 'W')
       ]);
+      const needle = UI.el('div', { class: 'qibla-needle', html:
+        '<svg viewBox="0 0 60 210" width="60" height="210"><polygon points="30,4 46,54 30,42 14,54" fill="#722F37"/><line x1="30" y1="42" x2="30" y2="150" stroke="#1A2744" stroke-width="3"/><g transform="translate(30,156)"><rect x="-15" y="-15" width="30" height="30" rx="3" fill="#1A2744"/><rect x="-15" y="-3" width="30" height="7" fill="#C2A050"/><rect x="-5" y="-15" width="10" height="11" fill="#C2A050"/></g></svg>' });
+      const ahead = UI.el('div', { class: 'qibla-ahead' });
+      const hub = UI.el('div', { class: 'qibla-hub' });
+      const dial = UI.el('div', { class: 'qibla-dial' }, [rose, needle, ahead, hub]);
       const readout = UI.el('div', { class: 'qibla-readout' });
+      const aligned = UI.el('div', { class: 'qibla-aligned' });
       const hint = UI.el('div', { class: 'tm-note' });
       const enableBtn = UI.el('button', { class: 'btn btn-block', style: 'margin-top:8px', onclick: enableCompass }, '🧭 ' + I18n.t('tm_enable'));
       root.appendChild(UI.el('div', { class: 'qibla-card' }, [
         UI.el('h3', { class: 'card-title', style: 'text-align:center' }, I18n.t('tm_qibla')),
-        dial, readout, hint, enableBtn
+        dial, readout, aligned, hint, enableBtn
       ]));
 
-      const needle = dial.querySelector('.qibla-needle');
       function paintQibla() {
         const c = getCity();
         const q = qibla(c.lat, c.lon);
-        readout.textContent = Math.round(q) + '° ' + I18n.t('tm_from_north');
-        const angle = heading == null ? q : (q - heading);
-        needle.style.transform = 'translate(-50%,-50%) rotate(' + angle + 'deg)';
-        hint.textContent = heading == null ? I18n.t('tm_hint_north') : I18n.t('tm_hint');
+        const rel = heading == null ? q : (q - heading);
+        needle.style.transform = 'translate(-50%,-50%) rotate(' + rel + 'deg)';
+        rose.style.transform = 'rotate(' + (heading == null ? 0 : -heading) + 'deg)';
+        let txt = I18n.t('tm_qibla') + ' ' + Math.round(q) + '° ' + I18n.t('tm_from_north');
+        if (heading != null) txt += '  •  ' + I18n.t('tm_heading') + ' ' + Math.round(((heading % 360) + 360) % 360) + '°';
+        readout.textContent = txt;
+        const isAligned = heading != null && Math.abs(norm180(rel)) <= 7;
+        dial.classList.toggle('aligned', isAligned);
+        aligned.textContent = isAligned ? ('🕋 ' + I18n.t('tm_aligned') + ' ✓') : '';
+        hint.textContent = heading == null ? I18n.t('tm_hint_north') : (isAligned ? '' : I18n.t('tm_hint'));
+        if (isAligned && !wasAligned) { try { if (navigator.vibrate) navigator.vibrate(60); } catch (e) {} }
+        wasAligned = isAligned;
       }
-
       function onOrient(e) {
         let h = null;
-        if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading;   // iOS: true heading
-        else if (e.absolute && typeof e.alpha === 'number') h = (360 - e.alpha) % 360; // Android absolute
+        if (typeof e.webkitCompassHeading === 'number') h = e.webkitCompassHeading;
+        else if (e.absolute && typeof e.alpha === 'number') h = (360 - e.alpha) % 360;
         if (h != null) { heading = h; paintQibla(); }
       }
       function startListening() {
