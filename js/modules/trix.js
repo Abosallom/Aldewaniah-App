@@ -27,7 +27,7 @@
 
   function load() {
     try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.players) return s; } catch (e) {}
-    return { players: ['لاعب ١', 'لاعب ٢', 'لاعب ٣', 'لاعب ٤'], starter: null, rounds: [] };
+    return { players: ['', '', '', ''], starter: null, rounds: [] };
   }
   function save(s) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) {} }
 
@@ -48,6 +48,7 @@
         tx_rename: 'اسم اللاعب',
         tx_roll: 'ارمِ النرد لاختيار من يبدأ', tx_roll_btn: '🎲 ارمِ النرد', tx_starts: 'يبدأ',
         tx_setup: 'سجّل أسماء اللاعبين الأربعة', tx_player: 'لاعب', tx_next: 'التالي', tx_edit_names: 'تعديل الأسماء',
+        tx_need_names: 'أدخل أسماء اللاعبين الأربعة جميعاً', tx_same_players: 'نفس اللاعبين', tx_new_players: 'لاعبون جدد',
         tx_seat_hint: 'الترتيب من اليمين إلى اليسار حسب الجلسة',
         tx_kingdom: 'مملكة', tx_turn_pick: 'اختر مشروعاً', tx_of: 'من', tx_round: 'المشروع',
         tx_gameover: 'انتهت اللعبة 🎉', tx_winner: 'الفائز',
@@ -64,6 +65,7 @@
         tx_rename: 'Player name',
         tx_roll: 'Roll the dice to choose who starts', tx_roll_btn: '🎲 Roll dice', tx_starts: 'starts',
         tx_setup: 'Enter the four player names', tx_player: 'Player', tx_next: 'Next', tx_edit_names: 'Edit names',
+        tx_need_names: 'Enter all four player names', tx_same_players: 'Same players', tx_new_players: 'New players',
         tx_seat_hint: 'Order is right-to-left around the table',
         tx_kingdom: 'Kingdom', tx_turn_pick: 'choose a contract', tx_of: 'of', tx_round: 'Contract',
         tx_gameover: 'Game over 🎉', tx_winner: 'Winner',
@@ -122,8 +124,12 @@
             return { inp, row: UI.el('div', { class: 'field' }, [inp]) };
           });
           inputs.forEach((x) => flow.appendChild(x.row));
+          const nerr = UI.el('p', { class: 'auth-err' });
+          flow.appendChild(nerr);
           flow.appendChild(UI.el('button', { class: 'btn btn-green btn-block', onclick: () => {
-            inputs.forEach((x, i) => { const v = (x.inp.value || '').trim(); if (v) s.players[i] = v; });
+            const vals = inputs.map((x) => (x.inp.value || '').trim());
+            if (vals.some((v) => !v)) { nerr.textContent = I18n.t('tx_need_names'); return; }
+            vals.forEach((v, i) => { s.players[i] = v; });
             s.setup = true; paint();
           } }, I18n.t('tx_next')));
         } else if (s.starter == null) {
@@ -184,7 +190,21 @@
         });
       }
       function undo() { if (s.rounds.length) { s.rounds.pop(); paint(); } }
-      function confirmNew() { if (!s.rounds.length && s.starter == null && !s.setup) return; UI.confirm(I18n.t('tx_confirm_new'), () => { s.rounds = []; s.starter = null; s.setup = false; paint(); }); }
+      function confirmNew() {
+        if (!s.rounds.length && s.starter == null && !s.setup) return;
+        const named = s.players.every((p) => (p || '').trim());
+        const backdrop = UI.el('div', { class: 'modal-backdrop' });
+        const close = () => backdrop.remove();
+        backdrop.onclick = (e) => { if (e.target === backdrop) close(); };
+        const opts = [];
+        if (named) opts.push(UI.el('button', { class: 'btn btn-green btn-block', style: 'margin-bottom:8px',
+          onclick: () => { close(); s.rounds = []; s.starter = null; s.setup = true; paint(); } }, I18n.t('tx_same_players')));
+        opts.push(UI.el('button', { class: 'btn btn-block', style: 'margin-bottom:8px',
+          onclick: () => { close(); s.rounds = []; s.starter = null; s.setup = false; s.players = ['', '', '', '']; paint(); } }, I18n.t('tx_new_players')));
+        opts.push(UI.el('button', { class: 'btn btn-ghost btn-block', onclick: close }, I18n.t('tx_cancel')));
+        backdrop.appendChild(UI.el('div', { class: 'modal' }, [UI.el('h3', null, I18n.t('tx_new'))].concat(opts)));
+        document.body.appendChild(backdrop);
+      }
       function addRound(id, label, deltas, owner) { s.rounds.push({ owner, contract: id, label, deltas }); paint(); }
 
       function modal(title, contentEls, onConfirm) {
