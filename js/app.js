@@ -15,6 +15,7 @@
    =========================================================== */
 (function () {
   const modules = [];
+  const navBadges = {};
   let current = null;
 
   const App = {
@@ -35,6 +36,9 @@
 
     /** Re-render the current view (e.g. after login state changes). */
     refresh() { if (current) this._render(current); },
+
+    /** Show a small count badge on a nav tab (e.g., pending join requests). */
+    setNavBadge(id, n) { navBadges[id] = n; this._paintNav(); },
 
     _render(id) {
       let mod = modules.find((m) => m.id === id) || modules[0];
@@ -60,6 +64,12 @@
         const btn = document.createElement('button');
         btn.className = 'nav-item' + (m.id === current ? ' active' : '');
         btn.innerHTML = `${m.icon}<span>${I18n.pick(m.title)}</span>`;
+        if (navBadges[m.id] > 0) {
+          const b = document.createElement('span');
+          b.className = 'nav-badge';
+          b.textContent = navBadges[m.id] > 9 ? '9+' : String(navBadges[m.id]);
+          btn.appendChild(b);
+        }
         btn.onclick = () => App.go(m.id);
         nav.appendChild(btn);
       });

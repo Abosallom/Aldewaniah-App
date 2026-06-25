@@ -62,6 +62,14 @@
       const canRequests = Auth.can('requests');
       view.appendChild(UI.pageTitle(I18n.t('adm_title'), I18n.t('adm_sub')));
 
+      // enable browser notifications for new requests
+      if (canRequests && window.Notification && Notification.permission !== 'granted') {
+        const nb = UI.el('button', { class: 'btn btn-block', style: 'margin-bottom:10px', onclick: () => {
+          try { Notification.requestPermission().then(() => { nb.remove(); }); } catch (e) {}
+        } }, I18n.t('ntf_enable'));
+        view.appendChild(nb);
+      }
+
       // ---- Join requests (admin or co-admin with the permission) ----
       let reqWrap = null;
       if (canRequests) {

@@ -529,3 +529,9 @@ html[lang="en"] .blt-arrow.them svg { transform: scaleX(-1); }
 .trix-seat-no { width: 22px; height: 22px; border-radius: 50%; background: var(--navy); color: var(--cream);
   display: grid; place-items: center; font-size: .72rem; font-weight: 700; }
 .trix-seat-input { text-align: center; padding: 8px 6px; }
+
+/* ---------- Nav badge (pending requests) ---------- */
+.nav-item { position: relative; }
+.nav-badge { position: absolute; top: 4px; inset-inline-end: 22px; min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 999px; background: var(--maroon); color: #fff; font-size: .62rem; font-weight: 800;
+  display: grid; place-items: center; line-height: 1; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
