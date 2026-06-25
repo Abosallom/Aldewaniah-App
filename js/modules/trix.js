@@ -47,6 +47,8 @@
         tx_undo: 'تراجع', tx_new: 'لعبة جديدة', tx_confirm_new: 'بدء لعبة جديدة؟ ستُمسح النتائج.',
         tx_rename: 'اسم اللاعب',
         tx_roll: 'ارمِ النرد لاختيار من يبدأ', tx_roll_btn: '🎲 ارمِ النرد', tx_starts: 'يبدأ',
+        tx_setup: 'سجّل أسماء اللاعبين الأربعة', tx_player: 'لاعب', tx_next: 'التالي', tx_edit_names: 'تعديل الأسماء',
+        tx_seat_hint: 'الترتيب من اليمين إلى اليسار حسب الجلسة',
         tx_kingdom: 'مملكة', tx_turn_pick: 'اختر مشروعاً', tx_of: 'من', tx_round: 'المشروع',
         tx_gameover: 'انتهت اللعبة 🎉', tx_winner: 'الفائز',
         tx_legend: 'شايب −٧٥ • بنت −٢٥ • ديمن −١٠ • لطشة −١٥ • تركس +٢٠٠/١٥٠/١٠٠/٥٠ (الدبل ×٢)'
@@ -61,6 +63,8 @@
         tx_undo: 'Undo', tx_new: 'New game', tx_confirm_new: 'Start a new game? Scores will be cleared.',
         tx_rename: 'Player name',
         tx_roll: 'Roll the dice to choose who starts', tx_roll_btn: '🎲 Roll dice', tx_starts: 'starts',
+        tx_setup: 'Enter the four player names', tx_player: 'Player', tx_next: 'Next', tx_edit_names: 'Edit names',
+        tx_seat_hint: 'Order is right-to-left around the table',
         tx_kingdom: 'Kingdom', tx_turn_pick: 'choose a contract', tx_of: 'of', tx_round: 'Contract',
         tx_gameover: 'Game over 🎉', tx_winner: 'Winner',
         tx_legend: 'King −75 • Queen −25 • Diamond −10 • Trick −15 • Trix +200/150/100/50 (Double ×2)'
@@ -110,9 +114,22 @@
         });
         // flow
         flow.innerHTML = '';
-        if (s.starter == null) {
+        if (s.starter == null && !s.setup) {
+          flow.appendChild(UI.el('p', { class: 'trix-flowmsg' }, I18n.t('tx_setup')));
+          flow.appendChild(UI.el('p', { class: 'trix-legend', style: 'margin-top:0' }, I18n.t('tx_seat_hint')));
+          const inputs = s.players.map((p, i) => {
+            const inp = UI.el('input', { class: 'fld', value: p, maxlength: '16', placeholder: I18n.t('tx_player') + ' ' + (i + 1) });
+            return { inp, row: UI.el('div', { class: 'field' }, [inp]) };
+          });
+          inputs.forEach((x) => flow.appendChild(x.row));
+          flow.appendChild(UI.el('button', { class: 'btn btn-green btn-block', onclick: () => {
+            inputs.forEach((x, i) => { const v = (x.inp.value || '').trim(); if (v) s.players[i] = v; });
+            s.setup = true; paint();
+          } }, I18n.t('tx_next')));
+        } else if (s.starter == null) {
           flow.appendChild(UI.el('p', { class: 'trix-flowmsg' }, I18n.t('tx_roll')));
           flow.appendChild(UI.el('button', { class: 'btn btn-green btn-block', onclick: rollDice }, I18n.t('tx_roll_btn')));
+          flow.appendChild(UI.el('button', { class: 'sec-back', style: 'margin:10px auto 0;display:flex', onclick: () => { s.setup = false; paint(); } }, I18n.t('tx_edit_names')));
         } else if (st.over) {
           const order = t.map((v, i) => ({ i, v })).sort((a, b) => b.v - a.v);
           flow.appendChild(UI.el('div', { class: 'trix-gameover' }, I18n.t('tx_gameover')));
@@ -167,7 +184,7 @@
         });
       }
       function undo() { if (s.rounds.length) { s.rounds.pop(); paint(); } }
-      function confirmNew() { if (!s.rounds.length && s.starter == null) return; UI.confirm(I18n.t('tx_confirm_new'), () => { s.rounds = []; s.starter = null; paint(); }); }
+      function confirmNew() { if (!s.rounds.length && s.starter == null && !s.setup) return; UI.confirm(I18n.t('tx_confirm_new'), () => { s.rounds = []; s.starter = null; s.setup = false; paint(); }); }
       function addRound(id, label, deltas, owner) { s.rounds.push({ owner, contract: id, label, deltas }); paint(); }
 
       function modal(title, contentEls, onConfirm) {
