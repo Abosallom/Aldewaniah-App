@@ -38,7 +38,8 @@
         adm_perm_requests: 'السماح بالموافقة على طلبات الانضمام',
         adm_confirm_decline: 'رفض هذا الطلب؟', adm_confirm_delete: 'حذف هذا العضو؟',
         adm_self: 'أنت',
-        adm_log: 'سجل الحضور', adm_log_none: 'لا يوجد حضور مسجّل بعد', adm_today: 'اليوم'
+        adm_log: 'سجل الحضور', adm_log_none: 'لا يوجد حضور مسجّل بعد', adm_today: 'اليوم',
+        adm_suggest: 'اقتراحات الأعضاء', adm_suggest_none: 'لا توجد اقتراحات بعد', adm_suggest_del: 'حذف الاقتراح؟'
       },
       en: {
         adm_title: 'Admin panel', adm_sub: 'Manage members and join requests',
@@ -51,7 +52,8 @@
         adm_perm_requests: 'Can approve join requests',
         adm_confirm_decline: 'Decline this request?', adm_confirm_delete: 'Delete this member?',
         adm_self: 'You',
-        adm_log: 'Check-in log', adm_log_none: 'No check-ins recorded yet', adm_today: 'Today'
+        adm_log: 'Check-in log', adm_log_none: 'No check-ins recorded yet', adm_today: 'Today',
+        adm_suggest: 'Member suggestions', adm_suggest_none: 'No suggestions yet', adm_suggest_del: 'Delete this suggestion?'
       }
     },
 
@@ -91,12 +93,42 @@
 
       await load();
 
+      // ---- Member suggestions (admin only) — from the AI assistant ----
+      if (isAdmin) {
+        view.appendChild(UI.el('h2', { class: 'section-head' }, I18n.t('adm_suggest')));
+        const sugWrap = UI.el('div');
+        view.appendChild(sugWrap);
+        loadSuggestions(sugWrap);
+      }
+
       // ---- Check-in log (admin only) ----
       if (isAdmin) {
         view.appendChild(UI.el('h2', { class: 'section-head' }, I18n.t('adm_log')));
         const logWrap = UI.el('div');
         view.appendChild(logWrap);
         loadLog(logWrap);
+      }
+
+      async function loadSuggestions(wrap) {
+        wrap.innerHTML = '<div class="muted" style="text-align:center;padding:10px">…</div>';
+        let rows = [];
+        try {
+          const snap = await db.collection('suggestions').orderBy('at', 'desc').limit(100).get();
+          snap.forEach((d) => rows.push(Object.assign({ id: d.id }, d.data())));
+        } catch (e) { wrap.innerHTML = '<div class="auth-err">' + (e.message || 'Error') + '</div>'; return; }
+        wrap.innerHTML = '';
+        if (!rows.length) { wrap.appendChild(UI.el('p', { class: 'muted', style: 'text-align:center' }, I18n.t('adm_suggest_none'))); return; }
+        rows.forEach((s) => {
+          const when = s.at && s.at.toDate ? s.at.toDate().toLocaleDateString(I18n.lang === 'ar' ? 'ar' : 'en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+          wrap.appendChild(UI.el('div', { class: 'card' }, [
+            UI.el('div', { class: 'flex-between' }, [
+              UI.el('div', { class: 'card-meta' }, (s.name || '—') + (when ? ' · ' + when : '')),
+              UI.el('button', { style: 'border:none;background:none;color:var(--maroon);cursor:pointer;font-size:1.2rem',
+                onclick: () => UI.confirm(I18n.t('adm_suggest_del'), async () => { await db.collection('suggestions').doc(s.id).delete(); loadSuggestions(wrap); }) }, '×')
+            ]),
+            UI.el('div', { style: 'margin-top:4px;line-height:1.6' }, s.text || '')
+          ]));
+        });
       }
 
       async function load() {
