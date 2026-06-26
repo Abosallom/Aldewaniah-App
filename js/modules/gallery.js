@@ -130,7 +130,7 @@
         } else {
           media = UI.el('img', { src: it.url, loading: 'lazy', class: 'gal-media', onclick: () => openViewer(i) });
         }
-        const canDel = (Auth.isAdmin && Auth.isAdmin()) || it.byPhone === Auth.phone();
+        const canDel = !!(Auth.isAdmin && Auth.isAdmin()); // admins only
         const cap = UI.el('div', { class: 'gal-cap' }, [
           UI.el('span', { class: 'card-meta' }, it.by ? (I18n.t('gal_by') + ' ' + it.by) : ''),
           canDel ? UI.el('button', { class: 'gal-del', title: I18n.t('gal_del_confirm'),

@@ -49,7 +49,8 @@ export default {
     try {
       if (path === "/file" && request.method === "GET") res = await serveFile(request, env, url);
       else if (path === "/list" && request.method === "GET") res = await listFiles(request, env, url);
-      else if (path === "/upload" && request.method === "POST") res = await uploadFile(request, env);
+      else if (path === "/upload" && request.method === "POST") res = await uploadFile(request, env, url);
+      else if (path === "/sign" && request.method === "POST") res = await signKeys(request, env, url);
       else if (path === "/delete" && request.method === "POST") res = await deleteFile(request, env);
       else if (path === "/" || path === "/health") res = json({ ok: true });
       else res = json({ error: "not found" }, 404);
@@ -197,14 +198,18 @@ async function listFiles(request, env, url) {
   return json({ items: out });
 }
 
-async function uploadFile(request, env) {
+// Which folders uploads may target.
+const DIRS = { gallery: "gallery/", chat: "chat/" };
+
+async function uploadFile(request, env, url) {
   const member = await getMember(request, env);
   if (!member) return json({ error: "unauthorized" }, 401);
 
+  const prefix = DIRS[(url && url.searchParams.get("dir")) || "gallery"] || PREFIX;
   const type = request.headers.get("X-File-Type") || "application/octet-stream";
   const rawName = decodeURIComponent(request.headers.get("X-File-Name") || "file");
   const safe = rawName.replace(/[^\w.\-]+/g, "_").slice(-80) || "file";
-  const key = PREFIX + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "_" + safe;
+  const key = prefix + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "_" + safe;
 
   const body = await request.arrayBuffer();
   if (body.byteLength === 0) return json({ error: "empty" }, 400);
@@ -222,16 +227,31 @@ async function uploadFile(request, env) {
   return json({ key });
 }
 
+// Sign short-lived URLs for a batch of stored keys (used by chat to show photos).
+async function signKeys(request, env, url) {
+  const member = await getMember(request, env);
+  if (!member) return json({ error: "unauthorized" }, 401);
+  const body = await request.json().catch(() => ({}));
+  const keys = Array.isArray(body.keys) ? body.keys.slice(0, 200) : [];
+  const urls = {};
+  for (const k of keys) {
+    if (typeof k === "string" && (k.startsWith("gallery/") || k.startsWith("chat/"))) {
+      urls[k] = await signedUrl(env, url.origin, k);
+    }
+  }
+  return json({ urls });
+}
+
 async function deleteFile(request, env) {
   const member = await getMember(request, env);
   if (!member) return json({ error: "unauthorized" }, 401);
   const { key } = await request.json().catch(() => ({}));
-  if (!key || !key.startsWith(PREFIX)) return json({ error: "bad request" }, 400);
+  if (!key || !(key.startsWith("gallery/") || key.startsWith("chat/"))) return json({ error: "bad request" }, 400);
 
   const obj = await env.BUCKET.head(key);
   if (!obj) return json({ error: "not found" }, 404);
-  const owner = (obj.customMetadata || {}).byPhone;
-  if (!member.admin && owner !== member.phone) return json({ error: "forbidden" }, 403);
+  // Only admins may delete media.
+  if (!member.admin) return json({ error: "forbidden" }, 403);
 
   await env.BUCKET.delete(key);
   return json({ ok: true });

@@ -756,3 +756,11 @@ html{ scroll-behavior:smooth; }
 /* ===== Cross-fade between tabs (out phase; .fade-in is the in phase) ===== */
 .view-out{ animation: viewOut .14s ease forwards; }
 @keyframes viewOut{ from{ opacity:1; transform:none; } to{ opacity:0; transform:translateY(-6px); } }
+
+/* ===== Admin-only delete on chat messages ===== */
+.chat-del{
+  align-self:center; background:none; border:none; color:var(--maroon);
+  opacity:.55; cursor:pointer; font-size:1.15rem; line-height:1; padding:0 6px;
+  transition:opacity .15s ease, transform .12s ease;
+}
+.chat-del:active{ opacity:1; transform:scale(.9); }
