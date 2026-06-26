@@ -14,15 +14,38 @@
     en: { mnt_default: "The app is paused for maintenance. We'll be back soon 🌿", mnt_until: 'Back in' }
   });
 
-  let el = null, last = null, until = 0, lift = null;
+  let el = null, last = null, until = 0, lift = null, pend = null;
 
   function isAdmin() { return !!(window.Auth && Auth.isAdmin && Auth.isAdmin()); }
+
+  // True while a phone member is signing in but we don't yet know whether they
+  // are the admin. We must NOT flash the pause page in this window — the admin
+  // keeps full access and should never even glimpse it.
+  function authResolving() {
+    try {
+      const u = firebase.auth().currentUser;
+      return !!(u && u.phoneNumber && !u.isAnonymous &&
+                (!window.Auth || !Auth.status || Auth.status() === null));
+    } catch (e) { return false; }
+  }
 
   function evaluate() {
     const paused = !!(last && last.paused === true);
     until = (last && last.until && last.until.toMillis) ? last.until.toMillis() : 0;
     const within = !until || until > Date.now();
-    if (paused && within && !isAdmin()) render(); else hide();
+    if (pend) { clearTimeout(pend); pend = null; }
+    if (paused && within) {
+      if (isAdmin()) {
+        hide();                       // admin keeps using the app while it's paused
+      } else if (authResolving()) {
+        hide();                       // wait until we know if this is the admin
+        pend = setTimeout(evaluate, 350);
+      } else {
+        render();                     // everyone else sees the pause page
+      }
+    } else {
+      hide();
+    }
     if (lift) { clearTimeout(lift); lift = null; }
     if (paused && until && until > Date.now()) {
       lift = setTimeout(evaluate, Math.min(60000, Math.max(1000, until - Date.now() + 300)));
