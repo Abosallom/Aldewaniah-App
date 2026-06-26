@@ -598,3 +598,56 @@ html[lang="en"] .blt-arrow.them svg { transform: scaleX(-1); }
 }
 .chat-input:focus{ border-color:var(--gold); }
 .chat-send{ flex:0 0 auto; border-radius:24px; padding:12px 18px; }
+
+/* ===== Chat: photos, bell, lightbox, smoother bubbles ===== */
+.chat-top{ display:flex; justify-content:flex-end; margin:-4px 0 8px; }
+.chat-bell{
+  background:var(--card); border:1px solid var(--line); color:var(--ink-soft);
+  border-radius:999px; padding:7px 14px; font:inherit; font-weight:700; font-size:.8rem;
+  cursor:pointer; transition:background .15s ease, color .15s ease, transform .12s ease;
+}
+.chat-bell.on{ background:rgba(194,160,80,.18); color:var(--gold-d); border-color:var(--gold); }
+.chat-bell:active{ transform:scale(.96); }
+
+.chat-photo{
+  flex:0 0 auto; width:44px; height:44px; border-radius:50%;
+  background:var(--card); border:1px solid var(--line); color:var(--navy);
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+  transition:background .15s ease, transform .12s ease;
+}
+.chat-photo svg{ width:22px; height:22px; }
+.chat-photo:active{ transform:scale(.92); }
+.chat-photo.busy{ opacity:.5; pointer-events:none; }
+
+.chat-img{
+  display:block; max-width:100%; width:190px; border-radius:12px; margin:2px 0 4px;
+  cursor:pointer; background:var(--cream);
+}
+.chat-bubble.img-only{ padding:5px; background:transparent !important; border:none !important; box-shadow:none; }
+.chat-row.mine .chat-bubble.img-only{ background:transparent !important; }
+
+.chat-row.pop{ animation:chatPop .26s cubic-bezier(.22,1,.36,1); }
+@keyframes chatPop{ from{ opacity:0; transform:translateY(8px) scale(.98); } to{ opacity:1; transform:none; } }
+
+.lb-backdrop{
+  position:fixed; inset:0; z-index:60; background:rgba(10,14,24,.86);
+  display:flex; align-items:center; justify-content:center; padding:24px;
+  animation:fade .2s ease; cursor:zoom-out;
+}
+.lb-img{ max-width:100%; max-height:100%; border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+
+/* ===== Global polish — smoother feel across the app ===== */
+html{ scroll-behavior:smooth; }
+.view, .chat-list, .sec-grid, .prof-grid{ -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+.btn, .nav-item, .sec-card, .chat-input, .fld, .field input, .field textarea, .field select{
+  transition:transform .14s ease, box-shadow .18s ease, background .16s ease,
+             color .16s ease, border-color .16s ease;
+}
+.btn:hover{ filter:brightness(1.03); }
+.nav-item:active{ transform:scale(.9); }
+.nav-item.active{ position:relative; }
+.nav-item.active::after{
+  content:""; position:absolute; bottom:5px; width:5px; height:5px; border-radius:50%;
+  background:var(--gold-d); animation:fade .25s ease;
+}
+.fade-in{ animation:fade .28s cubic-bezier(.22,1,.36,1); }

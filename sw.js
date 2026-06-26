@@ -1,5 +1,5 @@
 /* Aldewaniah App — service worker (offline shell cache) */
-const CACHE = 'aldewaniah-v34';
+const CACHE = 'aldewaniah-v35';
 const ASSETS = [
   './',
   './index.html',
@@ -12,6 +12,7 @@ const ASSETS = [
   './js/auth.js',
   './js/install.js',
   './js/notify.js',
+  './js/chat-notify.js',
   './js/modules/home.js',
   './js/modules/tournaments.js',
   './js/modules/sections.js',
