@@ -1,12 +1,15 @@
 /* ===========================================================
-   Profile (الأعضاء) — member directory + self profile.
-   Each member sets a photo, display name, a saying, hobbies and
-   a bio; everyone (members) can browse the directory.
-   Photos are resized small client-side and stored in Firestore
-   ('profiles' collection). Top-level tab (members only).
+   Members (الأعضاء) — member directory + self profile.
+   A Sections sub-section (members only).
+
+   Privacy: the directory lives in its own 'directory' collection
+   keyed by a random id (NOT the phone number), so browsing the
+   directory never exposes anyone's phone. Admin seeds an entry per
+   member (on approve / "rebuild directory"); each member edits
+   their OWN entry via the dirId stored on their member doc.
    =========================================================== */
 (function () {
-  const COLL = 'profiles';
+  const COLL = 'directory';
 
   Sections.add({
     id: 'profile',
@@ -19,15 +22,17 @@
         pr_title: 'الأعضاء', pr_sub: 'تعرّف على أعضاء الديوانية', pr_mine: 'ملفي الشخصي',
         pr_edit: 'تعديل ملفي', pr_name: 'الاسم', pr_saying: 'مقولتك المفضلة', pr_hobbies: 'الهوايات',
         pr_bio: 'نبذة عنك', pr_photo: 'الصورة الشخصية', pr_save: 'حفظ', pr_cancel: 'إلغاء',
-        pr_empty: 'لا توجد ملفات بعد — كن أول من يضيف ملفه', pr_you: 'أنت',
-        pr_locked: 'الأعضاء للأعضاء المعتمدين فقط'
+        pr_empty: 'لا توجد ملفات بعد', pr_you: 'أنت',
+        pr_locked: 'الأعضاء للأعضاء المعتمدين فقط',
+        pr_not_listed: 'لم تتم إضافتك إلى الدليل بعد — اطلب من المشرف تحديث الدليل'
       },
       en: {
         pr_title: 'Members', pr_sub: 'Meet the Dewaniah members', pr_mine: 'My profile',
         pr_edit: 'Edit my profile', pr_name: 'Name', pr_saying: 'Favourite saying', pr_hobbies: 'Hobbies',
         pr_bio: 'About you', pr_photo: 'Profile photo', pr_save: 'Save', pr_cancel: 'Cancel',
-        pr_empty: 'No profiles yet — be the first to add yours', pr_you: 'You',
-        pr_locked: 'Members area is for approved members only'
+        pr_empty: 'No profiles yet', pr_you: 'You',
+        pr_locked: 'Members area is for approved members only',
+        pr_not_listed: "You're not in the directory yet — ask an admin to rebuild the directory"
       }
     },
 
@@ -38,7 +43,7 @@
         return;
       }
       const db = Auth.getDb();
-      const me = (Auth.phone && Auth.phone()) || '';
+      const myDir = ((Auth.member && Auth.member()) || {}).dirId || null; // my directory doc id
       view.appendChild(UI.pageTitle(I18n.t('pr_title'), I18n.t('pr_sub')));
 
       view.appendChild(UI.el('div', { class: 'add-fab-wrap' }, [
@@ -51,23 +56,14 @@
 
       async function load() {
         grid.innerHTML = '<div class="muted" style="text-align:center;grid-column:1/-1">…</div>';
-        const byId = {};
-        // 1) the full roster — every approved member shows up by name
+        let rows = [];
         try {
-          const ms = await db.collection('members').where('status', '==', 'approved').get();
-          ms.forEach((d) => { const m = d.data() || {}; byId[d.id] = { id: d.id, name: m.name || '' }; });
-        } catch (e) { /* not permitted / offline — fall back to profiles only */ }
-        // 2) profiles overlay the richer details (photo, saying, hobbies, bio)
-        try {
-          const ps = await db.collection(COLL).get();
-          ps.forEach((d) => { byId[d.id] = Object.assign(byId[d.id] || { id: d.id }, d.data()); });
-        } catch (e) {
-          if (!Object.keys(byId).length) { grid.innerHTML = '<div class="auth-err" style="grid-column:1/-1">' + (e.message || 'Error') + '</div>'; return; }
-        }
-        const rows = Object.keys(byId).map((k) => byId[k]);
+          const snap = await db.collection(COLL).get();
+          snap.forEach((d) => rows.push(Object.assign({ id: d.id }, d.data())));
+        } catch (e) { grid.innerHTML = '<div class="auth-err" style="grid-column:1/-1">' + (e.message || 'Error') + '</div>'; return; }
         grid.innerHTML = '';
         if (!rows.length) { grid.appendChild(UI.el('div', { style: 'grid-column:1/-1' }, [UI.empty(I18n.t('pr_empty'))])); return; }
-        rows.sort((a, b) => (a.id === me ? -1 : b.id === me ? 1 : (a.name || '').localeCompare(b.name || '', 'ar')));
+        rows.sort((a, b) => (a.id === myDir ? -1 : b.id === myDir ? 1 : (a.name || '').localeCompare(b.name || '', 'ar')));
         rows.forEach((p) => grid.appendChild(card(p)));
       }
 
@@ -77,7 +73,7 @@
           : UI.el('div', { class: 'prof-photo prof-initials' }, UI.initials(p.name));
         return UI.el('div', { class: 'prof-card' }, [
           avatar,
-          UI.el('div', { class: 'prof-name' }, (p.name || '—') + (p.id === me ? ' (' + I18n.t('pr_you') + ')' : '')),
+          UI.el('div', { class: 'prof-name' }, (p.name || '—') + (p.id === myDir ? ' (' + I18n.t('pr_you') + ')' : '')),
           p.saying ? UI.el('div', { class: 'prof-saying' }, '“' + p.saying + '”') : null,
           p.hobbies ? UI.el('div', { class: 'prof-line' }, '🎯 ' + p.hobbies) : null,
           p.bio ? UI.el('div', { class: 'prof-bio' }, p.bio) : null
@@ -85,8 +81,9 @@
       }
 
       function editMine() {
+        if (!myDir) { alert(I18n.t('pr_not_listed')); return; }
         const cur = {};
-        db.collection(COLL).doc(me).get().then((d) => { if (d.exists) Object.assign(cur, d.data()); openForm(cur); }).catch(() => openForm(cur));
+        db.collection(COLL).doc(myDir).get().then((d) => { if (d.exists) Object.assign(cur, d.data()); openForm(cur); }).catch(() => openForm(cur));
       }
 
       function openForm(cur) {
@@ -127,8 +124,8 @@
         async function save() {
           saveBtn.disabled = true; saveBtn.textContent = '…';
           try {
-            await db.collection(COLL).doc(me).set({
-              phone: me, name: (name.value || '').trim() || (Auth.member() || {}).name || '',
+            await db.collection(COLL).doc(myDir).set({
+              name: (name.value || '').trim() || (Auth.member() || {}).name || '',
               saying: (saying.value || '').trim(), hobbies: (hobbies.value || '').trim(),
               bio: (bio.value || '').trim(), photo: photoData || '',
               updatedAt: firebase.firestore.FieldValue.serverTimestamp()
