@@ -10,7 +10,7 @@
  *   - FIREBASE_PROJECT : plain var -> aldewaniah-45158
  */
 
-const MODEL = "@cf/meta/llama-3.1-8b-instruct"; // swap here to change the model
+const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"; // swap here to change the model
 const MAX_TURNS = 12; // keep the last N messages of history
 
 const ALLOWED_ORIGINS = [
@@ -107,6 +107,12 @@ async function chat(request, env) {
 
   const messages = [{ role: "system", content: SYSTEM_PROMPT }].concat(history);
   const out = await env.AI.run(MODEL, { messages, max_tokens: 512 });
-  const reply = (out && (out.response || out.result || "")) || "…";
-  return json({ reply: String(reply).trim() });
+  // Workers AI returns either { response } (older) or OpenAI-style { choices:[{message:{content}}] }.
+  let reply = "";
+  if (out) {
+    if (typeof out.response === "string" && out.response) reply = out.response;
+    else if (out.choices && out.choices[0] && out.choices[0].message) reply = out.choices[0].message.content || "";
+    else if (out.result && out.result.response) reply = out.result.response;
+  }
+  return json({ reply: (String(reply).trim() || "…") });
 }
