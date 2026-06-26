@@ -651,3 +651,27 @@ html{ scroll-behavior:smooth; }
   background:var(--gold-d); animation:fade .25s ease;
 }
 .fade-in{ animation:fade .28s cubic-bezier(.22,1,.36,1); }
+
+/* ===== Extra smoothness pass (GPU hints, modals, reduced-motion) ===== */
+/* Smooth, hardware-accelerated entrance for modals */
+.modal-backdrop{ animation:fade .2s ease; }
+.modal{ animation:modalIn .26s cubic-bezier(.22,1,.36,1); transform-origin:bottom center; }
+@media (min-width:640px){ .modal{ transform-origin:center; } }
+@keyframes modalIn{ from{ opacity:0; transform:translateY(14px) scale(.98); } to{ opacity:1; transform:none; } }
+
+/* Hint the compositor for the elements that animate the most (avoids jank) */
+.nav-item, .btn, .sec-card, .chat-row, .modal, .rl-wheel{ will-change:transform; }
+.gal-media, .prof-photo, .chat-img{ backface-visibility:hidden; }
+
+/* Buttery momentum + no rubber-band bleed on the scrollers */
+.view, .chat-list, .sec-grid, .prof-grid, .modal{
+  -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+}
+
+/* Respect users who prefer less motion (accessibility + perceived smoothness) */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration:.001ms !important; animation-iteration-count:1 !important;
+    transition-duration:.001ms !important; scroll-behavior:auto !important;
+  }
+}
