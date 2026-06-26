@@ -34,7 +34,8 @@
         gal_upload: 'رفع صورة أو فيديو', gal_uploading: 'جارٍ الرفع',
         gal_by: 'بواسطة', gal_del_confirm: 'حذف هذا الملف؟',
         gal_too_big: 'الملف كبير جداً (الحد 100 ميجابايت)',
-        gal_err: 'تعذّر الرفع، حاول مرة أخرى'
+        gal_err: 'تعذّر الرفع، حاول مرة أخرى',
+        gal_del_err: 'تعذّر حذف الملف، حاول مرة أخرى'
       },
       en: {
         gal_title: 'Photo Gallery', gal_sub: 'Photos & clips from our gatherings',
@@ -44,7 +45,8 @@
         gal_upload: 'Upload photo or video', gal_uploading: 'Uploading',
         gal_by: 'by', gal_del_confirm: 'Delete this file?',
         gal_too_big: 'File too large (max 100MB)',
-        gal_err: 'Upload failed, please try again'
+        gal_err: 'Upload failed, please try again',
+        gal_del_err: 'Could not delete the file, please try again'
       }
     },
 
@@ -140,12 +142,13 @@
       async function del(it) {
         try {
           const tk = await authToken();
-          await fetch(WORKER + '/delete', {
+          const res = await fetch(WORKER + '/delete', {
             method: 'POST',
             headers: { Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json' },
             body: JSON.stringify({ key: it.key })
           });
-        } catch (e) {}
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+        } catch (e) { alert(I18n.t('gal_del_err')); }
         load();
       }
 

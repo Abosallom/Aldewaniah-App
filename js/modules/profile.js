@@ -8,22 +8,6 @@
 (function () {
   const COLL = 'profiles';
 
-  function resizeImage(file, max, cb) {
-    try {
-      const img = new Image(); const url = URL.createObjectURL(file);
-      img.onload = () => {
-        const sc = Math.min(1, max / Math.max(img.width, img.height));
-        const w = Math.max(1, Math.round(img.width * sc)), h = Math.max(1, Math.round(img.height * sc));
-        const c = document.createElement('canvas'); c.width = w; c.height = h;
-        c.getContext('2d').drawImage(img, 0, 0, w, h);
-        URL.revokeObjectURL(url);
-        try { cb(c.toDataURL('image/jpeg', 0.82)); } catch (e) { cb(null); }
-      };
-      img.onerror = () => cb(null);
-      img.src = url;
-    } catch (e) { cb(null); }
-  }
-
   Sections.add({
     id: 'profile',
     memberOnly: true,
@@ -115,7 +99,7 @@
         function paintPreview() { preview.innerHTML = ''; if (photoData) preview.appendChild(UI.el('img', { class: 'prof-photo', src: photoData })); else preview.textContent = UI.initials(cur.name || (Auth.member() || {}).name || '?'); }
         paintPreview();
         const file = UI.el('input', { type: 'file', accept: 'image/*', style: 'display:none' });
-        file.onchange = () => { const f = file.files && file.files[0]; if (f) resizeImage(f, 220, (d) => { if (d) { photoData = d; paintPreview(); } }); };
+        file.onchange = () => { const f = file.files && file.files[0]; if (f) UI.resizeImage(f, 220, 0.82, (d) => { if (d) { photoData = d; paintPreview(); } }); };
         const photoBtn = UI.el('button', { class: 'btn btn-ghost', type: 'button', onclick: () => file.click() }, '📷 ' + I18n.t('pr_photo'));
 
         const name = UI.el('input', { class: 'fld', value: cur.name || (Auth.member() || {}).name || '', maxlength: '24' });

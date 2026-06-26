@@ -19,39 +19,57 @@ const PREFIX = "gallery/";
 const URL_TTL = 6 * 60 * 60; // signed file URLs valid 6 hours
 const MAX_BYTES = 100 * 1024 * 1024; // 100 MB per file
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization,Content-Type,X-File-Name,X-File-Type",
-  "Access-Control-Max-Age": "86400",
-};
+// Only these origins may call the Worker from a browser.
+// (Add more here if you ever serve the app from another domain.)
+const ALLOWED_ORIGINS = [
+  "https://app.aldewaniah.com",
+  "https://abosallom.github.io",
+];
+
+function corsHeaders(request) {
+  const origin = request.headers.get("Origin") || "";
+  const allow = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allow,
+    "Vary": "Origin",
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Authorization,Content-Type,X-File-Name,X-File-Type",
+    "Access-Control-Max-Age": "86400",
+  };
+}
 
 export default {
   async fetch(request, env) {
+    const ch = corsHeaders(request);
+    if (request.method === "OPTIONS") return new Response(null, { headers: ch });
+
     const url = new URL(request.url);
     const path = url.pathname;
-
-    if (request.method === "OPTIONS") return new Response(null, { headers: CORS });
-
+    let res;
     try {
-      if (path === "/file" && request.method === "GET") return serveFile(request, env, url);
-      if (path === "/list" && request.method === "GET") return listFiles(request, env, url);
-      if (path === "/upload" && request.method === "POST") return uploadFile(request, env);
-      if (path === "/delete" && request.method === "POST") return deleteFile(request, env);
-      if (path === "/" || path === "/health") return json({ ok: true });
-      return json({ error: "not found" }, 404);
+      if (path === "/file" && request.method === "GET") res = await serveFile(request, env, url);
+      else if (path === "/list" && request.method === "GET") res = await listFiles(request, env, url);
+      else if (path === "/upload" && request.method === "POST") res = await uploadFile(request, env);
+      else if (path === "/delete" && request.method === "POST") res = await deleteFile(request, env);
+      else if (path === "/" || path === "/health") res = json({ ok: true });
+      else res = json({ error: "not found" }, 404);
     } catch (e) {
-      return json({ error: String(e && e.message || e) }, 500);
+      res = json({ error: String(e && e.message || e) }, 500);
     }
+    // apply the per-origin CORS headers to every response
+    const out = new Response(res.body, res);
+    for (const k in ch) out.headers.set(k, ch[k]);
+    return out;
   },
 };
 
 /* ---------- helpers ---------- */
 
 function json(obj, status = 200) {
+  // CORS headers are applied centrally in fetch().
   return new Response(JSON.stringify(obj), {
     status,
-    headers: { "Content-Type": "application/json", ...CORS },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
@@ -147,7 +165,7 @@ async function serveFile(request, env, url) {
   const headers = new Headers();
   obj.writeHttpMetadata(headers);
   headers.set("Cache-Control", "private, max-age=21600");
-  headers.set("Access-Control-Allow-Origin", "*");
+  // CORS applied centrally in fetch()
   return new Response(obj.body, { headers });
 }
 

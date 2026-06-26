@@ -8,23 +8,6 @@
 (function () {
   let unsub = null;
 
-  /* shrink a picked image to a sane size before storing it in Firestore */
-  function resizeImg(file, max, cb) {
-    try {
-      const img = new Image(), url = URL.createObjectURL(file);
-      img.onload = () => {
-        const sc = Math.min(1, max / Math.max(img.width, img.height));
-        const w = Math.max(1, Math.round(img.width * sc)), h = Math.max(1, Math.round(img.height * sc));
-        const c = document.createElement('canvas'); c.width = w; c.height = h;
-        c.getContext('2d').drawImage(img, 0, 0, w, h);
-        URL.revokeObjectURL(url);
-        try { cb(c.toDataURL('image/jpeg', 0.72)); } catch (e) { cb(null); }
-      };
-      img.onerror = () => cb(null);
-      img.src = url;
-    } catch (e) { cb(null); }
-  }
-
   function lightbox(src) {
     const bd = UI.el('div', { class: 'lb-backdrop', onclick: () => bd.remove() },
       [UI.el('img', { class: 'lb-img', src: src })]);
@@ -78,7 +61,7 @@
         const f = file.files && file.files[0]; file.value = '';
         if (!f) return;
         photoBtn.classList.add('busy');
-        resizeImg(f, 1100, (data) => {
+        UI.resizeImage(f, 1100, 0.72, (data) => {
           photoBtn.classList.remove('busy');
           if (data) sendMsg({ image: data });
         });

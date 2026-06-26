@@ -128,6 +128,23 @@
       return (name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
     },
 
+    /** Shrink a picked image file to a JPEG data URL (longest side <= max). */
+    resizeImage(file, max, quality, cb) {
+      try {
+        const img = new Image(), url = URL.createObjectURL(file);
+        img.onload = () => {
+          const sc = Math.min(1, max / Math.max(img.width, img.height));
+          const w = Math.max(1, Math.round(img.width * sc)), h = Math.max(1, Math.round(img.height * sc));
+          const c = document.createElement('canvas'); c.width = w; c.height = h;
+          c.getContext('2d').drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(url);
+          try { cb(c.toDataURL('image/jpeg', quality)); } catch (e) { cb(null); }
+        };
+        img.onerror = () => cb(null);
+        img.src = url;
+      } catch (e) { cb(null); }
+    },
+
     /** Open a modal with a built form. fields: [{name,label,type,required,options}] */
     modal(titleText, fields, onSubmit) {
       const backdrop = UI.el('div', { class: 'modal-backdrop' });
