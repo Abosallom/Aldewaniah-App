@@ -12,8 +12,26 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    /* Loading splash (inline so it shows before the stylesheet loads) */
+    #splash{ position:fixed; inset:0; z-index:1000;
+      background:linear-gradient(160deg,#1A2744,#121b30 60%,#0c1322);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:20px; transition:opacity .45s ease; }
+    #splash.hide{ opacity:0; pointer-events:none; }
+    #splash img{ width:88px; height:88px; border-radius:50%;
+      box-shadow:0 10px 36px rgba(0,0,0,.45); animation:splashSpin 1.1s linear infinite; }
+    #splash .lt{ color:#C2A050; font-weight:700; letter-spacing:1px; font-size:1rem;
+      font-family:"Tajawal",system-ui,sans-serif; }
+    @keyframes splashSpin{ to{ transform:rotate(360deg); } }
+  </style>
 </head>
 <body>
+  <!-- Loading splash: spinning logo while the app boots -->
+  <div id="splash">
+    <img src="assets/icon-192.png" alt="" />
+    <div class="lt">جاري التحميل…</div>
+  </div>
   <!-- App header -->
   <header class="app-header">
     <div class="brand">
@@ -71,6 +89,16 @@
 
   <!-- Boot the app after all modules have registered -->
   <script>App.start();</script>
+
+  <!-- Reveal the app once it's booted (spin the logo briefly first) -->
+  <script>
+    (function () {
+      var s = document.getElementById('splash');
+      if (!s) return;
+      var hide = function () { s.classList.add('hide'); setTimeout(function () { if (s && s.parentNode) s.parentNode.removeChild(s); }, 500); };
+      setTimeout(hide, 650);
+    })();
+  </script>
 
   <!-- Member login (after App so it can refresh views on sign-in) -->
   <script src="js/auth.js"></script>

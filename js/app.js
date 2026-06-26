@@ -47,13 +47,24 @@
       if (mod.memberOnly && !(window.Auth && Auth.isMember && Auth.isMember())) mod = modules[0];
       current = mod.id;
       const view = document.getElementById('view');
-      view.innerHTML = '';
-      view.className = 'view fade-in';
-      // force reflow so the animation replays on each navigation
-      void view.offsetWidth;
-      view.classList.add('fade-in');
-      mod.render(view);
-      this._paintNav();
+      this._navTok = (this._navTok || 0) + 1;
+      const tok = this._navTok;
+      const paint = () => {
+        if (tok !== this._navTok) return; // a newer navigation won — skip
+        view.innerHTML = '';
+        view.className = 'view fade-in';
+        void view.offsetWidth; // replay the entrance animation
+        mod.render(view);
+        this._paintNav();
+      };
+      // Cross-fade: gently fade the current page out, then fade the new one in.
+      if (view && view.childNodes.length) {
+        view.classList.remove('fade-in');
+        view.classList.add('view-out');
+        setTimeout(paint, 140);
+      } else {
+        paint();
+      }
     },
 
     _paintNav() {

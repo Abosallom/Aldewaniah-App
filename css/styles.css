@@ -752,3 +752,7 @@ html{ scroll-behavior:smooth; }
 /* smoother, springy view transition between tabs */
 .fade-in{ animation:viewIn .34s cubic-bezier(.22,1,.36,1); }
 @keyframes viewIn{ from{ opacity:0; transform:translateY(8px) scale(.995); } to{ opacity:1; transform:none; } }
+
+/* ===== Cross-fade between tabs (out phase; .fade-in is the in phase) ===== */
+.view-out{ animation: viewOut .14s ease forwards; }
+@keyframes viewOut{ from{ opacity:1; transform:none; } to{ opacity:0; transform:translateY(-6px); } }
