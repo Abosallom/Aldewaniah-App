@@ -815,3 +815,12 @@ html{ scroll-behavior:smooth; }
   background:#fff; font:inherit; color:var(--ink); outline:none; }
 .ai-input:focus{ border-color:var(--gold); }
 .ai-send{ flex:0 0 auto; border-radius:24px; padding:12px 18px; }
+
+/* ===== Email login add-on (phone/email toggle, account panel) ===== */
+.auth-tabs{ display:flex; gap:8px; margin-bottom:14px; }
+.auth-tab{ flex:1; padding:9px; border:1px solid var(--line); background:#fff; border-radius:12px;
+  font:inherit; font-weight:700; color:var(--ink-soft); cursor:pointer; transition:background .15s ease, color .15s ease; }
+.auth-tab.active{ background:var(--navy); color:#fff; border-color:var(--navy); }
+.auth-link{ background:none; border:none; color:var(--navy); text-decoration:underline; cursor:pointer;
+  font:inherit; font-size:.85rem; padding:0; display:block; }
+.auth-ok{ color:#2e7d32; font-size:.85rem; margin:4px 0; }

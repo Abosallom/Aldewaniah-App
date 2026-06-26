@@ -36,7 +36,16 @@
       auth_req_sent: 'تم إرسال طلبك، بانتظار موافقة المشرف ✅',
       auth_pending: 'قيد المراجعة',
       auth_pending_full: 'طلب انضمامك قيد مراجعة المشرف',
-      auth_req_err: 'تعذّر إرسال الطلب، حاول مرة أخرى'
+      auth_req_err: 'تعذّر إرسال الطلب، حاول مرة أخرى',
+      auth_mode_phone: 'بالجوال', auth_mode_email: 'بالبريد',
+      auth_email: 'البريد الإلكتروني', auth_password: 'كلمة المرور',
+      auth_signin: 'تسجيل الدخول', auth_forgot: 'نسيت كلمة المرور؟',
+      auth_reset_sent: 'أرسلنا رابط إعادة التعيين إلى بريدك ✅',
+      auth_email_bad: 'بريد أو كلمة مرور غير صحيحة (٦ أحرف على الأقل)',
+      auth_account: 'حسابي', auth_link_email: 'اربط بريدًا إلكترونيًا لتسجيل الدخول به لاحقًا:',
+      auth_link_btn: 'ربط البريد', auth_linked_as: 'البريد المرتبط',
+      auth_reset_pw: 'إعادة تعيين كلمة المرور', auth_no_email: 'لا يوجد بريد مرتبط بعد',
+      auth_link_err: 'تعذّر ربط البريد، تأكد من صحته أو سجّل خروجًا ودخولًا ثم حاول'
     },
     en: {
       auth_login: 'Member login', auth_logout: 'Sign out',
@@ -50,7 +59,16 @@
       auth_req_sent: 'Request sent — awaiting admin approval ✅',
       auth_pending: 'Pending',
       auth_pending_full: 'Your join request is awaiting admin approval',
-      auth_req_err: 'Could not send the request, please try again'
+      auth_req_err: 'Could not send the request, please try again',
+      auth_mode_phone: 'Phone', auth_mode_email: 'Email',
+      auth_email: 'Email', auth_password: 'Password',
+      auth_signin: 'Sign in', auth_forgot: 'Forgot password?',
+      auth_reset_sent: 'We sent a reset link to your email ✅',
+      auth_email_bad: 'Wrong email or password (min 6 chars)',
+      auth_account: 'My account', auth_link_email: 'Link an email to sign in with later:',
+      auth_link_btn: 'Link email', auth_linked_as: 'Linked email',
+      auth_reset_pw: 'Reset password', auth_no_email: 'No email linked yet',
+      auth_link_err: "Couldn't link email; check it, or sign out and back in, then retry"
     }
   });
 
@@ -113,8 +131,8 @@
       box.innerHTML = '';
       if (_status === 'approved') {
         const name = (_member && (_member.name || _member.phone)) || I18n.t('auth_welcome');
-        box.appendChild(UI.el('button', { class: 'auth-btn', onclick: () => Auth.logout() },
-          I18n.pick(name) + ' · ' + I18n.t('auth_logout')));
+        box.appendChild(UI.el('button', { class: 'auth-btn', onclick: () => Auth.openAccount() },
+          I18n.pick(name)));
       } else if (_status === 'pending') {
         box.appendChild(UI.el('button', { class: 'auth-btn auth-btn-pending', onclick: () => Auth.logout() },
           I18n.t('auth_pending') + ' · ' + I18n.t('auth_logout')));
@@ -137,10 +155,28 @@
       const close = () => { backdrop.remove(); cleanupRecaptcha(); };
       backdrop.onclick = (e) => { if (e.target === backdrop) close(); };
       const body = UI.el('div');
-      const modal = UI.el('div', { class: 'modal' }, [UI.el('h3', null, I18n.t('auth_title')), body]);
+      const tabPhone = UI.el('button', { class: 'auth-tab active' }, I18n.t('auth_mode_phone'));
+      const tabEmail = UI.el('button', { class: 'auth-tab' }, I18n.t('auth_mode_email'));
+      tabPhone.onclick = () => { tabPhone.classList.add('active'); tabEmail.classList.remove('active'); phoneStep(body, close); };
+      tabEmail.onclick = () => { tabEmail.classList.add('active'); tabPhone.classList.remove('active'); emailStep(body, close); };
+      const tabs = UI.el('div', { class: 'auth-tabs' }, [tabPhone, tabEmail]);
+      const modal = UI.el('div', { class: 'modal' }, [UI.el('h3', null, I18n.t('auth_title')), tabs, body]);
       backdrop.appendChild(modal);
       document.body.appendChild(backdrop);
       phoneStep(body, close);
+    },
+
+    /** A signed-in member's account panel: link an email, reset it, sign out. */
+    openAccount() {
+      if (_status !== 'approved') { return; }
+      const backdrop = UI.el('div', { class: 'modal-backdrop' });
+      const close = () => backdrop.remove();
+      backdrop.onclick = (e) => { if (e.target === backdrop) close(); };
+      const body = UI.el('div');
+      const modal = UI.el('div', { class: 'modal' }, [UI.el('h3', null, I18n.t('auth_account')), body]);
+      backdrop.appendChild(modal);
+      document.body.appendChild(backdrop);
+      renderAccount(body, close);
     }
   };
 
@@ -283,6 +319,83 @@
         btn.disabled = false; btn.textContent = I18n.t('auth_submit_req');
       }
     };
+  }
+
+  // Sign in with a linked email + password (alternative to phone OTP).
+  function emailStep(body, close) {
+    body.innerHTML = '';
+    const email = UI.el('input', { class: 'fld', type: 'email', placeholder: I18n.t('auth_email'), autocomplete: 'email' });
+    const pass = UI.el('input', { class: 'fld', type: 'password', placeholder: I18n.t('auth_password'), autocomplete: 'current-password' });
+    const err = UI.el('p', { class: 'auth-err' });
+    const ok = UI.el('p', { class: 'auth-ok' });
+    const btn = UI.el('button', { class: 'btn btn-block', style: 'margin-top:10px' }, I18n.t('auth_signin'));
+    const forgot = UI.el('button', { class: 'auth-link', style: 'margin-top:10px' }, I18n.t('auth_forgot'));
+    body.appendChild(UI.el('div', { class: 'field' }, [email]));
+    body.appendChild(UI.el('div', { class: 'field' }, [pass]));
+    body.appendChild(err); body.appendChild(ok); body.appendChild(btn); body.appendChild(forgot);
+    btn.onclick = async () => {
+      err.textContent = ''; ok.textContent = '';
+      btn.disabled = true; btn.textContent = '…';
+      try {
+        await fbAuth.signInWithEmailAndPassword((email.value || '').trim(), pass.value || '');
+        close(); // onAuthStateChanged resolves the member + refreshes the app
+      } catch (e) { err.textContent = I18n.t('auth_email_bad'); btn.disabled = false; btn.textContent = I18n.t('auth_signin'); }
+    };
+    forgot.onclick = async () => {
+      err.textContent = ''; ok.textContent = '';
+      const em = (email.value || '').trim();
+      if (!em) { email.focus(); return; }
+      try { await fbAuth.sendPasswordResetEmail(em); ok.textContent = I18n.t('auth_reset_sent'); }
+      catch (e) { err.textContent = I18n.t('auth_email_bad'); }
+    };
+  }
+
+  // Account panel for a signed-in member: link/reset email, sign out.
+  function renderAccount(body, close) {
+    body.innerHTML = '';
+    const user = fbAuth && fbAuth.currentUser;
+    const name = (_member && _member.name) || '';
+    body.appendChild(UI.el('p', { class: 'muted' }, I18n.t('auth_welcome') + (name ? ' ' + name : '')));
+    const err = UI.el('p', { class: 'auth-err' });
+    const ok = UI.el('p', { class: 'auth-ok' });
+    const emailProvider = user && (user.providerData || []).find((p) => p.providerId === 'password');
+    const linkedEmail = (emailProvider && emailProvider.email) || (user && user.email) || null;
+
+    if (linkedEmail) {
+      body.appendChild(UI.el('div', { class: 'field' }, [
+        UI.el('label', null, I18n.t('auth_linked_as')),
+        UI.el('div', { class: 'muted' }, linkedEmail)
+      ]));
+      const reset = UI.el('button', { class: 'btn btn-block', style: 'margin-top:4px' }, I18n.t('auth_reset_pw'));
+      reset.onclick = async () => {
+        err.textContent = ''; ok.textContent = '';
+        try { await fbAuth.sendPasswordResetEmail(linkedEmail); ok.textContent = I18n.t('auth_reset_sent'); }
+        catch (e) { err.textContent = e.message || 'Error'; }
+      };
+      body.appendChild(reset);
+    } else {
+      body.appendChild(UI.el('p', { class: 'muted', style: 'margin-top:4px' }, I18n.t('auth_link_email')));
+      const email = UI.el('input', { class: 'fld', type: 'email', placeholder: I18n.t('auth_email'), autocomplete: 'email' });
+      const pass = UI.el('input', { class: 'fld', type: 'password', placeholder: I18n.t('auth_password'), autocomplete: 'new-password' });
+      body.appendChild(UI.el('div', { class: 'field' }, [email]));
+      body.appendChild(UI.el('div', { class: 'field' }, [pass]));
+      const link = UI.el('button', { class: 'btn btn-block' }, I18n.t('auth_link_btn'));
+      link.onclick = async () => {
+        err.textContent = ''; ok.textContent = '';
+        const em = (email.value || '').trim(), pw = pass.value || '';
+        if (!em || pw.length < 6) { err.textContent = I18n.t('auth_email_bad'); return; }
+        link.disabled = true; link.textContent = '…';
+        try {
+          const cred = firebase.auth.EmailAuthProvider.credential(em, pw);
+          await user.linkWithCredential(cred);
+          renderAccount(body, close); // refresh -> now shows the linked email + reset
+        } catch (e) { err.textContent = I18n.t('auth_link_err'); link.disabled = false; link.textContent = I18n.t('auth_link_btn'); }
+      };
+      body.appendChild(link);
+    }
+    body.appendChild(err); body.appendChild(ok);
+    body.appendChild(UI.el('button', { class: 'btn btn-ghost btn-block', style: 'margin-top:14px',
+      onclick: () => { close(); Auth.logout(); } }, I18n.t('auth_logout')));
   }
 
   window.Auth = Auth;
