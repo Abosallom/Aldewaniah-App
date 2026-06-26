@@ -39,7 +39,12 @@
         adm_confirm_decline: 'رفض هذا الطلب؟', adm_confirm_delete: 'حذف هذا العضو؟',
         adm_self: 'أنت',
         adm_log: 'سجل الحضور', adm_log_none: 'لا يوجد حضور مسجّل بعد', adm_today: 'اليوم',
-        adm_suggest: 'اقتراحات الأعضاء', adm_suggest_none: 'لا توجد اقتراحات بعد', adm_suggest_del: 'حذف الاقتراح؟'
+        adm_suggest: 'اقتراحات الأعضاء', adm_suggest_none: 'لا توجد اقتراحات بعد', adm_suggest_del: 'حذف الاقتراح؟',
+        adm_mnt: 'الإيقاف المؤقت (الصيانة)', adm_mnt_state: 'الحالة', adm_mnt_run: 'يعمل', adm_mnt_pause: 'موقوف',
+        adm_mnt_msg: 'الرسالة المعروضة للأعضاء', adm_mnt_msg_ph: 'مثال: التطبيق متوقف مؤقتًا، نعود قريبًا',
+        adm_mnt_dur: 'المدة', adm_mnt_indef: 'حتى أوقفه يدويًا', adm_mnt_save: 'حفظ',
+        adm_mnt_on_now: 'التطبيق متوقف حاليًا ⛔', adm_mnt_off_now: 'التطبيق يعمل ✓',
+        adm_mnt_15: '١٥ دقيقة', adm_mnt_60: 'ساعة', adm_mnt_180: '٣ ساعات', adm_mnt_360: '٦ ساعات', adm_mnt_1440: 'يوم كامل'
       },
       en: {
         adm_title: 'Admin panel', adm_sub: 'Manage members and join requests',
@@ -53,7 +58,12 @@
         adm_confirm_decline: 'Decline this request?', adm_confirm_delete: 'Delete this member?',
         adm_self: 'You',
         adm_log: 'Check-in log', adm_log_none: 'No check-ins recorded yet', adm_today: 'Today',
-        adm_suggest: 'Member suggestions', adm_suggest_none: 'No suggestions yet', adm_suggest_del: 'Delete this suggestion?'
+        adm_suggest: 'Member suggestions', adm_suggest_none: 'No suggestions yet', adm_suggest_del: 'Delete this suggestion?',
+        adm_mnt: 'Maintenance / pause', adm_mnt_state: 'State', adm_mnt_run: 'Running', adm_mnt_pause: 'Paused',
+        adm_mnt_msg: 'Message shown to members', adm_mnt_msg_ph: 'e.g. The app is paused, back soon',
+        adm_mnt_dur: 'Duration', adm_mnt_indef: 'Until I turn it off', adm_mnt_save: 'Save',
+        adm_mnt_on_now: 'The app is paused ⛔', adm_mnt_off_now: 'The app is running ✓',
+        adm_mnt_15: '15 minutes', adm_mnt_60: '1 hour', adm_mnt_180: '3 hours', adm_mnt_360: '6 hours', adm_mnt_1440: '1 day'
       }
     },
 
@@ -70,6 +80,14 @@
           try { Notification.requestPermission().then(() => { nb.remove(); }); } catch (e) {}
         } }, I18n.t('ntf_enable'));
         view.appendChild(nb);
+      }
+
+      // ---- Maintenance / pause (admin only) ----
+      if (isAdmin) {
+        view.appendChild(UI.el('h2', { class: 'section-head' }, I18n.t('adm_mnt')));
+        const mntWrap = UI.el('div');
+        view.appendChild(mntWrap);
+        loadMaintenance(mntWrap);
       }
 
       // ---- Join requests (admin or co-admin with the permission) ----
@@ -129,6 +147,52 @@
             UI.el('div', { style: 'margin-top:4px;line-height:1.6' }, s.text || '')
           ]));
         });
+      }
+
+      async function loadMaintenance(wrap) {
+        wrap.innerHTML = '<div class="muted" style="text-align:center;padding:10px">…</div>';
+        let cur = {};
+        try { const d = await db.collection('config').doc('app').get(); if (d.exists) cur = d.data() || {}; } catch (e) {}
+        wrap.innerHTML = '';
+
+        const status = UI.el('div', { class: cur.paused ? 'card chip-red' : 'card', style: 'text-align:center;font-weight:800;margin-bottom:10px;color:' + (cur.paused ? 'var(--maroon)' : 'var(--navy)') },
+          cur.paused ? I18n.t('adm_mnt_on_now') : I18n.t('adm_mnt_off_now'));
+
+        const stateSel = UI.el('select', { class: 'fld' });
+        [['run', I18n.t('adm_mnt_run')], ['pause', I18n.t('adm_mnt_pause')]].forEach(([v, l]) => stateSel.appendChild(UI.el('option', { value: v }, l)));
+        stateSel.value = cur.paused ? 'pause' : 'run';
+
+        const msg = UI.el('textarea', { class: 'fld', maxlength: '200', placeholder: I18n.t('adm_mnt_msg_ph') }); msg.value = cur.message || '';
+
+        const dur = UI.el('select', { class: 'fld' });
+        [['0', I18n.t('adm_mnt_indef')], ['15', I18n.t('adm_mnt_15')], ['60', I18n.t('adm_mnt_60')], ['180', I18n.t('adm_mnt_180')], ['360', I18n.t('adm_mnt_360')], ['1440', I18n.t('adm_mnt_1440')]]
+          .forEach(([v, l]) => dur.appendChild(UI.el('option', { value: v }, l)));
+
+        const err = UI.el('p', { class: 'auth-err' });
+        const ok = UI.el('p', { class: 'auth-ok' });
+        const save = UI.el('button', { class: 'btn btn-block' }, I18n.t('adm_mnt_save'));
+        save.onclick = async () => {
+          err.textContent = ''; ok.textContent = '';
+          save.disabled = true; save.textContent = '…';
+          try {
+            const paused = stateSel.value === 'pause';
+            const mins = Number(dur.value) || 0;
+            const until = (paused && mins > 0) ? firebase.firestore.Timestamp.fromDate(new Date(Date.now() + mins * 60000)) : null;
+            await db.collection('config').doc('app').set({
+              paused: paused, message: (msg.value || '').trim(), until: until,
+              by: ((Auth.member && Auth.member()) || {}).name || '', at: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            ok.textContent = paused ? I18n.t('adm_mnt_on_now') : I18n.t('adm_mnt_off_now');
+            status.textContent = ok.textContent;
+          } catch (e) { err.textContent = e.message || 'Error'; }
+          save.disabled = false; save.textContent = I18n.t('adm_mnt_save');
+        };
+
+        wrap.appendChild(status);
+        wrap.appendChild(UI.el('div', { class: 'field' }, [UI.el('label', null, I18n.t('adm_mnt_state')), stateSel]));
+        wrap.appendChild(UI.el('div', { class: 'field' }, [UI.el('label', null, I18n.t('adm_mnt_msg')), msg]));
+        wrap.appendChild(UI.el('div', { class: 'field' }, [UI.el('label', null, I18n.t('adm_mnt_dur')), dur]));
+        wrap.appendChild(err); wrap.appendChild(ok); wrap.appendChild(save);
       }
 
       async function load() {
