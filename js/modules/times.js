@@ -51,6 +51,31 @@
   }
   const norm180 = (a) => { a = ((a % 360) + 360) % 360; return a > 180 ? a - 360 : a; };
 
+  // ---- Shared core (so the maintenance/pause page can show prayer times + Qibla too) ----
+  function tzNowMinutes(tz) {
+    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: tz || 'Asia/Riyadh', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+    return (+parts.find((p) => p.type === 'hour').value) * 60 + (+parts.find((p) => p.type === 'minute').value);
+  }
+  function nextKey(timings, tz) {
+    if (!timings) return null;
+    const m = (hhmm) => { const p = (hhmm || '0:0').split(':'); return (+p[0]) * 60 + (+p[1]); };
+    const now = tzNowMinutes(tz);
+    return ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'].find((k) => m(timings[k]) > now) || 'Fajr';
+  }
+  function loadTimings(city, cb) {
+    let timings = null, tz = 'Asia/Riyadh';
+    try { const cached = JSON.parse(localStorage.getItem(cacheKey(city.id)) || 'null'); if (cached) { timings = cached.timings; tz = cached.tz || tz; } } catch (e) {}
+    if (timings && cb) cb(timings, tz, true);
+    const url = 'https://api.aladhan.com/v1/timingsByCity?city=' + encodeURIComponent(city.city) +
+      '&country=' + encodeURIComponent(city.country) + '&method=4';
+    fetch(url).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then((d) => {
+      const t = d.data.timings, z = (d.data.meta && d.data.meta.timezone) || tz;
+      try { localStorage.setItem(cacheKey(city.id), JSON.stringify({ timings: t, tz: z })); } catch (e) {}
+      if (cb) cb(t, z, false);
+    }).catch(() => { if (cb) cb(timings, tz, false, true); });
+  }
+  window.PrayerCore = { CITIES, PRAYERS, KAABA, getCity, to12, qibla, norm180, nextKey, loadTimings };
+
   Sections.add({
     id: 'times',
     title: { ar: 'الأوقات', en: 'Times' },

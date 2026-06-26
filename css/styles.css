@@ -828,11 +828,16 @@ html{ scroll-behavior:smooth; }
 /* ===== Maintenance / pause page ===== */
 .mnt{
   position:fixed; inset:0; z-index:2000; display:none;
-  flex-direction:column; align-items:center; justify-content:center; gap:22px;
-  padding:32px; text-align:center;
+  flex-direction:column; align-items:stretch; justify-content:flex-start;
+  padding:28px 20px; text-align:center; overflow-y:auto; -webkit-overflow-scrolling:touch;
   background:linear-gradient(160deg,var(--navy) 0%,var(--navy-d) 60%,#0c1322 100%);
   color:#fff;
 }
+.mnt-inner{ margin:auto; display:flex; flex-direction:column; align-items:center; gap:20px; width:100%; max-width:420px; }
+.mnt-extras{ width:100%; display:flex; flex-direction:column; gap:8px; }
+.mnt-sect{ color:rgba(245,240,230,.82); font-weight:700; font-size:.95rem; }
+.mnt-card{ width:100%; text-align:initial; }
+.mnt-qbtn{ margin-top:2px; }
 .mnt-logo{ width:96px; height:96px; border-radius:26px; box-shadow:0 10px 38px rgba(0,0,0,.5); }
 .mnt-msg{ font-size:1.2rem; font-weight:700; line-height:1.9; max-width:440px;
   color:var(--cream); white-space:pre-wrap; }
