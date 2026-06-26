@@ -166,6 +166,12 @@ async function serveFile(request, env, url) {
   const headers = new Headers();
   obj.writeHttpMetadata(headers);
   headers.set("Cache-Control", "private, max-age=21600");
+  // Hardening: never let the browser sniff a different type, and only allow
+  // image/video/audio to render inline. Anything else is forced to download
+  // (so a stored file can't run as HTML/JS on this Worker origin).
+  headers.set("X-Content-Type-Options", "nosniff");
+  const ct = (headers.get("Content-Type") || "").toLowerCase();
+  if (!/^(image|video|audio)\//.test(ct)) headers.set("Content-Disposition", "attachment");
   // CORS applied centrally in fetch()
   return new Response(obj.body, { headers });
 }
@@ -207,6 +213,8 @@ async function uploadFile(request, env, url) {
 
   const prefix = DIRS[(url && url.searchParams.get("dir")) || "gallery"] || PREFIX;
   const type = request.headers.get("X-File-Type") || "application/octet-stream";
+  // Only photos and videos may be uploaded (gallery + chat). Reject anything else.
+  if (!/^(image|video)\//i.test(type)) return json({ error: "unsupported type" }, 415);
   const rawName = decodeURIComponent(request.headers.get("X-File-Name") || "file");
   const safe = rawName.replace(/[^\w.\-]+/g, "_").slice(-80) || "file";
   const key = prefix + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "_" + safe;
