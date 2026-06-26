@@ -38,8 +38,7 @@
         adm_perm_requests: 'السماح بالموافقة على طلبات الانضمام',
         adm_confirm_decline: 'رفض هذا الطلب؟', adm_confirm_delete: 'حذف هذا العضو؟',
         adm_self: 'أنت',
-        adm_log: 'سجل الحضور', adm_log_none: 'لا يوجد حضور مسجّل بعد', adm_today: 'اليوم',
-        adm_rebuild_dir: 'تحديث دليل الأعضاء', adm_rebuild_done: 'تم تحديث الدليل ✓'
+        adm_log: 'سجل الحضور', adm_log_none: 'لا يوجد حضور مسجّل بعد', adm_today: 'اليوم'
       },
       en: {
         adm_title: 'Admin panel', adm_sub: 'Manage members and join requests',
@@ -52,8 +51,7 @@
         adm_perm_requests: 'Can approve join requests',
         adm_confirm_decline: 'Decline this request?', adm_confirm_delete: 'Delete this member?',
         adm_self: 'You',
-        adm_log: 'Check-in log', adm_log_none: 'No check-ins recorded yet', adm_today: 'Today',
-        adm_rebuild_dir: 'Rebuild members directory', adm_rebuild_done: 'Directory updated ✓'
+        adm_log: 'Check-in log', adm_log_none: 'No check-ins recorded yet', adm_today: 'Today'
       }
     },
 
@@ -87,9 +85,6 @@
         view.appendChild(UI.el('div', { class: 'add-fab-wrap' }, [
           UI.el('button', { class: 'btn btn-block', onclick: openAdd }, '+ ' + I18n.t('adm_add'))
         ]));
-        view.appendChild(UI.el('div', { class: 'add-fab-wrap', style: 'margin-top:-8px' }, [
-          UI.el('button', { class: 'btn btn-ghost btn-block', onclick: (e) => rebuildDirectory(e.target) }, '🔄  ' + I18n.t('adm_rebuild_dir'))
-        ]));
         memWrap = UI.el('div');
         view.appendChild(memWrap);
       }
@@ -102,40 +97,6 @@
         const logWrap = UI.el('div');
         view.appendChild(logWrap);
         loadLog(logWrap);
-      }
-
-      // Create a phone-free directory entry (returns its id). Reuses an existing one if given.
-      async function ensureDir(name, existingDirId) {
-        if (existingDirId) return existingDirId;
-        const ref = await db.collection('directory').add({
-          name: name || '', createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        return ref.id;
-      }
-      async function removeDir(dirId) {
-        if (!dirId) return;
-        try { await db.collection('directory').doc(dirId).delete(); } catch (e) {}
-      }
-      // One-time backfill: give every approved member a directory entry.
-      async function rebuildDirectory(btn) {
-        const orig = btn.textContent; btn.disabled = true; btn.textContent = '…';
-        try {
-          const snap = await db.collection('members').get();
-          const tasks = [];
-          snap.forEach((d) => {
-            const m = Object.assign({ phone: d.id }, d.data());
-            const approved = m.status === 'approved' || m.approved === true;
-            if (approved && !m.dirId) {
-              tasks.push((async () => {
-                const dirId = await ensureDir(m.name);
-                await db.collection('members').doc(m.phone).update({ dirId });
-              })());
-            }
-          });
-          await Promise.all(tasks);
-          btn.textContent = I18n.t('adm_rebuild_done');
-          setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2200);
-        } catch (e) { alert(e.message || 'Error'); btn.textContent = orig; btn.disabled = false; }
       }
 
       async function load() {
@@ -175,11 +136,10 @@
             ]),
             UI.el('div', { class: 'row', style: 'gap:8px' }, [
               UI.el('button', { class: 'btn', style: 'padding:8px 14px', onclick: async () => {
-                const dirId = await ensureDir(m.name, m.dirId);
-                await db.collection('members').doc(m.phone).update({ status: 'approved', dirId }); load();
+                await db.collection('members').doc(m.phone).update({ status: 'approved' }); load();
               } }, I18n.t('adm_approve')),
               UI.el('button', { class: 'btn btn-ghost', style: 'padding:8px 14px;color:var(--maroon);border-color:var(--maroon)',
-                onclick: () => UI.confirm(I18n.t('adm_confirm_decline'), async () => { await removeDir(m.dirId); await db.collection('members').doc(m.phone).delete(); load(); }) },
+                onclick: () => UI.confirm(I18n.t('adm_confirm_decline'), async () => { await db.collection('members').doc(m.phone).delete(); load(); }) },
                 I18n.t('adm_decline'))
             ])
           ])
@@ -209,7 +169,7 @@
               UI.el('button', { class: 'btn-ghost', style: 'border:none;cursor:pointer;color:var(--navy);padding:4px 8px',
                 onclick: () => openEdit(m) }, I18n.t('adm_edit')),
               isSelf ? null : UI.el('button', { style: 'border:none;background:none;color:var(--maroon);cursor:pointer;font-size:1.2rem',
-                onclick: () => UI.confirm(I18n.t('adm_confirm_delete'), async () => { await removeDir(m.dirId); await db.collection('members').doc(m.phone).delete(); load(); }) }, '×')
+                onclick: () => UI.confirm(I18n.t('adm_confirm_delete'), async () => { await db.collection('members').doc(m.phone).delete(); load(); }) }, '×')
             ])
           ])
         ]);
@@ -228,8 +188,7 @@
             value: 'no', options: yn() }
         ], async (data) => {
           const phone = normalizePhone(data.phone);
-          const dirId = await ensureDir(data.name);
-          const rec = { name: data.name, status: 'approved', dirId: dirId,
+          const rec = { name: data.name, status: 'approved',
             createdAt: firebase.firestore.FieldValue.serverTimestamp() };
           if (data.role === 'admin') { rec.admin = true; rec.perms = {}; }
           else if (data.role === 'coadmin') { rec.admin = false; rec.perms = { requests: data.p_requests === 'yes' }; }
@@ -256,7 +215,6 @@
           else if (data.role === 'coadmin') { patch.admin = false; patch.perms = { requests: data.p_requests === 'yes' }; }
           else { patch.admin = false; patch.perms = {}; }
           await db.collection('members').doc(m.phone).update(patch);
-          if (m.dirId) { try { await db.collection('directory').doc(m.dirId).set({ name: data.name }, { merge: true }); } catch (e) {} }
           load();
         });
       }

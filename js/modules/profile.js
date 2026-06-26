@@ -3,10 +3,10 @@
    A Sections sub-section (members only).
 
    Privacy: the directory lives in its own 'directory' collection
-   keyed by a random id (NOT the phone number), so browsing the
-   directory never exposes anyone's phone. Admin seeds an entry per
-   member (on approve / "rebuild directory"); each member edits
-   their OWN entry via the dirId stored on their member doc.
+   keyed by the member's Firebase UID (NOT their phone number), so
+   browsing the directory never exposes anyone's phone. Each member
+   creates and edits their OWN entry (self-service, no admin step):
+   they add a photo, display name, a saying, hobbies and a bio.
    =========================================================== */
 (function () {
   const COLL = 'directory';
@@ -22,18 +22,17 @@
         pr_title: 'الأعضاء', pr_sub: 'تعرّف على أعضاء الديوانية', pr_mine: 'ملفي الشخصي',
         pr_edit: 'تعديل ملفي', pr_name: 'الاسم', pr_saying: 'مقولتك المفضلة', pr_hobbies: 'الهوايات',
         pr_bio: 'نبذة عنك', pr_photo: 'الصورة الشخصية', pr_save: 'حفظ', pr_cancel: 'إلغاء',
-        pr_empty: 'لا توجد ملفات بعد', pr_you: 'أنت',
+        pr_empty: 'لا توجد ملفات بعد — كن أول من يضيف ملفه', pr_you: 'أنت',
         pr_locked: 'الأعضاء للأعضاء المعتمدين فقط',
-        pr_not_listed: 'لم تتم إضافتك إلى الدليل بعد — اطلب من المشرف تحديث الدليل',
         pr_no_info: 'لم يضِف هذا العضو معلومات بعد', pr_close: 'إغلاق'
       },
       en: {
         pr_title: 'Members', pr_sub: 'Meet the Dewaniah members', pr_mine: 'My profile',
         pr_edit: 'Edit my profile', pr_name: 'Name', pr_saying: 'Favourite saying', pr_hobbies: 'Hobbies',
         pr_bio: 'About you', pr_photo: 'Profile photo', pr_save: 'Save', pr_cancel: 'Cancel',
-        pr_empty: 'No profiles yet', pr_you: 'You',
+        pr_empty: 'No profiles yet — be the first to add yours', pr_you: 'You',
         pr_locked: 'Members area is for approved members only',
-        pr_not_listed: "You're not in the directory yet — ask an admin to rebuild the directory"
+        pr_no_info: "This member hasn't added any info yet", pr_close: 'Close'
       }
     },
 
@@ -44,7 +43,7 @@
         return;
       }
       const db = Auth.getDb();
-      const myDir = ((Auth.member && Auth.member()) || {}).dirId || null; // my directory doc id
+      const myUid = (firebase.auth().currentUser && firebase.auth().currentUser.uid) || null; // my directory key
       view.appendChild(UI.pageTitle(I18n.t('pr_title'), I18n.t('pr_sub')));
 
       view.appendChild(UI.el('div', { class: 'add-fab-wrap' }, [
@@ -53,7 +52,22 @@
 
       const grid = UI.el('div', { class: 'prof-grid' });
       view.appendChild(grid);
-      load();
+      ensureMine().then(load);
+
+      // Make sure I have a directory entry (created on first visit, name only).
+      async function ensureMine() {
+        if (!myUid) return;
+        try {
+          const ref = db.collection(COLL).doc(myUid);
+          const snap = await ref.get();
+          if (!snap.exists) {
+            await ref.set({
+              name: ((Auth.member && Auth.member()) || {}).name || '',
+              createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+          }
+        } catch (e) { /* non-fatal */ }
+      }
 
       async function load() {
         grid.innerHTML = '<div class="muted" style="text-align:center;grid-column:1/-1">…</div>';
@@ -64,7 +78,7 @@
         } catch (e) { grid.innerHTML = '<div class="auth-err" style="grid-column:1/-1">' + (e.message || 'Error') + '</div>'; return; }
         grid.innerHTML = '';
         if (!rows.length) { grid.appendChild(UI.el('div', { style: 'grid-column:1/-1' }, [UI.empty(I18n.t('pr_empty'))])); return; }
-        rows.sort((a, b) => (a.id === myDir ? -1 : b.id === myDir ? 1 : (a.name || '').localeCompare(b.name || '', 'ar')));
+        rows.sort((a, b) => (a.id === myUid ? -1 : b.id === myUid ? 1 : (a.name || '').localeCompare(b.name || '', 'ar')));
         rows.forEach((p) => grid.appendChild(card(p)));
       }
 
@@ -74,7 +88,7 @@
           : UI.el('div', { class: 'prof-photo prof-initials' }, UI.initials(p.name));
         return UI.el('div', { class: 'prof-card', onclick: () => openBrief(p) }, [
           avatar,
-          UI.el('div', { class: 'prof-name' }, (p.name || '—') + (p.id === myDir ? ' (' + I18n.t('pr_you') + ')' : '')),
+          UI.el('div', { class: 'prof-name' }, (p.name || '—') + (p.id === myUid ? ' (' + I18n.t('pr_you') + ')' : '')),
           p.saying ? UI.el('div', { class: 'prof-saying' }, '“' + p.saying + '”') : null,
           p.hobbies ? UI.el('div', { class: 'prof-line' }, '🎯 ' + p.hobbies) : null,
           p.bio ? UI.el('div', { class: 'prof-bio' }, p.bio) : null
@@ -86,7 +100,7 @@
         const backdrop = UI.el('div', { class: 'modal-backdrop' });
         const close = () => backdrop.remove();
         backdrop.onclick = (e) => { if (e.target === backdrop) close(); };
-        const isMe = p.id === myDir;
+        const isMe = p.id === myUid;
         const avatar = p.photo
           ? UI.el('img', { class: 'prof-brief-photo', src: p.photo, alt: '' })
           : UI.el('div', { class: 'prof-brief-photo prof-initials' }, UI.initials(p.name));
@@ -109,9 +123,9 @@
       }
 
       function editMine() {
-        if (!myDir) { alert(I18n.t('pr_not_listed')); return; }
+        if (!myUid) return;
         const cur = {};
-        db.collection(COLL).doc(myDir).get().then((d) => { if (d.exists) Object.assign(cur, d.data()); openForm(cur); }).catch(() => openForm(cur));
+        db.collection(COLL).doc(myUid).get().then((d) => { if (d.exists) Object.assign(cur, d.data()); openForm(cur); }).catch(() => openForm(cur));
       }
 
       function openForm(cur) {
@@ -150,9 +164,10 @@
         backdrop.appendChild(box); document.body.appendChild(backdrop);
 
         async function save() {
+          if (!myUid) { err.textContent = 'Error'; return; }
           saveBtn.disabled = true; saveBtn.textContent = '…';
           try {
-            await db.collection(COLL).doc(myDir).set({
+            await db.collection(COLL).doc(myUid).set({
               name: (name.value || '').trim() || (Auth.member() || {}).name || '',
               saying: (saying.value || '').trim(), hobbies: (hobbies.value || '').trim(),
               bio: (bio.value || '').trim(), photo: photoData || '',

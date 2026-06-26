@@ -21,13 +21,6 @@
 
   const lockSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>';
   const backSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>';
-  const refreshSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>';
-
-  // Manual escape hatch: reload the app (also picks up the newest version).
-  function refreshBtn() {
-    return UI.el('button', { class: 'sec-refresh', onclick: () => { try { location.reload(); } catch (e) {} },
-      html: refreshSvg + '<span>' + I18n.t('sec_refresh') + '</span>' });
-  }
 
   App.registerModule({
     id: 'sections',
@@ -47,7 +40,6 @@
 
   function grid(view) {
     view.appendChild(UI.pageTitle(I18n.t('sec_title'), I18n.t('sec_sub')));
-    view.appendChild(UI.el('div', { class: 'sec-refresh-row' }, [refreshBtn()]));
     const wrap = UI.el('div', { class: 'sec-grid' });
     Sections.list().forEach((s) => {
       const locked = s.memberOnly && !isMember();
@@ -64,11 +56,8 @@
 
   function open(view, s) {
     view.innerHTML = '';
-    view.appendChild(UI.el('div', { class: 'sec-bar' }, [
-      UI.el('button', { class: 'sec-back', onclick: () => { view.innerHTML = ''; grid(view); } },
-        [UI.el('span', { class: 'sec-back-ic', html: backSvg }), I18n.t('sec_back')]),
-      refreshBtn()
-    ]));
+    view.appendChild(UI.el('button', { class: 'sec-back', onclick: () => { view.innerHTML = ''; grid(view); } },
+      [UI.el('span', { class: 'sec-back-ic', html: backSvg }), I18n.t('sec_back')]));
     s.render(view);
   }
 })();
