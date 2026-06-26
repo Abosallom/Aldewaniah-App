@@ -53,8 +53,8 @@
        Order here sets the order in the bottom navigation. -->
   <script src="js/modules/home.js"></script>
   <script src="js/modules/tournaments.js"></script>
-  <script src="js/modules/sections.js"></script>
   <script src="js/modules/chat.js"></script>
+  <script src="js/modules/sections.js"></script>
   <script src="js/modules/admin.js"></script>
 
   <!-- Sub-sections (registered into the Sections tab; load after sections.js) -->
@@ -76,8 +76,37 @@
   <script src="js/chat-notify.js"></script>
 
   <script>
+    /* Auto-update: keep the app on the latest version without quitting/reopening.
+       When a new version is deployed, the new service worker installs in the
+       background; once ready we activate it and reload the page once. We also
+       re-check for updates periodically and whenever the app regains focus. */
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+      let updating = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (updating) window.location.reload();
+      });
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').then((reg) => {
+          const promote = (worker) => {
+            if (!worker) return;
+            worker.addEventListener('statechange', () => {
+              // A NEW version finished installing (controller exists = this is an
+              // update, not the first install) -> activate it now.
+              if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+                updating = true;
+                worker.postMessage({ type: 'SKIP_WAITING' });
+              }
+            });
+          };
+          if (reg.waiting && navigator.serviceWorker.controller) {
+            updating = true; reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+          reg.addEventListener('updatefound', () => promote(reg.installing));
+          const check = () => { reg.update().catch(() => {}); };
+          setInterval(check, 60000); // check for a new version every minute
+          document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+        }).catch(() => {});
+      });
     }
   </script>
 </body>

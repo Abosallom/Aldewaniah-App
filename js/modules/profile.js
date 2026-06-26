@@ -24,7 +24,8 @@
         pr_bio: 'نبذة عنك', pr_photo: 'الصورة الشخصية', pr_save: 'حفظ', pr_cancel: 'إلغاء',
         pr_empty: 'لا توجد ملفات بعد', pr_you: 'أنت',
         pr_locked: 'الأعضاء للأعضاء المعتمدين فقط',
-        pr_not_listed: 'لم تتم إضافتك إلى الدليل بعد — اطلب من المشرف تحديث الدليل'
+        pr_not_listed: 'لم تتم إضافتك إلى الدليل بعد — اطلب من المشرف تحديث الدليل',
+        pr_no_info: 'لم يضِف هذا العضو معلومات بعد', pr_close: 'إغلاق'
       },
       en: {
         pr_title: 'Members', pr_sub: 'Meet the Dewaniah members', pr_mine: 'My profile',
@@ -71,13 +72,40 @@
         const avatar = p.photo
           ? UI.el('img', { class: 'prof-photo', src: p.photo, alt: '' })
           : UI.el('div', { class: 'prof-photo prof-initials' }, UI.initials(p.name));
-        return UI.el('div', { class: 'prof-card' }, [
+        return UI.el('div', { class: 'prof-card', onclick: () => openBrief(p) }, [
           avatar,
           UI.el('div', { class: 'prof-name' }, (p.name || '—') + (p.id === myDir ? ' (' + I18n.t('pr_you') + ')' : '')),
           p.saying ? UI.el('div', { class: 'prof-saying' }, '“' + p.saying + '”') : null,
           p.hobbies ? UI.el('div', { class: 'prof-line' }, '🎯 ' + p.hobbies) : null,
           p.bio ? UI.el('div', { class: 'prof-bio' }, p.bio) : null
         ]);
+      }
+
+      // Tap a card -> full brief (members-only, same as the directory itself)
+      function openBrief(p) {
+        const backdrop = UI.el('div', { class: 'modal-backdrop' });
+        const close = () => backdrop.remove();
+        backdrop.onclick = (e) => { if (e.target === backdrop) close(); };
+        const isMe = p.id === myDir;
+        const avatar = p.photo
+          ? UI.el('img', { class: 'prof-brief-photo', src: p.photo, alt: '' })
+          : UI.el('div', { class: 'prof-brief-photo prof-initials' }, UI.initials(p.name));
+        const rows = [];
+        if (p.saying) rows.push(UI.el('div', { class: 'prof-saying', style: 'font-size:1rem' }, '“' + p.saying + '”'));
+        if (p.hobbies) rows.push(UI.el('div', { class: 'prof-brief-row' }, '🎯  ' + p.hobbies));
+        if (p.bio) rows.push(UI.el('div', { class: 'prof-bio', style: 'font-size:.95rem;margin-top:6px' }, p.bio));
+        if (!rows.length) rows.push(UI.el('p', { class: 'muted', style: 'text-align:center;margin-top:8px' }, I18n.t('pr_no_info')));
+        const actions = UI.el('div', { class: 'flex-between', style: 'justify-content:flex-end;gap:10px;margin-top:16px' }, [
+          isMe ? UI.el('button', { class: 'btn btn-ghost', onclick: () => { close(); editMine(); } }, '✏️  ' + I18n.t('pr_edit')) : null,
+          UI.el('button', { class: 'btn', onclick: close }, I18n.t('pr_close'))
+        ]);
+        const box = UI.el('div', { class: 'modal prof-brief' }, [
+          avatar,
+          UI.el('div', { class: 'prof-brief-name' }, (p.name || '—') + (isMe ? ' (' + I18n.t('pr_you') + ')' : '')),
+          UI.el('div', { class: 'prof-brief-body' }, rows),
+          actions
+        ]);
+        backdrop.appendChild(box); document.body.appendChild(backdrop);
       }
 
       function editMine() {
