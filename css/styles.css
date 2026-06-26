@@ -848,3 +848,60 @@ html{ scroll-behavior:smooth; }
 .mnt-count{ color:var(--gold); font-weight:800; font-size:1.05rem; letter-spacing:.5px;
   background:rgba(245,240,230,.1); border:1px solid rgba(245,240,230,.22);
   border-radius:999px; padding:9px 20px; }
+
+/* ===== قطّة / Calendar / Polls (shared member tools) ===== */
+.sp-form, .cal-form, .pl-form { display: flex; flex-direction: column; gap: 9px; margin-bottom: 14px; }
+.sp-title2 { font-weight: 800; color: var(--navy); font-size: 1.02rem; }
+.cal-row2 { display: flex; gap: 9px; }
+.cal-row2 .fld { flex: 1; min-width: 0; }
+.pl-opts { display: flex; flex-direction: column; gap: 8px; }
+.pl-addopt { align-self: flex-start; padding: 6px 12px; }
+
+.sp-list, .cal-list, .pl-list { display: flex; flex-direction: column; gap: 12px; }
+.sp-card, .pl-card { display: flex; flex-direction: column; gap: 10px; }
+.sp-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sp-name { font-weight: 800; color: var(--navy); font-size: 1.08rem; }
+.sp-x { background: rgba(114,47,55,.1); color: var(--maroon); border: none; width: 28px; height: 28px;
+  border-radius: 50%; font-size: 1.1rem; line-height: 1; cursor: pointer; flex: 0 0 auto; }
+.sp-x:hover { background: rgba(114,47,55,.2); }
+.sp-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sp-stat { background: var(--cream); border: 1px solid var(--line); border-radius: 12px; padding: 9px 12px;
+  display: flex; flex-direction: column; gap: 2px; }
+.sp-stat b { color: var(--navy); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.sp-stat span { color: #6b7280; font-size: .78rem; }
+.sp-who { color: var(--gold-d); font-size: .85rem; font-weight: 600; }
+.sp-pay { width: 100%; }
+.sp-by, .cal-by, .pl-by { color: #9aa1ad; font-size: .76rem; }
+
+/* Calendar */
+.cal-item { display: flex; align-items: stretch; gap: 12px; }
+.cal-date { flex: 0 0 58px; background: var(--navy); color: #fff; border-radius: 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 4px; }
+.cal-date.today { background: var(--maroon); }
+.cal-dnum { font-size: 1.5rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.cal-dmon { font-size: .68rem; opacity: .9; margin-top: 3px; text-align: center; }
+.cal-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; justify-content: center; }
+.cal-name { font-weight: 700; color: var(--navy); }
+.cal-meta { color: var(--gold-d); font-size: .84rem; font-weight: 600; }
+.cal-note { color: var(--ink); font-size: .86rem; }
+
+/* Polls */
+.pl-q { font-weight: 800; color: var(--navy); font-size: 1.06rem; }
+.pl-choices { display: flex; flex-direction: column; gap: 8px; }
+.pl-choice { position: relative; overflow: hidden; text-align: start; border: 1px solid var(--line);
+  background: var(--cream); border-radius: 12px; padding: 11px 14px; cursor: pointer;
+  display: flex; align-items: center; gap: 8px; transition: border-color .15s, transform .06s; }
+.pl-choice:active { transform: scale(.99); }
+.pl-choice.chosen { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+.pl-choice.locked { cursor: default; }
+.pl-bar { position: absolute; inset: 0; z-index: 0; }
+.pl-fill { height: 100%; background: rgba(194,160,80,.20); transition: width .4s ease; }
+.pl-choice.chosen .pl-fill { background: rgba(194,160,80,.34); }
+.pl-otext { position: relative; z-index: 1; flex: 1; color: var(--navy); font-weight: 600; }
+.pl-opct { position: relative; z-index: 1; color: var(--navy); font-weight: 800; font-variant-numeric: tabular-nums; }
+.pl-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pl-count { color: var(--gold-d); font-weight: 700; font-size: .85rem; }
+.pl-foot .pl-by { margin-inline-start: auto; }
+.pl-closebtn { background: var(--cream); border: 1px solid var(--line); color: var(--navy);
+  border-radius: 999px; padding: 5px 12px; font-size: .8rem; font-weight: 600; cursor: pointer; }
+.pl-closebtn:hover { background: #efe7d6; }
