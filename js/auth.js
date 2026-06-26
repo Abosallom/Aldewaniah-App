@@ -146,6 +146,27 @@
 
   function reset() { _status = null; _isAdmin = false; _perms = {}; _member = null; }
 
+  // Email the admin when someone requests to join. Sent from the joining
+  // user's browser via FormSubmit (no backend), so it arrives even when the
+  // admin's app is closed. (First time, the admin must click FormSubmit's
+  // one-time activation email.)
+  function notifyJoin(name, phone) {
+    try {
+      const email = (window.CONTENT && CONTENT.contact && CONTENT.contact.email) || 'Aziz@aldewaniah.com';
+      fetch('https://formsubmit.co/ajax/' + encodeURIComponent(email), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({
+          _subject: 'طلب انضمام جديد — الديوانية',
+          'الاسم': name,
+          'الجوال': phone,
+          'الرسالة': name + ' يطلب الانضمام إلى الديوانية. افتح صفحة الإدارة للموافقة أو الرفض.',
+          _captcha: 'false', _template: 'table'
+        })
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
   async function resolve(phone) {
     try {
       const doc = await db.collection('members').doc(phone).get();
@@ -251,6 +272,7 @@
         });
         _status = 'pending';
         _member = { phone, name, status: 'pending', admin: false };
+        notifyJoin(name, phone);
         body.innerHTML = '';
         body.appendChild(UI.el('p', { class: 'auth-ok' }, I18n.t('auth_req_sent')));
         body.appendChild(UI.el('button', { class: 'btn btn-block', style: 'margin-top:10px',
