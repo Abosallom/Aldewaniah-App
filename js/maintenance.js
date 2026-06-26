@@ -12,14 +12,14 @@
   I18n.extend({
     ar: {
       mnt_default: 'التطبيق متوقف مؤقتًا للصيانة. نعود قريبًا بإذن الله 🌿', mnt_until: 'يعود العمل بعد',
-      mnt_prayers: 'مواقيت الصلاة اليوم', mnt_qibla_btn: 'بوصلة القبلة',
+      mnt_prayers: 'مواقيت الصلاة اليوم', mnt_open: 'مواقيت الصلاة والقبلة', mnt_back: 'رجوع',
       mnt_qibla: 'القبلة', mnt_enable: 'تفعيل البوصلة', mnt_from_north: 'من الشمال',
       mnt_aligned: 'أنت متجه نحو القبلة', mnt_hint: 'لُف بجهازك حتى يشير سهم الكعبة للأعلى',
       mnt_hint_north: 'وجّه أعلى الجهاز نحو الشمال ثم اتبع السهم'
     },
     en: {
       mnt_default: "The app is paused for maintenance. We'll be back soon 🌿", mnt_until: 'Back in',
-      mnt_prayers: "Today's prayer times", mnt_qibla_btn: 'Qibla compass',
+      mnt_prayers: "Today's prayer times", mnt_open: 'Prayer times & Qibla', mnt_back: 'Back',
       mnt_qibla: 'Qibla', mnt_enable: 'Enable compass', mnt_from_north: 'from North',
       mnt_aligned: 'You are facing the Qibla', mnt_hint: 'Turn until the Kaaba arrow points straight up',
       mnt_hint_north: 'Point the top of the device North, then follow the arrow'
@@ -71,31 +71,42 @@
     const sig = JSON.stringify({ m: (last && last.message) || '', u: until, l: I18n.lang });
     if (el.style.display !== 'none' && shownSig === sig) return;
     shownSig = sig;
-    stopTick();
+    stopTick(); stopOrient(); heading = null; wasAligned = false;
 
-    const inner = UI.el('div', { class: 'mnt-inner' });
-    inner.appendChild(UI.el('img', { class: 'mnt-logo', src: 'assets/icon-192.png', alt: '' }));
-    inner.appendChild(UI.el('div', { class: 'mnt-msg' }, (last && last.message) || I18n.t('mnt_default')));
-    if (until && until > Date.now()) { const c = UI.el('div', { class: 'mnt-count' }); inner.appendChild(c); countdown(c); }
+    // --- Pane 1: the pause message + a single "Prayer times & Qibla" option ---
+    const main = UI.el('div', { class: 'mnt-inner mnt-pane' });
+    main.appendChild(UI.el('img', { class: 'mnt-logo', src: 'assets/icon-192.png', alt: '' }));
+    main.appendChild(UI.el('div', { class: 'mnt-msg' }, (last && last.message) || I18n.t('mnt_default')));
+    if (until && until > Date.now()) { const c = UI.el('div', { class: 'mnt-count' }); main.appendChild(c); countdown(c); }
+    const openBtn = UI.el('button', { class: 'btn btn-block mnt-open' }, '🕌 ' + I18n.t('mnt_open'));
+    main.appendChild(UI.el('div', { class: 'mnt-extras' }, [openBtn]));
 
-    buildPrayers(inner);
-    buildQibla(inner);
+    // --- Pane 2: the prayer-times + Qibla feature (hidden until opened) ---
+    const feat = UI.el('div', { class: 'mnt-inner mnt-pane', style: 'display:none' });
+    const backBtn = UI.el('button', { class: 'sec-back mnt-back' }, '‹ ' + I18n.t('mnt_back'));
+    feat.appendChild(backBtn);
+    feat.appendChild(UI.el('h2', { class: 'mnt-ftitle' }, I18n.t('mnt_open')));
+    feat.appendChild(buildPrayers());
+    feat.appendChild(buildQibla());
+
+    openBtn.onclick = () => { main.style.display = 'none'; feat.style.display = 'flex'; el.scrollTop = 0; };
+    backBtn.onclick = () => { feat.style.display = 'none'; main.style.display = 'flex'; stopOrient(); el.scrollTop = 0; };
 
     el.innerHTML = '';
-    el.appendChild(inner);
+    el.appendChild(main);
+    el.appendChild(feat);
     el.style.display = 'flex';
   }
 
   // ---- Today's prayer times (reuses the Times section core) ----
-  function buildPrayers(inner) {
-    const PC = window.PrayerCore; if (!PC) return;
+  function buildPrayers() {
+    const PC = window.PrayerCore;
+    const wrap = UI.el('div', { class: 'mnt-extras' });
+    if (!PC) return wrap;
     const city = PC.getCity();
     const card = UI.el('div', { class: 'tm-pray mnt-card' });
-    const wrap = UI.el('div', { class: 'mnt-extras' }, [
-      UI.el('div', { class: 'mnt-sect' }, I18n.t('mnt_prayers') + ' · ' + I18n.pick(city)),
-      card
-    ]);
-    inner.appendChild(wrap);
+    wrap.appendChild(UI.el('div', { class: 'mnt-sect' }, I18n.t('mnt_prayers') + ' · ' + I18n.pick(city)));
+    wrap.appendChild(card);
 
     const paint = (timings, tz) => {
       if (!timings) return;
@@ -117,11 +128,14 @@
       }, 30000);
     };
     PC.loadTimings(city, (timings, tz) => paint(timings, tz));
+    return wrap;
   }
 
-  // ---- Qibla compass (optional — revealed on tap) ----
-  function buildQibla(inner) {
-    const PC = window.PrayerCore; if (!PC) return;
+  // ---- Qibla compass (shown inside the feature pane) ----
+  function buildQibla() {
+    const PC = window.PrayerCore;
+    const outer = UI.el('div', { class: 'mnt-extras' });
+    if (!PC) return outer;
     const city = PC.getCity();
 
     const rose = UI.el('div', { class: 'qibla-rose' }, [
@@ -139,18 +153,11 @@
     const aligned = UI.el('div', { class: 'qibla-aligned' });
     const hint = UI.el('div', { class: 'tm-note', style: 'color:#5b6472' });
     const enableBtn = UI.el('button', { class: 'btn btn-block', style: 'margin-top:8px', onclick: enableCompass }, '🧭 ' + I18n.t('mnt_enable'));
-    const card = UI.el('div', { class: 'qibla-card mnt-card', style: 'display:none' }, [
+    const card = UI.el('div', { class: 'qibla-card mnt-card' }, [
       UI.el('h3', { class: 'card-title', style: 'text-align:center;margin:0 0 4px' }, I18n.t('mnt_qibla')),
       dial, readout, aligned, hint, enableBtn
     ]);
-
-    const toggle = UI.el('button', { class: 'btn btn-block mnt-qbtn' }, '🧭 ' + I18n.t('mnt_qibla_btn'));
-    toggle.onclick = () => {
-      const open = card.style.display === 'none';
-      card.style.display = open ? 'block' : 'none';
-      if (open) { paintQibla(); card.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-    };
-    inner.appendChild(UI.el('div', { class: 'mnt-extras' }, [toggle, card]));
+    outer.appendChild(card);
 
     function paintQibla() {
       const q = PC.qibla(city.lat, city.lon);
@@ -184,6 +191,9 @@
         DOE.requestPermission().then((s) => { if (s === 'granted') startListening(); }).catch(() => {});
       } else { startListening(); }
     }
+
+    paintQibla();   // draw the static bearing immediately (before compass is enabled)
+    return outer;
   }
 
   function stopTick() { if (tick) { clearInterval(tick); tick = null; } }
