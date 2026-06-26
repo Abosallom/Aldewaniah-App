@@ -1,15 +1,15 @@
 /* ===========================================================
    Chat (الدردشة) — real-time members' group chat (Firestore).
-   Members only. A Sections sub-section.
+   Members only. A top-level bottom-nav tab.
    =========================================================== */
 (function () {
   let unsub = null;
 
-  Sections.add({
+  App.registerModule({
     id: 'chat',
+    memberOnly: true,
     title: { ar: 'الدردشة', en: 'Chat' },
     subtitle: { ar: 'دردشة الأعضاء', en: 'Members group chat' },
-    memberOnly: true,
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 5h16v11H8l-4 3z"/></svg>',
     strings: {
       ar: { ch_title: 'الدردشة', ch_sub: 'دردشة بين الأعضاء', ch_ph: 'اكتب رسالة…', ch_send: 'إرسال',

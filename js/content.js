@@ -24,8 +24,7 @@ window.CONTENT = {
     {
       id: '4th',
       name: { ar: 'البطولة الرمضانية الرابعة', en: '4th Ramadan Tournament' },
-      status: { ar: 'الحالية', en: 'Current' },
-      current: true,
+      status: { ar: 'منتهية', en: 'Finished' },
       embed: 'https://brackethq.com/b/k7x9c/embed/'
     },
     {
