@@ -67,14 +67,23 @@
 
       async function load() {
         grid.innerHTML = '<div class="muted" style="text-align:center;grid-column:1/-1">…</div>';
-        let rows = [];
+        const byId = {};
+        // 1) the full roster — every approved member shows up by name
         try {
-          const snap = await db.collection(COLL).get();
-          snap.forEach((d) => rows.push(Object.assign({ id: d.id }, d.data())));
-        } catch (e) { grid.innerHTML = '<div class="auth-err" style="grid-column:1/-1">' + (e.message || 'Error') + '</div>'; return; }
+          const ms = await db.collection('members').where('status', '==', 'approved').get();
+          ms.forEach((d) => { const m = d.data() || {}; byId[d.id] = { id: d.id, name: m.name || '' }; });
+        } catch (e) { /* not permitted / offline — fall back to profiles only */ }
+        // 2) profiles overlay the richer details (photo, saying, hobbies, bio)
+        try {
+          const ps = await db.collection(COLL).get();
+          ps.forEach((d) => { byId[d.id] = Object.assign(byId[d.id] || { id: d.id }, d.data()); });
+        } catch (e) {
+          if (!Object.keys(byId).length) { grid.innerHTML = '<div class="auth-err" style="grid-column:1/-1">' + (e.message || 'Error') + '</div>'; return; }
+        }
+        const rows = Object.keys(byId).map((k) => byId[k]);
         grid.innerHTML = '';
         if (!rows.length) { grid.appendChild(UI.el('div', { style: 'grid-column:1/-1' }, [UI.empty(I18n.t('pr_empty'))])); return; }
-        rows.sort((a, b) => (a.id === me ? -1 : b.id === me ? 1 : 0));
+        rows.sort((a, b) => (a.id === me ? -1 : b.id === me ? 1 : (a.name || '').localeCompare(b.name || '', 'ar')));
         rows.forEach((p) => grid.appendChild(card(p)));
       }
 
