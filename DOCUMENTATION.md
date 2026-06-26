@@ -50,7 +50,7 @@ Aldewaniah App/
 ├─ manifest.json           ← PWA manifest (name, icons, theme)
 ├─ sw.js                   ← service worker (offline cache). BUMP CACHE ON EVERY DEPLOY.
 ├─ css/styles.css          ← all styles + theme variables (:root)
-├─ assets/icon.svg         ← app/brand icon
+├─ assets/                 ← icons & brand images (PNG)
 ├─ js/
 │  ├─ firebase-config.js   ← public Firebase web config + databaseURL + default country code
 │  ├─ i18n.js              ← AR/EN strings engine + RTL handling
@@ -65,7 +65,6 @@ Aldewaniah App/
 │     ├─ gallery.js        ← gallery (R2-backed)  [sub-section]
 │     ├─ baloot.js         ← Baloot calculator    [sub-section]
 │     ├─ buzzer.js         ← WebRTC buzzer         [sub-section]
-│     ├─ contact.js        ← Contact (NOT loaded anymore; kept for reference)
 │     └─ admin.js          ← admin/staff panel
 └─ worker/
    └─ aldewaniah-media-worker.js  ← source of the Cloudflare Worker (R2 gallery API)
