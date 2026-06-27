@@ -208,6 +208,12 @@
         wrap.appendChild(err); wrap.appendChild(ok); wrap.appendChild(save);
       }
 
+      // order by when added (oldest first); members without a timestamp sort first
+      const byAdded = (a, b) => {
+        const ta = (a.createdAt && a.createdAt.seconds) || 0, tb = (b.createdAt && b.createdAt.seconds) || 0;
+        return ta !== tb ? ta - tb : (a.name || '').localeCompare(b.name || '');
+      };
+
       async function load() {
         if (reqWrap) reqWrap.innerHTML = '<div class="muted" style="text-align:center;padding:10px">…</div>';
         if (memWrap) memWrap.innerHTML = '';
@@ -226,12 +232,13 @@
         if (reqWrap) {
           reqWrap.innerHTML = '';
           if (!pending.length) reqWrap.appendChild(UI.el('p', { class: 'muted', style: 'text-align:center' }, I18n.t('adm_no_requests')));
+          pending.sort(byAdded);
           pending.forEach((m) => reqWrap.appendChild(requestCard(m)));
         }
         if (memWrap) {
           memWrap.innerHTML = '';
           if (!approved.length) memWrap.appendChild(UI.el('p', { class: 'muted', style: 'text-align:center' }, I18n.t('adm_no_members')));
-          approved.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+          approved.sort(byAdded);
           approved.forEach((m) => memWrap.appendChild(memberCard(m)));
         }
       }
