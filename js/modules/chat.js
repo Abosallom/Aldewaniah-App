@@ -2,8 +2,8 @@
    Chat (الدردشة) — real-time members' group chat (Firestore).
    Members only. A top-level bottom-nav tab.
    - native full-height screen, message grouping
-   - attachments: photos, voice notes, video notes (stored on R2)
-   - an "attachments" panel summarising everything shared
+   - WhatsApp-style press-and-HOLD voice & video notes
+   - photos, plus a Media panel and an Attachments (voice) panel
    - per-member new-message notifications (see chat-notify.js)
    =========================================================== */
 (function () {
@@ -18,7 +18,6 @@
       [UI.el('img', { class: 'lb-img', src: src })]);
     document.body.appendChild(bd);
   }
-  // A generic centered modal that holds any node (used for the attachments panel).
   function sheetModal(title, bodyNode) {
     const bd = UI.el('div', { class: 'modal-backdrop' });
     bd.onclick = (e) => { if (e.target === bd) bd.remove(); };
@@ -42,19 +41,19 @@
     strings: {
       ar: { ch_title: 'الدردشة', ch_sub: 'دردشة بين الأعضاء', ch_ph: 'اكتب رسالة…', ch_send: 'إرسال',
         ch_empty: 'لا توجد رسائل بعد — ابدأ المحادثة', ch_locked: 'الدردشة للأعضاء فقط',
-        ch_photo: 'صورة', ch_video: 'فيديو', ch_voice: 'رسالة صوتية', ch_attach: 'إرفاق',
-        ch_img: 'صورة', ch_voice_msg: '🎤 رسالة صوتية', ch_video_msg: '🎥 فيديو',
-        ch_recording: 'يسجّل', ch_cancel: 'إلغاء', ch_rec_send: 'إرسال',
-        ch_voice_unsup: 'التسجيل الصوتي غير مدعوم على هذا الجهاز', ch_mic_denied: 'تعذّر الوصول للميكروفون',
+        ch_photo: 'صورة', ch_voice_msg: '🎤 رسالة صوتية', ch_video_msg: '🎥 فيديو',
+        ch_slide_cancel: 'اسحب لأعلى للإلغاء ⬆', ch_rel_cancel: 'أفلت للإلغاء',
+        ch_voice_unsup: 'التسجيل غير مدعوم على هذا الجهاز', ch_mic_denied: 'تعذّر الوصول للميكروفون/الكاميرا',
+        ch_hold_hint: 'اضغط مطوّلاً 🎤 للصوت و 🎥 للفيديو',
         ch_attachments: 'المرفقات', ch_no_attach: 'لا توجد رسائل صوتية بعد', ch_media: 'الوسائط', ch_no_media: 'لا توجد وسائط بعد',
         ch_notif_on: '🔔 تنبيهات الدردشة مفعّلة', ch_notif_off: '🔕 تفعيل تنبيهات الدردشة',
         ch_del: 'حذف', ch_del_confirm: 'حذف هذه الرسالة؟' },
       en: { ch_title: 'Chat', ch_sub: 'Members group chat', ch_ph: 'Type a message…', ch_send: 'Send',
         ch_empty: 'No messages yet — say hi', ch_locked: 'Chat is for members only',
-        ch_photo: 'Photo', ch_video: 'Video', ch_voice: 'Voice note', ch_attach: 'Attach',
-        ch_img: 'Photo', ch_voice_msg: '🎤 Voice note', ch_video_msg: '🎥 Video',
-        ch_recording: 'Recording', ch_cancel: 'Cancel', ch_rec_send: 'Send',
-        ch_voice_unsup: 'Voice recording is not supported on this device', ch_mic_denied: 'Could not access the microphone',
+        ch_photo: 'Photo', ch_voice_msg: '🎤 Voice note', ch_video_msg: '🎥 Video',
+        ch_slide_cancel: 'Slide up to cancel ⬆', ch_rel_cancel: 'Release to cancel',
+        ch_voice_unsup: 'Recording is not supported on this device', ch_mic_denied: 'Could not access mic/camera',
+        ch_hold_hint: 'Hold 🎤 for voice, 🎥 for video',
         ch_attachments: 'Attachments', ch_no_attach: 'No voice notes yet', ch_media: 'Media', ch_no_media: 'No media yet',
         ch_notif_on: '🔔 Chat alerts on', ch_notif_off: '🔕 Turn on chat alerts',
         ch_del: 'Delete', ch_del_confirm: 'Delete this message?' }
@@ -74,7 +73,7 @@
       const screen = UI.el('div', { class: 'chat-screen' });
       view.appendChild(screen);
 
-      /* head: notifications toggle + attachments panel button */
+      /* head: notifications toggle + Media + Attachments panels */
       const headKids = [];
       if (window.ChatNotify && window.Notification) {
         const bell = UI.el('button', { class: 'chat-bell', onclick: () => {
@@ -83,43 +82,47 @@
         if (ChatNotify.enabled()) bell.classList.add('on');
         headKids.push(bell);
       }
-      const mediaBtn = UI.el('button', { class: 'chat-bell', onclick: () => openAttachments('media') }, '🖼️ ' + I18n.t('ch_media'));
-      const attBtn = UI.el('button', { class: 'chat-bell', onclick: () => openAttachments('attach') }, '📎 ' + I18n.t('ch_attachments'));
-      headKids.push(mediaBtn, attBtn);
+      headKids.push(UI.el('button', { class: 'chat-bell', onclick: () => openAttachments('media') }, '🖼️ ' + I18n.t('ch_media')));
+      headKids.push(UI.el('button', { class: 'chat-bell', onclick: () => openAttachments('attach') }, '📎 ' + I18n.t('ch_attachments')));
       screen.appendChild(UI.el('div', { class: 'chat-head' }, headKids));
 
       const list = UI.el('div', { class: 'chat-list' });
 
-      /* hidden file inputs: photo (resized) + video (native capture) */
+      /* hidden file inputs: photo (resized) + video capture (fallback if no MediaRecorder) */
       const photoFile = UI.el('input', { type: 'file', accept: 'image/*', style: 'display:none' });
-      const videoFile = UI.el('input', { type: 'file', accept: 'video/*', capture: 'environment', style: 'display:none' });
+      const vidFallback = UI.el('input', { type: 'file', accept: 'video/*', capture: 'user', style: 'display:none' });
       photoFile.onchange = () => { const f = photoFile.files && photoFile.files[0]; photoFile.value = ''; if (f) sendPhoto(f); };
-      videoFile.onchange = () => { const f = videoFile.files && videoFile.files[0]; videoFile.value = ''; if (f) sendVideo(f); };
+      vidFallback.onchange = () => { const f = vidFallback.files && vidFallback.files[0]; vidFallback.value = ''; if (f) sendVideoFile(f); };
 
-      /* normal input row: attach (+) , text, send */
-      const attachBtn = UI.el('button', { class: 'chat-photo', title: I18n.t('ch_attach'), onclick: () => openAttachMenu(),
-        html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>' });
+      const photoBtn = UI.el('button', { class: 'chat-photo', title: I18n.t('ch_photo'), onclick: () => photoFile.click(),
+        html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="11" r="2"/><path d="M21 17l-5-5-4 4-2-2-4 4"/></svg>' });
+      const micBtn = UI.el('button', { class: 'chat-photo chat-hold', title: I18n.t('ch_voice_msg'),
+        html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>' });
+      const vidBtn = UI.el('button', { class: 'chat-photo chat-hold', title: I18n.t('ch_video_msg'),
+        html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="M16 10l5-3v10l-5-3"/></svg>' });
       const input = UI.el('input', { class: 'chat-input', type: 'text', placeholder: I18n.t('ch_ph'), maxlength: '500', enterkeyhint: 'send' });
       const sendBtn = UI.el('button', { class: 'btn btn-green chat-send', onclick: () => sendText() }, I18n.t('ch_send'));
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendText(); } });
-      const normalBar = UI.el('div', { class: 'chat-bar' }, [attachBtn, photoFile, videoFile, input, sendBtn]);
+      const normalBar = UI.el('div', { class: 'chat-bar' }, [photoBtn, micBtn, vidBtn, photoFile, vidFallback, input, sendBtn]);
 
-      /* recording bar (hidden until a voice note is being recorded) */
+      /* recording overlay (shown while holding) */
       const recDot = UI.el('span', { class: 'chat-rec-dot' });
       const recTime = UI.el('span', { class: 'chat-rec-time' }, '0:00');
-      const recCancel = UI.el('button', { class: 'chat-rec-x', onclick: () => cancelVoice() }, '✕');
-      const recSend = UI.el('button', { class: 'btn btn-green chat-send', onclick: () => stopVoice(true) }, I18n.t('ch_rec_send'));
-      const recBar = UI.el('div', { class: 'chat-bar chat-recbar', style: 'display:none' }, [
-        recCancel, UI.el('div', { class: 'chat-rec-info' }, [recDot, UI.el('span', null, I18n.t('ch_recording')), recTime]), recSend
+      const recHint = UI.el('span', { class: 'chat-rec-hint' }, I18n.t('ch_slide_cancel'));
+      const recPrev = UI.el('video', { class: 'chat-vidprev', muted: '', playsinline: '', style: 'display:none' });
+      const recBar = UI.el('div', { class: 'chat-bar chat-recbar' }, [
+        recDot, UI.el('div', { class: 'chat-rec-info' }, [recTime, recHint])
       ]);
+      const recWrap = UI.el('div', { class: 'chat-recwrap', style: 'display:none' }, [recPrev, recBar]);
 
       screen.appendChild(list);
       screen.appendChild(normalBar);
-      screen.appendChild(recBar);
+      screen.appendChild(recWrap);
+      screen.appendChild(UI.el('div', { class: 'chat-hint' }, I18n.t('ch_hold_hint')));
 
       list.innerHTML = '<div class="muted" style="text-align:center;padding:14px">…</div>';
       let renderedKeys = [], lastDocs = [];
-      const signedUrls = {};   // R2 key -> short-lived signed URL
+      const signedUrls = {};
       let atBottom = true;
       list.addEventListener('scroll', () => { atBottom = nearBottom(); });
 
@@ -156,12 +159,8 @@
           const src = m.imageKey ? signedUrls[m.imageKey] : m.image;
           return UI.el('img', { class: 'chat-img', src: src, alt: '', onclick: () => lightbox(src), onload: pinIfBottom });
         }
-        if (m.audioKey) {
-          return UI.el('audio', { class: 'chat-audio', src: signedUrls[m.audioKey], controls: '', preload: 'metadata' });
-        }
-        if (m.videoKey) {
-          return UI.el('video', { class: 'chat-video', src: signedUrls[m.videoKey], controls: '', playsinline: '', preload: 'metadata', onloadeddata: pinIfBottom });
-        }
+        if (m.audioKey) return UI.el('audio', { class: 'chat-audio', src: signedUrls[m.audioKey], controls: '', preload: 'metadata' });
+        if (m.videoKey) return UI.el('video', { class: 'chat-video', src: signedUrls[m.videoKey], controls: '', playsinline: '', preload: 'metadata', onloadeddata: pinIfBottom });
         return null;
       }
 
@@ -169,21 +168,19 @@
         const mine = m.phone === me;
         const grouped = !!(prev && prev.phone === m.phone && sameWindow(prev, m));
         const media = mediaNode(m);
-        const isMediaOnly = !!media && !m.text;
+        const isMediaOnly = !!media && !m.text && !m.audioKey;
         const bubbleKids = [(!mine && !grouped) ? UI.el('div', { class: 'chat-name' }, m.name || '—') : null];
         if (media) bubbleKids.push(media);
         if (m.text) bubbleKids.push(UI.el('div', { class: 'chat-text' }, m.text));
         bubbleKids.push(UI.el('div', { class: 'chat-time' }, timeOf(m)));
-        const kids = [UI.el('div', { class: 'chat-bubble' + (isMediaOnly && !m.audioKey ? ' img-only' : '') }, bubbleKids)];
+        const kids = [UI.el('div', { class: 'chat-bubble' + (isMediaOnly ? ' img-only' : '') }, bubbleKids)];
         if (window.Auth && Auth.isAdmin && Auth.isAdmin()) {
           kids.push(UI.el('button', { class: 'chat-del', title: I18n.t('ch_del'),
             onclick: () => UI.confirm(I18n.t('ch_del_confirm'), () => delMsg(id)) }, '×'));
         }
         return UI.el('div', { class: 'chat-row ' + (mine ? 'mine' : 'theirs') + (grouped ? ' grouped' : '') + (animate ? ' pop' : '') }, kids);
       }
-      async function delMsg(id) {
-        try { await db.collection('messages').doc(id).delete(); } catch (e) { alert(e.message || 'Error'); }
-      }
+      async function delMsg(id) { try { await db.collection('messages').doc(id).delete(); } catch (e) { alert(e.message || 'Error'); } }
       function nearBottom() { return (list.scrollHeight - list.scrollTop - list.clientHeight) < 90; }
       function toBottom(smooth) { list.scrollTo({ top: list.scrollHeight, behavior: smooth ? 'smooth' : 'auto' }); }
 
@@ -192,7 +189,6 @@
           const docs = []; snap.forEach((d) => docs.push({ id: d.id, m: d.data() })); docs.reverse();
           lastDocs = docs;
           const keys = docs.map((d) => d.id);
-          // sign any media URLs before rendering them
           const allMedia = []; docs.forEach((d) => mediaKeysOf(d.m).forEach((k) => allMedia.push(k)));
           await signKeys(allMedia);
 
@@ -207,9 +203,7 @@
           const wasNear = atBottom;
           if (prefix) {
             const mineIncoming = docs.slice(renderedKeys.length).some((d) => d.m.phone === me);
-            for (let i = renderedKeys.length; i < docs.length; i++) {
-              list.appendChild(rowEl(docs[i].id, docs[i].m, docs[i - 1] && docs[i - 1].m, true));
-            }
+            for (let i = renderedKeys.length; i < docs.length; i++) list.appendChild(rowEl(docs[i].id, docs[i].m, docs[i - 1] && docs[i - 1].m, true));
             if (wasNear || mineIncoming) toBottom(true);
           } else {
             list.innerHTML = '';
@@ -220,20 +214,6 @@
           atBottom = nearBottom();
         }, () => { list.innerHTML = '<div class="auth-err" style="text-align:center">—</div>'; });
       } catch (e) {}
-
-      /* -------- attach menu (photo / video / voice) -------- */
-      function openAttachMenu() {
-        const close = () => bd.remove();
-        const it = (label, fn) => UI.el('button', { class: 'chat-sheet-it', onclick: () => { close(); fn(); } }, label);
-        const sheet = UI.el('div', { class: 'chat-sheet' }, [
-          it('📷  ' + I18n.t('ch_photo'), () => photoFile.click()),
-          it('🎥  ' + I18n.t('ch_video'), () => videoFile.click()),
-          it('🎤  ' + I18n.t('ch_voice'), () => startVoice()),
-          UI.el('button', { class: 'chat-sheet-it cancel', onclick: close }, I18n.t('ch_cancel'))
-        ]);
-        const bd = UI.el('div', { class: 'chat-sheet-bd', onclick: (e) => { if (e.target === bd) close(); } }, [sheet]);
-        document.body.appendChild(bd);
-      }
 
       /* -------- uploads -------- */
       async function uploadBlob(blob, type, name) {
@@ -246,87 +226,116 @@
         return out && out.key;
       }
       function sendPhoto(f) {
-        attachBtn.classList.add('busy');
+        photoBtn.classList.add('busy');
         UI.resizeImage(f, 1100, 0.72, async (data) => {
-          try {
-            if (!data) throw new Error('image');
-            const blob = await (await fetch(data)).blob();
-            const key = await uploadBlob(blob, 'image/jpeg', 'chat.jpg');
-            if (key) sendMsg({ imageKey: key });
-          } catch (e) { alert((e && e.message) || 'Error'); }
-          attachBtn.classList.remove('busy');
+          try { if (!data) throw new Error('image'); const blob = await (await fetch(data)).blob();
+            const key = await uploadBlob(blob, 'image/jpeg', 'chat.jpg'); if (key) sendMsg({ imageKey: key }); }
+          catch (e) { alert((e && e.message) || 'Error'); }
+          photoBtn.classList.remove('busy');
         });
       }
-      async function sendVideo(f) {
-        attachBtn.classList.add('busy');
-        try {
-          const type = f.type || 'video/mp4';
-          const ext = (type.split('/')[1] || 'mp4').split(';')[0];
-          const key = await uploadBlob(f, type, 'video.' + ext);
-          if (key) sendMsg({ videoKey: key });
-        } catch (e) { alert((e && e.message) || 'Error'); }
-        attachBtn.classList.remove('busy');
+      async function sendVideoFile(f) {
+        vidBtn.classList.add('busy');
+        try { const type = f.type || 'video/mp4'; const ext = (type.split('/')[1] || 'mp4').split(';')[0];
+          const key = await uploadBlob(f, type, 'video.' + ext); if (key) sendMsg({ videoKey: key }); }
+        catch (e) { alert((e && e.message) || 'Error'); }
+        vidBtn.classList.remove('busy');
       }
 
-      /* -------- voice notes (MediaRecorder) -------- */
-      let mediaRec = null, recStream = null, recChunks = [], recTimer = null, recSec = 0, recCancelled = false;
-      function showRec(on) { recBar.style.display = on ? 'flex' : 'none'; normalBar.style.display = on ? 'none' : 'flex'; }
+      /* -------- press-and-HOLD recorder (voice + video), WhatsApp style -------- */
+      const rec = { on: false, pending: false, aborted: false, cancel: false, kind: null, mr: null, stream: null, chunks: [], timer: null, sec: 0, startY: 0 };
       function fmt(s) { const m = Math.floor(s / 60), x = s % 60; return m + ':' + String(x).padStart(2, '0'); }
-      async function startVoice() {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) { alert(I18n.t('ch_voice_unsup')); return; }
-        try { recStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-        catch (e) { alert(I18n.t('ch_mic_denied')); return; }
-        recChunks = []; recCancelled = false; recSec = 0;
-        let mime = '';
-        if (window.MediaRecorder.isTypeSupported) {
-          if (MediaRecorder.isTypeSupported('audio/webm')) mime = 'audio/webm';
-          else if (MediaRecorder.isTypeSupported('audio/mp4')) mime = 'audio/mp4';
-        }
-        try { mediaRec = mime ? new MediaRecorder(recStream, { mimeType: mime }) : new MediaRecorder(recStream); }
-        catch (e) { mediaRec = new MediaRecorder(recStream); }
-        mediaRec.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.push(e.data); };
-        mediaRec.onstop = () => finishVoice();
-        mediaRec.start();
-        showRec(true); recTime.textContent = '0:00';
-        recTimer = setInterval(() => { recSec++; recTime.textContent = fmt(recSec); if (recSec >= 120) stopVoice(true); }, 1000);
+      function pickMime(kind) {
+        const c = kind === 'video' ? ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'] : ['audio/webm', 'audio/mp4', 'audio/aac'];
+        if (window.MediaRecorder && MediaRecorder.isTypeSupported) for (const t of c) if (MediaRecorder.isTypeSupported(t)) return t;
+        return '';
       }
-      function stopVoice(send) { recCancelled = !send; try { if (mediaRec && mediaRec.state !== 'inactive') mediaRec.stop(); } catch (e) {} }
-      function cancelVoice() { stopVoice(false); }
-      async function finishVoice() {
-        clearInterval(recTimer); recTimer = null;
-        try { if (recStream) recStream.getTracks().forEach((t) => t.stop()); } catch (e) {}
-        showRec(false);
-        if (recCancelled || !recChunks.length) { recChunks = []; return; }
-        const type = (mediaRec && mediaRec.mimeType) || 'audio/webm';
-        const blob = new Blob(recChunks, { type: type });
-        recChunks = [];
-        const ext = type.indexOf('mp4') >= 0 ? 'm4a' : 'webm';
-        try { const key = await uploadBlob(blob, type, 'voice.' + ext); if (key) sendMsg({ audioKey: key, dur: recSec }); }
+      function setCancel(on) {
+        if (rec.cancel === on) return;
+        rec.cancel = on;
+        recHint.textContent = I18n.t(on ? 'ch_rel_cancel' : 'ch_slide_cancel');
+        recWrap.classList.toggle('cancel', on);
+      }
+      function showRec(kind, stream) {
+        recTime.textContent = '0:00'; setCancel(false);
+        if (kind === 'video') { recPrev.style.display = 'block'; recPrev.srcObject = stream; recPrev.play().catch(() => {}); }
+        else { recPrev.style.display = 'none'; recPrev.srcObject = null; }
+        recWrap.style.display = 'flex'; normalBar.style.display = 'none';
+      }
+      function hideRec() { recWrap.style.display = 'none'; normalBar.style.display = 'flex'; recPrev.srcObject = null; recPrev.style.display = 'none'; }
+
+      async function beginRecord(kind) {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+          if (kind === 'video') { vidFallback.click(); } else { alert(I18n.t('ch_voice_unsup')); } return;
+        }
+        rec.pending = true; rec.aborted = false; rec.cancel = false; rec.kind = kind; rec.chunks = []; rec.sec = 0;
+        let stream;
+        try { stream = await navigator.mediaDevices.getUserMedia(kind === 'video' ? { video: { facingMode: 'user' }, audio: true } : { audio: true }); }
+        catch (e) { rec.pending = false; if (kind === 'video') { vidFallback.click(); } else { alert(I18n.t('ch_mic_denied')); } return; }
+        if (rec.aborted) { stream.getTracks().forEach((t) => t.stop()); rec.pending = false; return; } // released before ready
+        rec.stream = stream;
+        const mime = pickMime(kind);
+        try { rec.mr = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream); }
+        catch (e) { rec.mr = new MediaRecorder(stream); }
+        rec.mr.ondataavailable = (e) => { if (e.data && e.data.size) rec.chunks.push(e.data); };
+        rec.mr.onstop = () => finishRecord();
+        rec.mr.start();
+        rec.on = true; rec.pending = false;
+        showRec(kind, stream);
+        rec.timer = setInterval(() => { rec.sec++; recTime.textContent = fmt(rec.sec); if (rec.sec >= 120) endRecord(); }, 1000);
+      }
+      function endRecord() {
+        if (rec.pending) { rec.aborted = true; return; }       // stream still opening -> abort on arrival
+        if (!rec.on) return;
+        try { if (rec.mr && rec.mr.state !== 'inactive') rec.mr.stop(); } catch (e) {}
+      }
+      async function finishRecord() {
+        rec.on = false; clearInterval(rec.timer); rec.timer = null;
+        try { if (rec.stream) rec.stream.getTracks().forEach((t) => t.stop()); } catch (e) {}
+        hideRec();
+        const tooShort = rec.sec < 1;                           // ignore accidental taps
+        if (rec.cancel || tooShort || !rec.chunks.length) { rec.chunks = []; return; }
+        const isVid = rec.kind === 'video';
+        const type = (rec.mr && rec.mr.mimeType) || (isVid ? 'video/webm' : 'audio/webm');
+        const blob = new Blob(rec.chunks, { type: type }); rec.chunks = [];
+        const ext = isVid ? (type.indexOf('mp4') >= 0 ? 'mp4' : 'webm') : (type.indexOf('mp4') >= 0 ? 'm4a' : 'webm');
+        try { const key = await uploadBlob(blob, type, (isVid ? 'video.' : 'voice.') + ext); if (key) sendMsg(isVid ? { videoKey: key } : { audioKey: key, dur: rec.sec }); }
         catch (e) { alert((e && e.message) || 'Error'); }
       }
+      function bindHold(btn, kind) {
+        btn.style.touchAction = 'none';
+        btn.addEventListener('pointerdown', (e) => {
+          e.preventDefault();
+          if (rec.on || rec.pending) return;
+          try { btn.setPointerCapture(e.pointerId); } catch (x) {}
+          rec.startY = e.clientY;
+          btn.classList.add('holding');
+          beginRecord(kind);
+        });
+        btn.addEventListener('pointermove', (e) => {
+          if (!(rec.on || rec.pending)) return;
+          setCancel((rec.startY - e.clientY) > 90);
+        });
+        const up = () => { btn.classList.remove('holding'); if (rec.on || rec.pending) endRecord(); };
+        btn.addEventListener('pointerup', up);
+        btn.addEventListener('pointercancel', () => { btn.classList.remove('holding'); if (rec.on || rec.pending) { setCancel(true); endRecord(); } });
+      }
+      bindHold(micBtn, 'audio');
+      bindHold(vidBtn, 'video');
 
-      /* -------- attachments panel -------- */
-      // kind: 'media' (photos + videos) or 'attach' (voice notes)
+      /* -------- attachments panel: 'media' (photos+videos) or 'attach' (voice) -------- */
       function openAttachments(kind) {
         const isMedia = kind === 'media';
-        const items = lastDocs.filter((d) => {
-          const m = d.m;
-          return isMedia ? (m.imageKey || m.image || m.videoKey) : !!m.audioKey;
-        }).slice().reverse(); // newest first
+        const items = lastDocs.filter((d) => { const m = d.m; return isMedia ? (m.imageKey || m.image || m.videoKey) : !!m.audioKey; }).slice().reverse();
         const body = UI.el('div', { class: 'chat-att-body' });
         if (!items.length) {
-          body.appendChild(UI.el('div', { class: 'muted', style: 'text-align:center;padding:20px;grid-column:1/-1' },
-            I18n.t(isMedia ? 'ch_no_media' : 'ch_no_attach')));
+          body.appendChild(UI.el('div', { class: 'muted', style: 'text-align:center;padding:20px;grid-column:1/-1' }, I18n.t(isMedia ? 'ch_no_media' : 'ch_no_attach')));
         } else {
           items.forEach(({ m }) => {
             let node;
             if (isMedia) {
-              if (m.imageKey || m.image) {
-                const src = m.imageKey ? signedUrls[m.imageKey] : m.image;
-                node = UI.el('img', { class: 'chat-att-thumb', src: src, onclick: () => lightbox(src) });
-              } else if (m.videoKey) {
-                node = UI.el('video', { class: 'chat-att-thumb', src: signedUrls[m.videoKey], controls: '', playsinline: '', preload: 'metadata' });
-              }
+              if (m.imageKey || m.image) { const src = m.imageKey ? signedUrls[m.imageKey] : m.image; node = UI.el('img', { class: 'chat-att-thumb', src: src, onclick: () => lightbox(src) }); }
+              else if (m.videoKey) { node = UI.el('video', { class: 'chat-att-thumb', src: signedUrls[m.videoKey], controls: '', playsinline: '', preload: 'metadata' }); }
             } else {
               node = UI.el('div', { class: 'chat-att-audio' }, [
                 UI.el('div', { class: 'chat-att-cap' }, I18n.t('ch_voice_msg') + ' · ' + (m.name || '—')),

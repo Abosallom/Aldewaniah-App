@@ -952,3 +952,16 @@ html{ scroll-behavior:smooth; }
 .chat-att-audio{ grid-column:1 / -1; background:var(--cream); border:1px solid var(--line);
   border-radius:10px; padding:8px 10px; }
 .chat-att-cap{ font-size:.8rem; font-weight:700; color:var(--navy); margin-bottom:4px; }
+
+/* ===== Chat: press-and-hold voice/video recording ===== */
+.chat-hold{ touch-action:none; user-select:none; -webkit-user-select:none; }
+.chat-hold.holding{ transform:scale(1.18); background:var(--maroon); color:#fff; box-shadow:0 0 0 6px rgba(114,47,55,.18); }
+.chat-hint{ text-align:center; color:var(--ink-soft); font-size:.72rem; margin-top:6px; flex:0 0 auto; }
+.chat-recwrap{ display:flex; flex-direction:column; align-items:center; gap:10px; flex:0 0 auto; }
+.chat-recwrap .chat-rec-info{ width:100%; }
+.chat-rec-hint{ margin-inline-start:auto; font-size:.8rem; font-weight:600; color:var(--ink-soft); }
+.chat-recwrap.cancel .chat-rec-info{ color:var(--maroon); border-color:var(--maroon); }
+.chat-recwrap.cancel .chat-rec-hint{ color:var(--maroon); }
+.chat-recwrap.cancel .chat-rec-dot{ background:var(--maroon); }
+.chat-vidprev{ width:150px; height:150px; border-radius:50%; object-fit:cover; background:#000;
+  border:3px solid var(--gold); box-shadow:0 8px 28px rgba(0,0,0,.35); transform:scaleX(-1); }
