@@ -34,7 +34,8 @@
         adm_sort: 'الترتيب:', adm_sort_added: 'حسب الإضافة', adm_sort_name: 'حسب الاسم', adm_sort_role: 'حسب الدور', adm_dir: 'تصاعدي/تنازلي',
         adm_geo: 'موقع تسجيل الحضور', adm_geo_enable: 'اشتراط الموقع', adm_geo_on: 'مطلوب (داخل النطاق فقط)', adm_geo_off: 'غير مطلوب',
         adm_geo_radius: 'نطاق المسافة (متر)', adm_geo_label: 'اسم المكان (اختياري)', adm_geo_center: 'مركز الموقع',
-        adm_geo_sethere: 'تعيين موقعي الحالي كمركز', adm_geo_nocenter: 'لم يُحدّد بعد', adm_geo_needcenter: 'حدّد مركز الموقع أولاً',
+        adm_geo_sethere: 'استخدام موقعي الحالي', adm_geo_nocenter: 'لم يُحدّد بعد', adm_geo_needcenter: 'حدّد مركز الموقع أولاً',
+        adm_geo_paste: 'ألصق إحداثيات أو رابط خرائط جوجل', adm_geo_openmap: 'افتح في الخرائط للتأكد',
         adm_geo_save: 'حفظ موقع الحضور', adm_geo_saved: 'تم حفظ موقع الحضور ✓',
         adm_approve: 'قبول', adm_decline: 'رفض', adm_add: 'إضافة عضو',
         adm_edit: 'تعديل', adm_delete: 'حذف', adm_admin_badge: 'مشرف', adm_coadmin_badge: 'مشرف مساعد',
@@ -58,7 +59,8 @@
         adm_sort: 'Sort:', adm_sort_added: 'By date added', adm_sort_name: 'By name', adm_sort_role: 'By role', adm_dir: 'Ascending/Descending',
         adm_geo: 'Check-in location', adm_geo_enable: 'Require location', adm_geo_on: 'Required (within area only)', adm_geo_off: 'Not required',
         adm_geo_radius: 'Radius (metres)', adm_geo_label: 'Place name (optional)', adm_geo_center: 'Centre point',
-        adm_geo_sethere: 'Set my current location as centre', adm_geo_nocenter: 'Not set yet', adm_geo_needcenter: 'Set the centre point first',
+        adm_geo_sethere: 'Use my current location', adm_geo_nocenter: 'Not set yet', adm_geo_needcenter: 'Set the centre point first',
+        adm_geo_paste: 'Paste coordinates or a Google Maps link', adm_geo_openmap: 'Open in Maps to verify',
         adm_geo_save: 'Save check-in location', adm_geo_saved: 'Check-in location saved ✓',
         adm_approve: 'Approve', adm_decline: 'Decline', adm_add: 'Add member',
         adm_edit: 'Edit', adm_delete: 'Delete', adm_admin_badge: 'Admin', adm_coadmin_badge: 'Co-Admin',
@@ -265,32 +267,45 @@
         let cur = {};
         try { const d = await db.collection('config').doc('checkin').get(); if (d.exists) cur = d.data() || {}; } catch (e) {}
         wrap.innerHTML = '';
-        let lat = (cur.lat != null) ? cur.lat : null, lng = (cur.lng != null) ? cur.lng : null;
-        const fmt = () => (lat != null && lng != null) ? (Number(lat).toFixed(5) + ', ' + Number(lng).toFixed(5)) : I18n.t('adm_geo_nocenter');
 
         const enable = UI.el('select', { class: 'fld' }, [UI.el('option', { value: 'no' }, I18n.t('adm_geo_off')), UI.el('option', { value: 'yes' }, I18n.t('adm_geo_on'))]);
         enable.value = cur.enabled ? 'yes' : 'no';
         const radius = UI.el('input', { class: 'fld', type: 'number', inputmode: 'numeric', min: '20', value: String(cur.radius || 100) });
         const label = UI.el('input', { class: 'fld', type: 'text', maxlength: '40', value: cur.label || '', placeholder: I18n.t('adm_geo_label') });
-        const coordsEl = UI.el('div', { class: 'muted', style: 'font-size:.85rem;margin:2px 0 8px' }, '📍 ' + fmt());
-        const here = UI.el('button', { class: 'btn btn-ghost btn-block' }, '📍 ' + I18n.t('adm_geo_sethere'));
+
+        // The admin chooses the centre freely: type/paste coordinates, paste a
+        // Google Maps link, or (optionally) use the current location.
+        const latIn = UI.el('input', { class: 'fld', type: 'number', step: 'any', inputmode: 'decimal', placeholder: 'lat', value: (cur.lat != null ? String(cur.lat) : '') });
+        const lngIn = UI.el('input', { class: 'fld', type: 'number', step: 'any', inputmode: 'decimal', placeholder: 'lng', value: (cur.lng != null ? String(cur.lng) : '') });
+        const link = UI.el('input', { class: 'fld', type: 'text', placeholder: I18n.t('adm_geo_paste') });
+        link.onchange = () => {
+          const m = (link.value || '').match(/(-?\d{1,3}\.\d{3,})[,\s]+(-?\d{1,3}\.\d{3,})/);
+          if (m) { latIn.value = m[1]; lngIn.value = m[2]; link.value = ''; updMap(); }
+        };
+        const here = UI.el('button', { class: 'btn btn-ghost btn-block', style: 'margin-top:4px' }, '📍 ' + I18n.t('adm_geo_sethere'));
         here.onclick = async () => {
           here.disabled = true; here.textContent = '…';
-          try { const p = await adminPos(); lat = p.coords.latitude; lng = p.coords.longitude; coordsEl.textContent = '📍 ' + fmt(); }
+          try { const p = await adminPos(); latIn.value = p.coords.latitude.toFixed(6); lngIn.value = p.coords.longitude.toFixed(6); updMap(); }
           catch (e) { alert(I18n.t('home_loc_denied')); }
           here.disabled = false; here.textContent = '📍 ' + I18n.t('adm_geo_sethere');
         };
+        const mapLink = UI.el('a', { class: 'muted', style: 'display:inline-block;font-size:.82rem;margin-top:6px', target: '_blank', rel: 'noopener' }, '🗺️ ' + I18n.t('adm_geo_openmap'));
+        function updMap() { mapLink.href = 'https://www.google.com/maps?q=' + (latIn.value || 0) + ',' + (lngIn.value || 0); }
+        updMap(); latIn.oninput = updMap; lngIn.oninput = updMap;
+
         const ok = UI.el('p', { class: 'auth-ok' });
         const err = UI.el('p', { class: 'auth-err' });
         const save = UI.el('button', { class: 'btn btn-block' }, I18n.t('adm_geo_save'));
         save.onclick = async () => {
           err.textContent = ''; ok.textContent = '';
-          if (enable.value === 'yes' && (lat == null || lng == null)) { err.textContent = I18n.t('adm_geo_needcenter'); return; }
+          const lat = parseFloat(latIn.value), lng = parseFloat(lngIn.value);
+          const hasCenter = isFinite(lat) && isFinite(lng);
+          if (enable.value === 'yes' && !hasCenter) { err.textContent = I18n.t('adm_geo_needcenter'); return; }
           save.disabled = true; save.textContent = '…';
           try {
             await db.collection('config').doc('checkin').set({
               enabled: enable.value === 'yes', radius: Math.max(20, Number(radius.value) || 100),
-              lat: (lat != null ? Number(lat) : null), lng: (lng != null ? Number(lng) : null),
+              lat: hasCenter ? lat : null, lng: hasCenter ? lng : null,
               label: (label.value || '').trim(), by: ((Auth.member && Auth.member()) || {}).name || '',
               at: firebase.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
@@ -302,7 +317,11 @@
         wrap.appendChild(UI.el('div', { class: 'field' }, [UI.el('label', null, I18n.t('adm_geo_enable')), enable]));
         wrap.appendChild(UI.el('div', { class: 'field' }, [UI.el('label', null, I18n.t('adm_geo_radius')), radius]));
         wrap.appendChild(UI.el('div', { class: 'field' }, [UI.el('label', null, I18n.t('adm_geo_label')), label]));
-        wrap.appendChild(UI.el('div', { class: 'field' }, [UI.el('label', null, I18n.t('adm_geo_center')), coordsEl, here]));
+        wrap.appendChild(UI.el('div', { class: 'field' }, [
+          UI.el('label', null, I18n.t('adm_geo_center')),
+          UI.el('div', { class: 'cal-row2' }, [latIn, lngIn]),
+          link, here, UI.el('div', null, [mapLink])
+        ]));
         wrap.appendChild(err); wrap.appendChild(ok); wrap.appendChild(save);
       }
 
