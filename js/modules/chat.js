@@ -46,7 +46,7 @@
         ch_img: 'صورة', ch_voice_msg: '🎤 رسالة صوتية', ch_video_msg: '🎥 فيديو',
         ch_recording: 'يسجّل', ch_cancel: 'إلغاء', ch_rec_send: 'إرسال',
         ch_voice_unsup: 'التسجيل الصوتي غير مدعوم على هذا الجهاز', ch_mic_denied: 'تعذّر الوصول للميكروفون',
-        ch_attachments: 'المرفقات', ch_no_attach: 'لا توجد مرفقات بعد',
+        ch_attachments: 'المرفقات', ch_no_attach: 'لا توجد رسائل صوتية بعد', ch_media: 'الوسائط', ch_no_media: 'لا توجد وسائط بعد',
         ch_notif_on: '🔔 تنبيهات الدردشة مفعّلة', ch_notif_off: '🔕 تفعيل تنبيهات الدردشة',
         ch_del: 'حذف', ch_del_confirm: 'حذف هذه الرسالة؟' },
       en: { ch_title: 'Chat', ch_sub: 'Members group chat', ch_ph: 'Type a message…', ch_send: 'Send',
@@ -55,7 +55,7 @@
         ch_img: 'Photo', ch_voice_msg: '🎤 Voice note', ch_video_msg: '🎥 Video',
         ch_recording: 'Recording', ch_cancel: 'Cancel', ch_rec_send: 'Send',
         ch_voice_unsup: 'Voice recording is not supported on this device', ch_mic_denied: 'Could not access the microphone',
-        ch_attachments: 'Attachments', ch_no_attach: 'No attachments yet',
+        ch_attachments: 'Attachments', ch_no_attach: 'No voice notes yet', ch_media: 'Media', ch_no_media: 'No media yet',
         ch_notif_on: '🔔 Chat alerts on', ch_notif_off: '🔕 Turn on chat alerts',
         ch_del: 'Delete', ch_del_confirm: 'Delete this message?' }
     },
@@ -83,8 +83,9 @@
         if (ChatNotify.enabled()) bell.classList.add('on');
         headKids.push(bell);
       }
-      const attBtn = UI.el('button', { class: 'chat-bell', onclick: () => openAttachments() }, '📎 ' + I18n.t('ch_attachments'));
-      headKids.push(attBtn);
+      const mediaBtn = UI.el('button', { class: 'chat-bell', onclick: () => openAttachments('media') }, '🖼️ ' + I18n.t('ch_media'));
+      const attBtn = UI.el('button', { class: 'chat-bell', onclick: () => openAttachments('attach') }, '📎 ' + I18n.t('ch_attachments'));
+      headKids.push(mediaBtn, attBtn);
       screen.appendChild(UI.el('div', { class: 'chat-head' }, headKids));
 
       const list = UI.el('div', { class: 'chat-list' });
@@ -305,20 +306,28 @@
       }
 
       /* -------- attachments panel -------- */
-      function openAttachments() {
-        const items = lastDocs.filter((d) => mediaKeysOf(d.m).length).slice().reverse(); // newest first
+      // kind: 'media' (photos + videos) or 'attach' (voice notes)
+      function openAttachments(kind) {
+        const isMedia = kind === 'media';
+        const items = lastDocs.filter((d) => {
+          const m = d.m;
+          return isMedia ? (m.imageKey || m.image || m.videoKey) : !!m.audioKey;
+        }).slice().reverse(); // newest first
         const body = UI.el('div', { class: 'chat-att-body' });
         if (!items.length) {
-          body.appendChild(UI.el('div', { class: 'muted', style: 'text-align:center;padding:20px' }, I18n.t('ch_no_attach')));
+          body.appendChild(UI.el('div', { class: 'muted', style: 'text-align:center;padding:20px;grid-column:1/-1' },
+            I18n.t(isMedia ? 'ch_no_media' : 'ch_no_attach')));
         } else {
           items.forEach(({ m }) => {
             let node;
-            if (m.imageKey || m.image) {
-              const src = m.imageKey ? signedUrls[m.imageKey] : m.image;
-              node = UI.el('img', { class: 'chat-att-thumb', src: src, onclick: () => lightbox(src) });
-            } else if (m.videoKey) {
-              node = UI.el('video', { class: 'chat-att-thumb', src: signedUrls[m.videoKey], controls: '', playsinline: '', preload: 'metadata' });
-            } else if (m.audioKey) {
+            if (isMedia) {
+              if (m.imageKey || m.image) {
+                const src = m.imageKey ? signedUrls[m.imageKey] : m.image;
+                node = UI.el('img', { class: 'chat-att-thumb', src: src, onclick: () => lightbox(src) });
+              } else if (m.videoKey) {
+                node = UI.el('video', { class: 'chat-att-thumb', src: signedUrls[m.videoKey], controls: '', playsinline: '', preload: 'metadata' });
+              }
+            } else {
               node = UI.el('div', { class: 'chat-att-audio' }, [
                 UI.el('div', { class: 'chat-att-cap' }, I18n.t('ch_voice_msg') + ' · ' + (m.name || '—')),
                 UI.el('audio', { src: signedUrls[m.audioKey], controls: '', preload: 'metadata', style: 'width:100%' })
@@ -327,7 +336,7 @@
             if (node) body.appendChild(node);
           });
         }
-        sheetModal(I18n.t('ch_attachments'), body);
+        sheetModal(I18n.t(isMedia ? 'ch_media' : 'ch_attachments'), body);
       }
 
       /* -------- send text -------- */

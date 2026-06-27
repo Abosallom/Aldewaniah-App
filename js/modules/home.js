@@ -6,7 +6,9 @@
    =========================================================== */
 (function () {
   const COLLECTION = 'checkins';
-  const todayKey = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+  // The "diwaniya day" runs 6:00 AM → 5:59 AM next day: check-ins reset at 6 AM.
+  // (Shift the clock back 6 hours, then take the calendar date.)
+  const todayKey = () => { const d = new Date(Date.now() - 6 * 3600 * 1000); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
 
   App.registerModule({
     id: 'home',
