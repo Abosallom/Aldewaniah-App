@@ -24,7 +24,8 @@
         pr_bio: 'نبذة عنك', pr_photo: 'الصورة الشخصية', pr_save: 'حفظ', pr_cancel: 'إلغاء',
         pr_empty: 'لا توجد ملفات بعد — كن أول من يضيف ملفه', pr_you: 'أنت',
         pr_locked: 'الأعضاء للأعضاء المعتمدين فقط',
-        pr_no_info: 'لم يضِف هذا العضو معلومات بعد', pr_close: 'إغلاق'
+        pr_no_info: 'لم يضِف هذا العضو معلومات بعد', pr_close: 'إغلاق',
+        pr_edit_one: 'تعديل', pr_delete: 'حذف', pr_del_confirm: 'حذف ملف هذا العضو؟'
       },
       en: {
         pr_title: 'Members', pr_sub: 'Meet the Dewaniah members', pr_mine: 'My profile',
@@ -32,7 +33,8 @@
         pr_bio: 'About you', pr_photo: 'Profile photo', pr_save: 'Save', pr_cancel: 'Cancel',
         pr_empty: 'No profiles yet — be the first to add yours', pr_you: 'You',
         pr_locked: 'Members area is for approved members only',
-        pr_no_info: "This member hasn't added any info yet", pr_close: 'Close'
+        pr_no_info: "This member hasn't added any info yet", pr_close: 'Close',
+        pr_edit_one: 'Edit', pr_delete: 'Delete', pr_del_confirm: "Delete this member's profile?"
       }
     },
 
@@ -116,8 +118,10 @@
         if (p.hobbies) rows.push(UI.el('div', { class: 'prof-brief-row' }, '🎯  ' + p.hobbies));
         if (p.bio) rows.push(UI.el('div', { class: 'prof-bio', style: 'font-size:.95rem;margin-top:6px' }, p.bio));
         if (!rows.length) rows.push(UI.el('p', { class: 'muted', style: 'text-align:center;margin-top:8px' }, I18n.t('pr_no_info')));
-        const actions = UI.el('div', { class: 'flex-between', style: 'justify-content:flex-end;gap:10px;margin-top:16px' }, [
-          isMe ? UI.el('button', { class: 'btn btn-ghost', onclick: () => { close(); editMine(); } }, '✏️  ' + I18n.t('pr_edit')) : null,
+        const admin = isAdminUser();
+        const actions = UI.el('div', { class: 'flex-between', style: 'justify-content:flex-end;gap:10px;margin-top:16px;flex-wrap:wrap' }, [
+          (isMe || admin) ? UI.el('button', { class: 'btn btn-ghost', onclick: () => { close(); editEntry(p.id); } }, '✏️  ' + I18n.t(isMe ? 'pr_edit' : 'pr_edit_one')) : null,
+          (admin && !isMe) ? UI.el('button', { class: 'btn btn-ghost', style: 'color:var(--maroon);border-color:var(--maroon)', onclick: () => { close(); UI.confirm(I18n.t('pr_del_confirm'), () => delEntry(p.id)); } }, '🗑️  ' + I18n.t('pr_delete')) : null,
           UI.el('button', { class: 'btn', onclick: close }, I18n.t('pr_close'))
         ]);
         const box = UI.el('div', { class: 'modal prof-brief' }, [
@@ -129,13 +133,19 @@
         backdrop.appendChild(box); document.body.appendChild(backdrop);
       }
 
-      function editMine() {
-        if (!myUid) return;
+      const isAdminUser = () => !!(window.Auth && Auth.isAdmin && Auth.isAdmin());
+      function editMine() { editEntry(myUid); }
+      function editEntry(uid) {
+        if (!uid) return;
         const cur = {};
-        db.collection(COLL).doc(myUid).get().then((d) => { if (d.exists) Object.assign(cur, d.data()); openForm(cur); }).catch(() => openForm(cur));
+        db.collection(COLL).doc(uid).get().then((d) => { if (d.exists) Object.assign(cur, d.data()); openForm(cur, uid); }).catch(() => openForm(cur, uid));
+      }
+      async function delEntry(uid) {
+        try { await db.collection(COLL).doc(uid).delete(); load(); } catch (e) { alert(e.message || 'Error'); }
       }
 
-      function openForm(cur) {
+      function openForm(cur, uid) {
+        uid = uid || myUid;
         let photoData = cur.photo || null;
         const backdrop = UI.el('div', { class: 'modal-backdrop' });
         const close = () => backdrop.remove();
@@ -171,16 +181,16 @@
         backdrop.appendChild(box); document.body.appendChild(backdrop);
 
         async function save() {
-          if (!myUid) { err.textContent = 'Error'; return; }
+          if (!uid) { err.textContent = 'Error'; return; }
           saveBtn.disabled = true; saveBtn.textContent = '…';
           try {
-            const memberName = (Auth.member() || {}).name || '';
-            const newName = (name.value || '').trim() || memberName;
-            // If they typed a name different from the admin-set one, mark it custom
-            // (so it won't be overwritten by the admin name). Otherwise keep it
-            // admin-managed so future admin renames still flow through.
-            const custom = !!newName && newName !== memberName;
-            await db.collection(COLL).doc(myUid).set({
+            const isSelf = (uid === myUid);
+            const memberName = isSelf ? ((Auth.member() || {}).name || '') : '';
+            const newName = (name.value || '').trim() || cur.name || memberName;
+            // Self: a name different from the admin-set one is marked custom (won't be
+            // overwritten by the admin-name sync). Admin editing another member = manual override.
+            const custom = isSelf ? (!!newName && newName !== memberName) : true;
+            await db.collection(COLL).doc(uid).set({
               name: newName,
               nameSrc: custom ? 'self' : firebase.firestore.FieldValue.delete(),
               saying: (saying.value || '').trim(), hobbies: (hobbies.value || '').trim(),
