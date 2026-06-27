@@ -213,6 +213,11 @@
         _isAdmin = approved && d.admin === true;
         _perms = approved ? (d.perms || {}) : {};
         _member = Object.assign({ phone }, d);
+        // record a private phone -> uid map so the admin can push directory edits
+        // (e.g. a name change) to this member's UID-keyed directory entry instantly.
+        if (approved) {
+          try { const u = fbAuth.currentUser; if (u && u.uid) db.collection('uidmap').doc(phone).set({ uid: u.uid }, { merge: true }).catch(function () {}); } catch (e) {}
+        }
         return _status;
       }
     } catch (e) {}

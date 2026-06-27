@@ -324,6 +324,14 @@
           else if (data.role === 'coadmin') { patch.admin = false; patch.perms = { requests: data.p_requests === 'yes' }; }
           else { patch.admin = false; patch.perms = {}; }
           await db.collection('members').doc(m.phone).update(patch);
+          // Push the new name straight to this member's directory card (instant),
+          // using the private phone->uid map. (Falls back to the member's own
+          // on-open sync if no map entry exists yet.)
+          try {
+            const map = await db.collection('uidmap').doc(m.phone).get();
+            const uid = map.exists && map.data() && map.data().uid;
+            if (uid) await db.collection('directory').doc(uid).set({ name: data.name }, { merge: true });
+          } catch (e) {}
           load();
         });
       }
