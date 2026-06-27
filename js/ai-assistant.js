@@ -36,7 +36,9 @@
         html: '<img src="assets/icon-192.png" alt="">' });
       document.body.appendChild(fab);
     }
-    fab.style.display = isMember() ? 'flex' : 'none';
+    // Hide on the Chat tab so it never overlaps the chat send button.
+    const onChat = (location.hash || '').replace('#', '').split('?')[0] === 'chat';
+    fab.style.display = (isMember() && !onChat) ? 'flex' : 'none';
   }
 
   function openPanel() {

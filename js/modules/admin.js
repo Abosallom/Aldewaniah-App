@@ -28,7 +28,7 @@
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9.5 12l1.8 1.8L15 10"/></svg>',
     strings: {
       ar: {
-        adm_title: 'لوحة الإدارة', adm_sub: 'إدارة الأعضاء وطلبات الانضمام',
+        adm_title: 'لوحة الإدارة', adm_sub: 'إدارة الأعضاء وطلبات الانضمام', adm_version: 'نسخة التطبيق:',
         adm_requests: 'طلبات الانضمام', adm_no_requests: 'لا توجد طلبات حالياً',
         adm_members: 'الأعضاء', adm_no_members: 'لا يوجد أعضاء',
         adm_approve: 'قبول', adm_decline: 'رفض', adm_add: 'إضافة عضو',
@@ -47,7 +47,7 @@
         adm_mnt_15: '١٥ دقيقة', adm_mnt_60: 'ساعة', adm_mnt_180: '٣ ساعات', adm_mnt_360: '٦ ساعات', adm_mnt_1440: 'يوم كامل'
       },
       en: {
-        adm_title: 'Admin panel', adm_sub: 'Manage members and join requests',
+        adm_title: 'Admin panel', adm_sub: 'Manage members and join requests', adm_version: 'App version:',
         adm_requests: 'Join requests', adm_no_requests: 'No requests right now',
         adm_members: 'Members', adm_no_members: 'No members',
         adm_approve: 'Approve', adm_decline: 'Decline', adm_add: 'Add member',
@@ -73,6 +73,19 @@
       const isAdmin = Auth.isAdmin();
       const canRequests = Auth.can('requests');
       view.appendChild(UI.pageTitle(I18n.t('adm_title'), I18n.t('adm_sub')));
+
+      // app version (read from the active service-worker cache, e.g. "v53")
+      const verEl = UI.el('div', { class: 'adm-version' }, I18n.t('adm_version') + ' …');
+      view.appendChild(verEl);
+      (async () => {
+        let v = window.APP_VERSION || '';
+        try {
+          const keys = await caches.keys();
+          const k = keys.find((x) => /aldewaniah-v\d+/.test(x));
+          if (k) v = (k.match(/aldewaniah-(v\d+)/) || [])[1] || v;
+        } catch (e) {}
+        verEl.textContent = I18n.t('adm_version') + ' ' + (v || '—');
+      })();
 
       // enable browser notifications for new requests
       if (canRequests && window.Notification && Notification.permission !== 'granted') {

@@ -213,8 +213,8 @@ async function uploadFile(request, env, url) {
 
   const prefix = DIRS[(url && url.searchParams.get("dir")) || "gallery"] || PREFIX;
   const type = request.headers.get("X-File-Type") || "application/octet-stream";
-  // Only photos and videos may be uploaded (gallery + chat). Reject anything else.
-  if (!/^(image|video)\//i.test(type)) return json({ error: "unsupported type" }, 415);
+  // Only photos, videos and voice notes may be uploaded (gallery + chat). Reject anything else.
+  if (!/^(image|video|audio)\//i.test(type)) return json({ error: "unsupported type" }, 415);
   const rawName = decodeURIComponent(request.headers.get("X-File-Name") || "file");
   const safe = rawName.replace(/[^\w.\-]+/g, "_").slice(-80) || "file";
   const key = prefix + Date.now() + "_" + Math.random().toString(36).slice(2, 8) + "_" + safe;
