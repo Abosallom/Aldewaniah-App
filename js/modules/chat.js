@@ -39,8 +39,8 @@
 
     render(view) {
       if (unsub) { try { unsub(); } catch (e) {} unsub = null; }
-      view.appendChild(UI.pageTitle(I18n.t('ch_title'), I18n.t('ch_sub')));
       if (!(window.Auth && Auth.isMember && Auth.isMember())) {
+        view.appendChild(UI.pageTitle(I18n.t('ch_title'), I18n.t('ch_sub')));
         view.appendChild(UI.el('p', { class: 'muted', style: 'text-align:center' }, I18n.t('ch_locked')));
         return;
       }
@@ -48,13 +48,17 @@
       const me = (Auth.phone && Auth.phone()) || '';
       const myName = ((Auth.member && Auth.member()) || {}).name || '';
 
-      /* notifications toggle (only if supported) */
+      // Full-height chat screen (fills the space between header and bottom nav).
+      const screen = UI.el('div', { class: 'chat-screen' });
+      view.appendChild(screen);
+
+      /* compact head: notifications toggle (only if supported) */
       if (window.ChatNotify && window.Notification) {
         const bell = UI.el('button', { class: 'chat-bell', onclick: () => {
           ChatNotify.toggle((on) => { bell.textContent = I18n.t(on ? 'ch_notif_on' : 'ch_notif_off'); bell.classList.toggle('on', on); });
         } }, I18n.t(ChatNotify.enabled() ? 'ch_notif_on' : 'ch_notif_off'));
         if (ChatNotify.enabled()) bell.classList.add('on');
-        view.appendChild(UI.el('div', { class: 'chat-top' }, [bell]));
+        screen.appendChild(UI.el('div', { class: 'chat-head' }, [bell]));
       }
 
       const list = UI.el('div', { class: 'chat-list' });
@@ -89,12 +93,14 @@
       const sendBtn = UI.el('button', { class: 'btn btn-green chat-send', onclick: () => sendText() }, I18n.t('ch_send'));
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendText(); });
 
-      view.appendChild(list);
-      view.appendChild(UI.el('div', { class: 'chat-bar' }, [photoBtn, file, input, sendBtn]));
+      screen.appendChild(list);
+      screen.appendChild(UI.el('div', { class: 'chat-bar' }, [photoBtn, file, input, sendBtn]));
 
       list.innerHTML = '<div class="muted" style="text-align:center;padding:14px">…</div>';
-      let renderedKeys = [], firstPaint = true;
+      let renderedKeys = [];
       const signedUrls = {}; // R2 key -> short-lived signed URL (for chat photos)
+      let atBottom = true;   // are we pinned to the latest message?
+      list.addEventListener('scroll', () => { atBottom = nearBottom(); });
       async function signKeys(keys) {
         const need = (keys || []).filter((k) => k && !signedUrls[k]);
         if (!need.length) return;
@@ -113,13 +119,24 @@
           ? m.at.toDate().toLocaleTimeString(I18n.lang === 'ar' ? 'ar' : 'en-GB', { hour: '2-digit', minute: '2-digit' })
           : '';
       }
-      function rowEl(id, m, animate) {
+      function sameWindow(a, b) {
+        try {
+          const ta = a.at && a.at.toMillis ? a.at.toMillis() : 0;
+          const tb = b.at && b.at.toMillis ? b.at.toMillis() : 0;
+          return (ta && tb) ? Math.abs(tb - ta) < 5 * 60000 : true;
+        } catch (e) { return true; }
+      }
+      function rowEl(id, m, prev, animate) {
         const mine = m.phone === me;
+        // group consecutive messages from the same sender (hide the repeated name, tighten spacing)
+        const grouped = !!(prev && prev.phone === m.phone && sameWindow(prev, m));
         // New messages store an R2 key (imageKey); old ones may have an inline base64 image.
         const imgSrc = m.imageKey ? signedUrls[m.imageKey] : (m.image || null);
-        const bubbleKids = [mine ? null : UI.el('div', { class: 'chat-name' }, m.name || '—')];
+        const bubbleKids = [(!mine && !grouped) ? UI.el('div', { class: 'chat-name' }, m.name || '—') : null];
         if (imgSrc) {
-          bubbleKids.push(UI.el('img', { class: 'chat-img', src: imgSrc, alt: '', onclick: () => lightbox(imgSrc) }));
+          bubbleKids.push(UI.el('img', { class: 'chat-img', src: imgSrc, alt: '',
+            onclick: () => lightbox(imgSrc),
+            onload: () => { if (atBottom) list.scrollTop = list.scrollHeight; } })); // keep pinned as the image expands
         }
         if (m.text) bubbleKids.push(UI.el('div', { class: 'chat-text' }, m.text));
         bubbleKids.push(UI.el('div', { class: 'chat-time' }, timeOf(m)));
@@ -129,7 +146,7 @@
           kids.push(UI.el('button', { class: 'chat-del', title: I18n.t('ch_del'),
             onclick: () => UI.confirm(I18n.t('ch_del_confirm'), () => delMsg(id)) }, '×'));
         }
-        return UI.el('div', { class: 'chat-row ' + (mine ? 'mine' : 'theirs') + (animate ? ' pop' : '') }, kids);
+        return UI.el('div', { class: 'chat-row ' + (mine ? 'mine' : 'theirs') + (grouped ? ' grouped' : '') + (animate ? ' pop' : '') }, kids);
       }
       async function delMsg(id) {
         try { await db.collection('messages').doc(id).delete(); } catch (e) { alert(e.message || 'Error'); }
@@ -154,19 +171,20 @@
           let prefix = renderedKeys.length > 0 && renderedKeys.length < keys.length;
           for (let i = 0; prefix && i < renderedKeys.length; i++) if (renderedKeys[i] !== keys[i]) prefix = false;
 
-          const wasNear = nearBottom();
+          const wasNear = atBottom;
           if (prefix) {
-            const tail = docs.slice(renderedKeys.length);
-            const mineIncoming = tail.some((d) => d.m.phone === me);
-            tail.forEach((d) => list.appendChild(rowEl(d.id, d.m, true)));
+            const mineIncoming = docs.slice(renderedKeys.length).some((d) => d.m.phone === me);
+            for (let i = renderedKeys.length; i < docs.length; i++) {
+              list.appendChild(rowEl(docs[i].id, docs[i].m, docs[i - 1] && docs[i - 1].m, true));
+            }
             if (wasNear || mineIncoming) toBottom(true);
           } else {
             list.innerHTML = '';
-            docs.forEach((d) => list.appendChild(rowEl(d.id, d.m, false)));
+            docs.forEach((d, i) => list.appendChild(rowEl(d.id, d.m, docs[i - 1] && docs[i - 1].m, false)));
             toBottom(false);
           }
           renderedKeys = keys;
-          firstPaint = false;
+          atBottom = nearBottom();
         }, () => { list.innerHTML = '<div class="auth-err" style="text-align:center">—</div>'; });
       } catch (e) {}
 
