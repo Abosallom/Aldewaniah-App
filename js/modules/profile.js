@@ -54,17 +54,24 @@
       view.appendChild(grid);
       ensureMine().then(load);
 
-      // Make sure I have a directory entry (created on first visit, name only).
+      // Make sure I have a directory entry, and keep my name in sync with the
+      // admin-set name (members.name) unless I've chosen a custom display name.
+      // This is how an admin rename shows up in the directory: the member's own
+      // client copies the latest members.name into directory/{uid} on app open.
       async function ensureMine() {
         if (!myUid) return;
+        const memberName = ((Auth.member && Auth.member()) || {}).name || '';
         try {
           const ref = db.collection(COLL).doc(myUid);
           const snap = await ref.get();
           if (!snap.exists) {
-            await ref.set({
-              name: ((Auth.member && Auth.member()) || {}).name || '',
-              createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
+            await ref.set({ name: memberName, createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+          } else {
+            const d = snap.data() || {};
+            // follow the admin name unless the member picked a custom one (nameSrc==='self')
+            if (d.nameSrc !== 'self' && memberName && d.name !== memberName) {
+              await ref.set({ name: memberName }, { merge: true });
+            }
           }
         } catch (e) { /* non-fatal */ }
       }
@@ -167,8 +174,15 @@
           if (!myUid) { err.textContent = 'Error'; return; }
           saveBtn.disabled = true; saveBtn.textContent = '…';
           try {
+            const memberName = (Auth.member() || {}).name || '';
+            const newName = (name.value || '').trim() || memberName;
+            // If they typed a name different from the admin-set one, mark it custom
+            // (so it won't be overwritten by the admin name). Otherwise keep it
+            // admin-managed so future admin renames still flow through.
+            const custom = !!newName && newName !== memberName;
             await db.collection(COLL).doc(myUid).set({
-              name: (name.value || '').trim() || (Auth.member() || {}).name || '',
+              name: newName,
+              nameSrc: custom ? 'self' : firebase.firestore.FieldValue.delete(),
               saying: (saying.value || '').trim(), hobbies: (hobbies.value || '').trim(),
               bio: (bio.value || '').trim(), photo: photoData || '',
               updatedAt: firebase.firestore.FieldValue.serverTimestamp()
