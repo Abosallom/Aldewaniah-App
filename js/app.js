@@ -34,14 +34,17 @@
       else { this._render(id); }
     },
 
-    /** Re-render the current view (e.g. after login state changes). */
-    refresh() { if (current) this._render(current); },
+    /** Re-render based on the URL (so after login/auth resolves we land on the
+        tab the user actually asked for — e.g. a gated tab opened via refresh). */
+    refresh() { this._render(location.hash.slice(1) || current || (modules[0] && modules[0].id)); },
 
     /** Show a small count badge on a nav tab (e.g., pending join requests). */
     setNavBadge(id, n) { navBadges[id] = n; this._paintNav(); },
 
     _render(id) {
-      let mod = modules.find((m) => m.id === id) || modules[0];
+      // hash may be "module" or "module/subsection" — route on the first segment
+      const modId = String(id || '').replace(/^#/, '').split('/')[0];
+      let mod = modules.find((m) => m.id === modId) || modules[0];
       if (!mod) return;
       if (mod.adminOnly && !(window.Auth && Auth.isStaff && Auth.isStaff())) mod = modules[0];
       if (mod.memberOnly && !(window.Auth && Auth.isMember && Auth.isMember())) mod = modules[0];
@@ -93,7 +96,7 @@
       // language toggle
       const toggle = document.getElementById('langToggle');
       if (toggle) toggle.onclick = () => I18n.toggle();
-      I18n.onChange(() => { this._render(current || (modules[0] && modules[0].id)); });
+      I18n.onChange(() => { this._render(location.hash.slice(1) || current || (modules[0] && modules[0].id)); });
 
       window.addEventListener('hashchange', () => {
         this._render(location.hash.slice(1));

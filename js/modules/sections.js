@@ -32,6 +32,12 @@
     },
 
     render(view) {
+      // Sub-section is encoded in the hash (#sections/<id>) so a refresh returns here.
+      const sub = (location.hash.slice(1).split('/')[1]) || '';
+      if (sub) {
+        const s = subs.find((x) => x.id === sub);
+        if (s) { open(view, s); return; }
+      }
       grid(view);
     }
   });
@@ -43,7 +49,7 @@
     const wrap = UI.el('div', { class: 'sec-grid' });
     Sections.list().forEach((s) => {
       const locked = s.memberOnly && !isMember();
-      const card = UI.el('button', { class: 'sec-card', onclick: () => open(view, s) }, [
+      const card = UI.el('button', { class: 'sec-card', onclick: () => { location.hash = 'sections/' + s.id; } }, [
         UI.el('div', { class: 'sec-icon', html: s.icon }),
         UI.el('div', { class: 'sec-name' }, I18n.pick(s.title)),
         s.subtitle ? UI.el('div', { class: 'sec-desc' }, I18n.pick(s.subtitle)) : null,
@@ -56,7 +62,7 @@
 
   function open(view, s) {
     view.innerHTML = '';
-    view.appendChild(UI.el('button', { class: 'sec-back', onclick: () => { view.innerHTML = ''; grid(view); } },
+    view.appendChild(UI.el('button', { class: 'sec-back', onclick: () => { location.hash = 'sections'; } },
       [UI.el('span', { class: 'sec-back-ic', html: backSvg }), I18n.t('sec_back')]));
     s.render(view);
   }

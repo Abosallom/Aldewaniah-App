@@ -965,3 +965,8 @@ html{ scroll-behavior:smooth; }
 .chat-recwrap.cancel .chat-rec-dot{ background:var(--maroon); }
 .chat-vidprev{ width:150px; height:150px; border-radius:50%; object-fit:cover; background:#000;
   border:3px solid var(--gold); box-shadow:0 8px 28px rgba(0,0,0,.35); transform:scaleX(-1); }
+
+/* admin: members sort row */
+.adm-sortrow{ display:flex; align-items:center; gap:8px; margin:0 0 12px; }
+.adm-sortrow label{ font-weight:600; color:var(--navy); font-size:.9rem; flex:0 0 auto; }
+.adm-sortrow select{ width:auto; flex:1; padding:9px 12px; }
