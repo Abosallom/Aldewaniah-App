@@ -103,7 +103,9 @@
     }
     async function undo() {
       if (!db) return;
-      try { await db.collection(COLLECTION).doc(docId).delete(); } catch (e) {}
+      // Keep a record (mark removed) instead of deleting, so the admin can see
+      // who checked in and then cancelled. Re-checking in clears this.
+      try { await db.collection(COLLECTION).doc(docId).set({ phone: phone, name: name, day: day, removed: true, removedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }); } catch (e) {}
     }
 
     function paintList(rows) {
@@ -125,7 +127,7 @@
       db.collection(COLLECTION).where('day', '==', day).onSnapshot((snap) => {
         const rows = [];
         mineIn = false;
-        snap.forEach((d) => { const v = d.data(); rows.push(v); if (d.id === docId) mineIn = true; });
+        snap.forEach((d) => { const v = d.data(); if (d.id === docId) mineIn = !v.removed; if (!v.removed) rows.push(v); });
         rows.sort((a, b) => ((a.at && a.at.seconds) || 0) - ((b.at && b.at.seconds) || 0));
         paintBtn();
         paintList(rows);

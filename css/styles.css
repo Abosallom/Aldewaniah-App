@@ -970,3 +970,8 @@ html{ scroll-behavior:smooth; }
 .adm-sortrow{ display:flex; align-items:center; gap:8px; margin:0 0 12px; }
 .adm-sortrow label{ font-weight:600; color:var(--navy); font-size:.9rem; flex:0 0 auto; }
 .adm-sortrow select{ width:auto; flex:1; padding:9px 12px; }
+
+.adm-sortrow .adm-dir{ flex:0 0 auto; padding:9px 14px; font-weight:800; line-height:1; }
+
+.checkin-row.removed{ opacity:.65; }
+.checkin-row.removed .checkin-name{ text-decoration:line-through; }

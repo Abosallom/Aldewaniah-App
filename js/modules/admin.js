@@ -31,7 +31,7 @@
         adm_title: 'لوحة الإدارة', adm_sub: 'إدارة الأعضاء وطلبات الانضمام', adm_version: 'نسخة التطبيق:',
         adm_requests: 'طلبات الانضمام', adm_no_requests: 'لا توجد طلبات حالياً',
         adm_members: 'الأعضاء', adm_no_members: 'لا يوجد أعضاء',
-        adm_sort: 'الترتيب:', adm_sort_added: 'حسب الإضافة', adm_sort_name: 'حسب الاسم', adm_sort_role: 'حسب الدور',
+        adm_sort: 'الترتيب:', adm_sort_added: 'حسب الإضافة', adm_sort_name: 'حسب الاسم', adm_sort_role: 'حسب الدور', adm_dir: 'تصاعدي/تنازلي',
         adm_approve: 'قبول', adm_decline: 'رفض', adm_add: 'إضافة عضو',
         adm_edit: 'تعديل', adm_delete: 'حذف', adm_admin_badge: 'مشرف', adm_coadmin_badge: 'مشرف مساعد',
         adm_name: 'الاسم', adm_phone: 'رقم الجوال',
@@ -39,7 +39,7 @@
         adm_perm_requests: 'السماح بالموافقة على طلبات الانضمام',
         adm_confirm_decline: 'رفض هذا الطلب؟', adm_confirm_delete: 'حذف هذا العضو؟',
         adm_self: 'أنت',
-        adm_log: 'سجل الحضور', adm_log_none: 'لا يوجد حضور مسجّل بعد', adm_today: 'اليوم',
+        adm_log: 'سجل الحضور', adm_log_none: 'لا يوجد حضور مسجّل بعد', adm_log_cancelled: 'ألغى الحضور', adm_today: 'اليوم',
         adm_suggest: 'اقتراحات الأعضاء', adm_suggest_none: 'لا توجد اقتراحات بعد', adm_suggest_del: 'حذف الاقتراح؟',
         adm_mnt: 'الإيقاف المؤقت (الصيانة)', adm_mnt_state: 'الحالة', adm_mnt_run: 'يعمل', adm_mnt_pause: 'موقوف',
         adm_mnt_msg: 'الرسالة المعروضة للأعضاء', adm_mnt_msg_ph: 'مثال: التطبيق متوقف مؤقتًا، نعود قريبًا',
@@ -51,7 +51,7 @@
         adm_title: 'Admin panel', adm_sub: 'Manage members and join requests', adm_version: 'App version:',
         adm_requests: 'Join requests', adm_no_requests: 'No requests right now',
         adm_members: 'Members', adm_no_members: 'No members',
-        adm_sort: 'Sort:', adm_sort_added: 'By date added', adm_sort_name: 'By name', adm_sort_role: 'By role',
+        adm_sort: 'Sort:', adm_sort_added: 'By date added', adm_sort_name: 'By name', adm_sort_role: 'By role', adm_dir: 'Ascending/Descending',
         adm_approve: 'Approve', adm_decline: 'Decline', adm_add: 'Add member',
         adm_edit: 'Edit', adm_delete: 'Delete', adm_admin_badge: 'Admin', adm_coadmin_badge: 'Co-Admin',
         adm_name: 'Name', adm_phone: 'Mobile number',
@@ -59,7 +59,7 @@
         adm_perm_requests: 'Can approve join requests',
         adm_confirm_decline: 'Decline this request?', adm_confirm_delete: 'Delete this member?',
         adm_self: 'You',
-        adm_log: 'Check-in log', adm_log_none: 'No check-ins recorded yet', adm_today: 'Today',
+        adm_log: 'Check-in log', adm_log_none: 'No check-ins recorded yet', adm_log_cancelled: 'Cancelled', adm_today: 'Today',
         adm_suggest: 'Member suggestions', adm_suggest_none: 'No suggestions yet', adm_suggest_del: 'Delete this suggestion?',
         adm_mnt: 'Maintenance / pause', adm_mnt_state: 'State', adm_mnt_run: 'Running', adm_mnt_pause: 'Paused',
         adm_mnt_msg: 'Message shown to members', adm_mnt_msg_ph: 'e.g. The app is paused, back soon',
@@ -77,6 +77,7 @@
 
       // ---- member sorting (chosen via the dropdown) ----
       let sortMode = 'added';
+      let sortDir = 1;          // 1 = ascending, -1 = descending
       let lastApproved = [];
       const byAdded = (a, b) => {
         const ta = (a.createdAt && a.createdAt.seconds) || 0, tb = (b.createdAt && b.createdAt.seconds) || 0;
@@ -92,7 +93,8 @@
         if (!memWrap) return;
         memWrap.innerHTML = '';
         if (!lastApproved.length) { memWrap.appendChild(UI.el('p', { class: 'muted', style: 'text-align:center' }, I18n.t('adm_no_members'))); return; }
-        lastApproved.slice().sort(comparatorFor(sortMode)).forEach((m) => memWrap.appendChild(memberCard(m)));
+        const cmp = comparatorFor(sortMode);
+        lastApproved.slice().sort((a, b) => sortDir * cmp(a, b)).forEach((m) => memWrap.appendChild(memberCard(m)));
       }
       view.appendChild(UI.pageTitle(I18n.t('adm_title'), I18n.t('adm_sub')));
 
@@ -146,7 +148,9 @@
           UI.el('option', { value: 'role' }, I18n.t('adm_sort_role'))
         ]);
         sortSel.value = sortMode;
-        view.appendChild(UI.el('div', { class: 'adm-sortrow' }, [UI.el('label', null, I18n.t('adm_sort')), sortSel]));
+        const dirBtn = UI.el('button', { class: 'btn btn-ghost adm-dir', title: I18n.t('adm_dir'),
+          onclick: () => { sortDir = -sortDir; dirBtn.textContent = sortDir === 1 ? '↑' : '↓'; paintMembers(); } }, '↑');
+        view.appendChild(UI.el('div', { class: 'adm-sortrow' }, [UI.el('label', null, I18n.t('adm_sort')), sortSel, dirBtn]));
         memWrap = UI.el('div');
         view.appendChild(memWrap);
       }
@@ -379,11 +383,13 @@
         const days = Object.keys(byDay).sort((a, b) => dayNum(b) - dayNum(a));
         days.forEach((day) => {
           const people = byDay[day].sort((a, b) => ((a.at && a.at.seconds) || 0) - ((b.at && b.at.seconds) || 0));
+          const active = people.filter((r) => !r.removed).length;
           const box = UI.el('div', { class: 'checkin-list', style: 'margin-bottom:12px' });
-          box.appendChild(UI.el('div', { class: 'checkin-h' }, fmtDay(day) + ' · ' + people.length));
-          people.forEach((r) => box.appendChild(UI.el('div', { class: 'checkin-row' }, [
+          box.appendChild(UI.el('div', { class: 'checkin-h' }, fmtDay(day) + ' · ' + active));
+          people.forEach((r) => box.appendChild(UI.el('div', { class: 'checkin-row' + (r.removed ? ' removed' : '') }, [
             UI.el('span', { class: 'avatar', style: 'width:34px;height:34px;font-size:.8rem' }, UI.initials(r.name)),
             UI.el('span', { class: 'checkin-name' }, r.name || '—'),
+            r.removed ? UI.el('span', { class: 'chip chip-red' }, I18n.t('adm_log_cancelled')) : null,
             UI.el('span', { class: 'checkin-time' }, r.at && r.at.toDate ? r.at.toDate().toLocaleTimeString(I18n.lang === 'ar' ? 'ar' : 'en-GB', { hour: '2-digit', minute: '2-digit' }) : '')
           ])));
           wrap.appendChild(box);
