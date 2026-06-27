@@ -25,7 +25,8 @@
         pr_empty: 'لا توجد ملفات بعد — كن أول من يضيف ملفه', pr_you: 'أنت',
         pr_locked: 'الأعضاء للأعضاء المعتمدين فقط',
         pr_no_info: 'لم يضِف هذا العضو معلومات بعد', pr_close: 'إغلاق',
-        pr_edit_one: 'تعديل', pr_delete: 'حذف', pr_del_confirm: 'حذف ملف هذا العضو؟'
+        pr_edit_one: 'تعديل', pr_delete: 'حذف', pr_del_confirm: 'حذف ملف هذا العضو؟',
+        pr_report: 'إبلاغ', pr_reported: 'تم الإبلاغ، شكرًا لك ✅', pr_report_fail: 'تعذّر الإبلاغ، حاول لاحقًا'
       },
       en: {
         pr_title: 'Members', pr_sub: 'Meet the Dewaniah members', pr_mine: 'My profile',
@@ -34,7 +35,8 @@
         pr_empty: 'No profiles yet — be the first to add yours', pr_you: 'You',
         pr_locked: 'Members area is for approved members only',
         pr_no_info: "This member hasn't added any info yet", pr_close: 'Close',
-        pr_edit_one: 'Edit', pr_delete: 'Delete', pr_del_confirm: "Delete this member's profile?"
+        pr_edit_one: 'Edit', pr_delete: 'Delete', pr_del_confirm: "Delete this member's profile?",
+        pr_report: 'Report', pr_reported: 'Reported, thank you ✅', pr_report_fail: 'Could not report, try later'
       }
     },
 
@@ -122,6 +124,7 @@
         const actions = UI.el('div', { class: 'flex-between', style: 'justify-content:flex-end;gap:10px;margin-top:16px;flex-wrap:wrap' }, [
           (isMe || admin) ? UI.el('button', { class: 'btn btn-ghost', onclick: () => { close(); editEntry(p.id); } }, '✏️  ' + I18n.t(isMe ? 'pr_edit' : 'pr_edit_one')) : null,
           (admin && !isMe) ? UI.el('button', { class: 'btn btn-ghost', style: 'color:var(--maroon);border-color:var(--maroon)', onclick: () => { close(); UI.confirm(I18n.t('pr_del_confirm'), () => delEntry(p.id)); } }, '🗑️  ' + I18n.t('pr_delete')) : null,
+          (!isMe) ? UI.el('button', { class: 'btn btn-ghost', onclick: () => { close(); reportProfile(p); } }, '⚑  ' + I18n.t('pr_report')) : null,
           UI.el('button', { class: 'btn', onclick: close }, I18n.t('pr_close'))
         ]);
         const box = UI.el('div', { class: 'modal prof-brief' }, [
@@ -142,6 +145,10 @@
       }
       async function delEntry(uid) {
         try { await db.collection(COLL).doc(uid).delete(); load(); } catch (e) { alert(e.message || 'Error'); }
+      }
+      async function reportProfile(p) {
+        const okR = window.Moderation && await Moderation.report('profile', p.id, p.name, '');
+        alert(I18n.t(okR ? 'pr_reported' : 'pr_report_fail'));
       }
 
       function openForm(cur, uid) {

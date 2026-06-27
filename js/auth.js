@@ -26,6 +26,9 @@
   I18n.extend({
     ar: {
       auth_login: 'دخول الأعضاء', auth_logout: 'خروج',
+      auth_delete: '🗑️ حذف حسابي', auth_delete_confirm: 'سيتم حذف حسابك وملفك الشخصي وبيانات دخولك نهائيًا. هل أنت متأكد؟',
+      auth_deleted: 'تم حذف حسابك. نأسف لمغادرتك 🌿', auth_delete_relogin: 'لأمان حسابك، سجّل الخروج ثم الدخول مرة أخرى وأعد المحاولة فورًا.',
+      auth_privacy: 'سياسة الخصوصية', auth_terms: 'شروط الاستخدام',
       auth_title: 'دخول الأعضاء', auth_phone: 'رقم الجوال', auth_send: 'إرسال الرمز',
       auth_code: 'رمز التحقق', auth_verify: 'تأكيد',
       auth_sent: 'أرسلنا رمز تحقق إلى جوالك',
@@ -49,6 +52,9 @@
     },
     en: {
       auth_login: 'Member login', auth_logout: 'Sign out',
+      auth_delete: '🗑️ Delete my account', auth_delete_confirm: 'This permanently deletes your account, profile and login. Are you sure?',
+      auth_deleted: 'Your account was deleted. Sorry to see you go 🌿', auth_delete_relogin: 'For security, sign out and sign in again, then retry deletion right away.',
+      auth_privacy: 'Privacy Policy', auth_terms: 'Terms of Use',
       auth_title: 'Member login', auth_phone: 'Mobile number', auth_send: 'Send code',
       auth_code: 'Verification code', auth_verify: 'Verify',
       auth_sent: 'We sent a code to your phone',
@@ -401,6 +407,39 @@
     body.appendChild(err); body.appendChild(ok);
     body.appendChild(UI.el('button', { class: 'btn btn-ghost btn-block', style: 'margin-top:14px',
       onclick: () => { close(); Auth.logout(); } }, I18n.t('auth_logout')));
+
+    // Delete account + personal data (required by App Store / Google Play).
+    const del = UI.el('button', { class: 'btn btn-block', style: 'margin-top:10px;background:var(--maroon);color:#fff' }, I18n.t('auth_delete'));
+    del.onclick = async () => {
+      err.textContent = ''; ok.textContent = '';
+      if (!window.confirm(I18n.t('auth_delete_confirm'))) return;
+      const u = fbAuth && fbAuth.currentUser;
+      if (!u) { err.textContent = 'Error'; return; }
+      const phone = u.phoneNumber || (_member && _member.phone) || '';
+      del.disabled = true; del.textContent = '…';
+      try {
+        if (u.uid) { try { await db.collection('directory').doc(u.uid).delete(); } catch (e) {} }
+        if (phone) {
+          try { await db.collection('members').doc(phone).delete(); } catch (e) {}
+          try { await db.collection('uidmap').doc(phone).delete(); } catch (e) {}
+        }
+        await u.delete();                 // remove the login itself
+        close(); reset(); Auth.renderBox();
+        if (window.App && App.refresh) App.refresh();
+        alert(I18n.t('auth_deleted'));
+      } catch (e) {
+        if (e && e.code === 'auth/requires-recent-login') err.textContent = I18n.t('auth_delete_relogin');
+        else err.textContent = e.message || 'Error';
+        del.disabled = false; del.textContent = I18n.t('auth_delete');
+      }
+    };
+    body.appendChild(del);
+
+    body.appendChild(UI.el('div', { class: 'muted', style: 'margin-top:14px;text-align:center;font-size:.84rem' }, [
+      UI.el('a', { href: 'privacy.html', target: '_blank', rel: 'noopener' }, I18n.t('auth_privacy')),
+      '  ·  ',
+      UI.el('a', { href: 'terms.html', target: '_blank', rel: 'noopener' }, I18n.t('auth_terms'))
+    ]));
   }
 
   window.Auth = Auth;

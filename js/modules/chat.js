@@ -42,6 +42,8 @@
       ar: { ch_title: 'الدردشة', ch_sub: 'دردشة بين الأعضاء', ch_ph: 'اكتب رسالة…', ch_send: 'إرسال',
         ch_empty: 'لا توجد رسائل بعد — ابدأ المحادثة', ch_locked: 'الدردشة للأعضاء فقط',
         ch_photo: 'صورة', ch_voice_msg: '🎤 رسالة صوتية', ch_video_msg: '🎥 فيديو',
+        ch_cancel: 'إلغاء', ch_report: 'إبلاغ', ch_report_msg: 'إبلاغ عن الرسالة', ch_block_user: 'حظر هذا العضو',
+        ch_reported: 'تم الإبلاغ، شكرًا لك ✅', ch_report_fail: 'تعذّر الإبلاغ، حاول لاحقًا',
         ch_slide_cancel: 'اسحب لأعلى للإلغاء ⬆', ch_rel_cancel: 'أفلت للإلغاء',
         ch_voice_unsup: 'التسجيل غير مدعوم على هذا الجهاز', ch_mic_denied: 'تعذّر الوصول للميكروفون/الكاميرا',
         ch_hold_hint: 'اضغط مطوّلاً 🎤 للصوت و 🎥 للفيديو',
@@ -51,6 +53,8 @@
       en: { ch_title: 'Chat', ch_sub: 'Members group chat', ch_ph: 'Type a message…', ch_send: 'Send',
         ch_empty: 'No messages yet — say hi', ch_locked: 'Chat is for members only',
         ch_photo: 'Photo', ch_voice_msg: '🎤 Voice note', ch_video_msg: '🎥 Video',
+        ch_cancel: 'Cancel', ch_report: 'Report', ch_report_msg: 'Report message', ch_block_user: 'Block this member',
+        ch_reported: 'Reported, thank you ✅', ch_report_fail: 'Could not report, try later',
         ch_slide_cancel: 'Slide up to cancel ⬆', ch_rel_cancel: 'Release to cancel',
         ch_voice_unsup: 'Recording is not supported on this device', ch_mic_denied: 'Could not access mic/camera',
         ch_hold_hint: 'Hold 🎤 for voice, 🎥 for video',
@@ -178,7 +182,27 @@
           kids.push(UI.el('button', { class: 'chat-del', title: I18n.t('ch_del'),
             onclick: () => UI.confirm(I18n.t('ch_del_confirm'), () => delMsg(id)) }, '×'));
         }
+        // report / block (everyone, on others' messages) — App Store UGC requirement
+        if (!mine) {
+          kids.push(UI.el('button', { class: 'chat-flag', title: I18n.t('ch_report'), onclick: () => modSheet(m) }, '⚑'));
+        }
         return UI.el('div', { class: 'chat-row ' + (mine ? 'mine' : 'theirs') + (grouped ? ' grouped' : '') + (animate ? ' pop' : '') }, kids);
+      }
+      function modSheet(m) {
+        const close = () => bd.remove();
+        const it = (label, fn) => UI.el('button', { class: 'chat-sheet-it', onclick: () => { close(); fn(); } }, label);
+        const sheet = UI.el('div', { class: 'chat-sheet' }, [
+          it('⚑  ' + I18n.t('ch_report_msg'), async () => {
+            const okR = window.Moderation && await Moderation.report('message', '', m.name, '');
+            alert(I18n.t(okR ? 'ch_reported' : 'ch_report_fail'));
+          }),
+          it('🚫  ' + I18n.t('ch_block_user'), () => {
+            if (window.Moderation) { Moderation.block(m.phone); if (window.App && App.refresh) App.refresh(); }
+          }),
+          UI.el('button', { class: 'chat-sheet-it cancel', onclick: close }, I18n.t('ch_cancel'))
+        ]);
+        const bd = UI.el('div', { class: 'chat-sheet-bd', onclick: (e) => { if (e.target === bd) close(); } }, [sheet]);
+        document.body.appendChild(bd);
       }
       async function delMsg(id) { try { await db.collection('messages').doc(id).delete(); } catch (e) { alert(e.message || 'Error'); } }
       function nearBottom() { return (list.scrollHeight - list.scrollTop - list.clientHeight) < 90; }
@@ -186,7 +210,7 @@
 
       try {
         unsub = db.collection('messages').orderBy('at', 'desc').limit(150).onSnapshot(async (snap) => {
-          const docs = []; snap.forEach((d) => docs.push({ id: d.id, m: d.data() })); docs.reverse();
+          const docs = []; snap.forEach((d) => { const m = d.data(); if (!(window.Moderation && Moderation.isBlocked(m.phone))) docs.push({ id: d.id, m: m }); }); docs.reverse();
           lastDocs = docs;
           const keys = docs.map((d) => d.id);
           const allMedia = []; docs.forEach((d) => mediaKeysOf(d.m).forEach((k) => allMedia.push(k)));

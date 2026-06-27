@@ -46,6 +46,7 @@
         adm_self: 'أنت',
         adm_log: 'سجل الحضور', adm_log_none: 'لا يوجد حضور مسجّل بعد', adm_log_cancelled: 'ألغى الحضور', adm_today: 'اليوم',
         adm_suggest: 'اقتراحات الأعضاء', adm_suggest_none: 'لا توجد اقتراحات بعد', adm_suggest_del: 'حذف الاقتراح؟',
+        adm_reports: 'البلاغات', adm_reports_none: 'لا توجد بلاغات', adm_reports_del: 'حذف هذا البلاغ؟', adm_reports_by: 'من',
         adm_mnt: 'الإيقاف المؤقت (الصيانة)', adm_mnt_state: 'الحالة', adm_mnt_run: 'يعمل', adm_mnt_pause: 'موقوف',
         adm_mnt_msg: 'الرسالة المعروضة للأعضاء', adm_mnt_msg_ph: 'مثال: التطبيق متوقف مؤقتًا، نعود قريبًا',
         adm_mnt_dur: 'المدة', adm_mnt_indef: 'حتى أوقفه يدويًا', adm_mnt_save: 'حفظ',
@@ -71,6 +72,7 @@
         adm_self: 'You',
         adm_log: 'Check-in log', adm_log_none: 'No check-ins recorded yet', adm_log_cancelled: 'Cancelled', adm_today: 'Today',
         adm_suggest: 'Member suggestions', adm_suggest_none: 'No suggestions yet', adm_suggest_del: 'Delete this suggestion?',
+        adm_reports: 'Reports', adm_reports_none: 'No reports', adm_reports_del: 'Delete this report?', adm_reports_by: 'by',
         adm_mnt: 'Maintenance / pause', adm_mnt_state: 'State', adm_mnt_run: 'Running', adm_mnt_pause: 'Paused',
         adm_mnt_msg: 'Message shown to members', adm_mnt_msg_ph: 'e.g. The app is paused, back soon',
         adm_mnt_dur: 'Duration', adm_mnt_indef: 'Until I turn it off', adm_mnt_save: 'Save',
@@ -183,6 +185,14 @@
         loadSuggestions(sugWrap);
       }
 
+      // ---- Reports (admin only) — reported content / users ----
+      if (isAdmin) {
+        view.appendChild(UI.el('h2', { class: 'section-head' }, I18n.t('adm_reports')));
+        const repWrap = UI.el('div');
+        view.appendChild(repWrap);
+        loadReports(repWrap);
+      }
+
       // ---- Check-in log (admin only) ----
       if (isAdmin) {
         view.appendChild(UI.el('h2', { class: 'section-head' }, I18n.t('adm_log')));
@@ -209,6 +219,30 @@
                 onclick: () => UI.confirm(I18n.t('adm_suggest_del'), async () => { await db.collection('suggestions').doc(s.id).delete(); loadSuggestions(wrap); }) }, '×')
             ]),
             UI.el('div', { style: 'margin-top:4px;line-height:1.6' }, s.text || '')
+          ]));
+        });
+      }
+
+      async function loadReports(wrap) {
+        wrap.innerHTML = '<div class="muted" style="text-align:center;padding:10px">…</div>';
+        let rows = [];
+        try {
+          const snap = await db.collection('reports').orderBy('at', 'desc').limit(100).get();
+          snap.forEach((d) => rows.push(Object.assign({ id: d.id }, d.data())));
+        } catch (e) { wrap.innerHTML = '<div class="auth-err">' + (e.message || 'Error') + '</div>'; return; }
+        wrap.innerHTML = '';
+        if (!rows.length) { wrap.appendChild(UI.el('p', { class: 'muted', style: 'text-align:center' }, I18n.t('adm_reports_none'))); return; }
+        rows.forEach((r) => {
+          const when = r.at && r.at.toDate ? r.at.toDate().toLocaleDateString(I18n.lang === 'ar' ? 'ar' : 'en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+          const what = (r.kind === 'profile' ? '👤 ' : '💬 ') + (r.targetName || '—');
+          wrap.appendChild(UI.el('div', { class: 'card' }, [
+            UI.el('div', { class: 'flex-between' }, [
+              UI.el('div', { class: 'card-title', style: 'margin:0' }, what),
+              UI.el('button', { style: 'border:none;background:none;color:var(--maroon);cursor:pointer;font-size:1.2rem',
+                onclick: () => UI.confirm(I18n.t('adm_reports_del'), async () => { await db.collection('reports').doc(r.id).delete(); loadReports(wrap); }) }, '×')
+            ]),
+            UI.el('div', { class: 'card-meta' }, I18n.t('adm_reports_by') + ' ' + (r.by || '—') + (when ? ' · ' + when : '')),
+            r.reason ? UI.el('div', { style: 'margin-top:4px;line-height:1.6' }, r.reason) : null
           ]));
         });
       }
