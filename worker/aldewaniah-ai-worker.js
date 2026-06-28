@@ -16,6 +16,9 @@ const MAX_TURNS = 12; // keep the last N messages of history
 const ALLOWED_ORIGINS = [
   "https://app.aldewaniah.com",
   "https://abosallom.github.io",
+  "capacitor://localhost", // iOS native shell (Capacitor)
+  "https://localhost",     // Android native shell (Capacitor)
+  "http://localhost",
 ];
 
 const SYSTEM_PROMPT =

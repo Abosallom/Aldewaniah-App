@@ -4,3 +4,7 @@ SECURITY-REPORT.md
 Security-Report.pdf
 CODE-REVIEW-2026-06.md
 .DS_Store
+mobile/node_modules/
+mobile/www/
+mobile/ios/
+mobile/android/

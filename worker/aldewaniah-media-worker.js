@@ -24,6 +24,9 @@ const MAX_BYTES = 100 * 1024 * 1024; // 100 MB per file
 const ALLOWED_ORIGINS = [
   "https://app.aldewaniah.com",
   "https://abosallom.github.io",
+  "capacitor://localhost", // iOS native shell (Capacitor)
+  "https://localhost",     // Android native shell (Capacitor)
+  "http://localhost",
 ];
 
 function corsHeaders(request) {

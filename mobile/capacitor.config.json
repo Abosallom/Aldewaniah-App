@@ -1,0 +1,9 @@
+{
+  "appId": "com.aldewaniah.app",
+  "appName": "الديوانية",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "always",
+    "backgroundColor": "#1A2744"
+  }
+}
