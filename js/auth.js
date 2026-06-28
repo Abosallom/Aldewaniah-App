@@ -161,15 +161,18 @@
       const close = () => { backdrop.remove(); cleanupRecaptcha(); };
       backdrop.onclick = (e) => { if (e.target === backdrop) close(); };
       const body = UI.el('div');
-      const tabPhone = UI.el('button', { class: 'auth-tab active' }, I18n.t('auth_mode_phone'));
-      const tabEmail = UI.el('button', { class: 'auth-tab' }, I18n.t('auth_mode_email'));
+      // Inside the native iOS/Android shell (Capacitor) SMS/reCAPTCHA is unreliable,
+      // so default to email login there; the website keeps phone login as default.
+      const inApp = !!(window.Capacitor && (typeof Capacitor.isNativePlatform === 'function' ? Capacitor.isNativePlatform() : Capacitor.isNativePlatform));
+      const tabPhone = UI.el('button', { class: 'auth-tab' + (inApp ? '' : ' active') }, I18n.t('auth_mode_phone'));
+      const tabEmail = UI.el('button', { class: 'auth-tab' + (inApp ? ' active' : '') }, I18n.t('auth_mode_email'));
       tabPhone.onclick = () => { tabPhone.classList.add('active'); tabEmail.classList.remove('active'); phoneStep(body, close); };
       tabEmail.onclick = () => { tabEmail.classList.add('active'); tabPhone.classList.remove('active'); emailStep(body, close); };
       const tabs = UI.el('div', { class: 'auth-tabs' }, [tabPhone, tabEmail]);
       const modal = UI.el('div', { class: 'modal' }, [UI.el('h3', null, I18n.t('auth_title')), tabs, body]);
       backdrop.appendChild(modal);
       document.body.appendChild(backdrop);
-      phoneStep(body, close);
+      if (inApp) emailStep(body, close); else phoneStep(body, close);
     },
 
     /** A signed-in member's account panel: link an email, reset it, sign out. */

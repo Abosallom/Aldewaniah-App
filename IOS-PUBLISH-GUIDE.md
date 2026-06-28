@@ -99,6 +99,28 @@ At https://appstoreconnect.apple.com → **My Apps → +**:
 
 ---
 
+## 5b) Make it UNLISTED (download-by-link only, not searchable)
+Apple supports **Unlisted App Distribution**: the app is on the App Store but does **not**
+appear in search, charts, categories, or recommendations — it’s reachable **only via its
+direct App Store link**, which you share with the group. This is the right fit for a private
+diwaniya app.
+
+How to get it:
+1. First get the app **approved** for normal release (submit + pass review as in §7). The app
+   does not have to be "Ready for Sale"; once it’s approved you can request unlisted.
+2. Request unlisted distribution here: **https://developer.apple.com/contact/request/unlisted-app-distribution**
+   (sign in with your developer account; give the app name + Apple ID number from App Store Connect).
+3. Apple emails an **unlisted distribution link** (usually a few days). That link is the only
+   way to find/install the app — share it with members; it won’t show up in search.
+
+Notes:
+- Unlisted apps still go through normal review (so §6 demo account still applies).
+- Alternative for quick private sharing while you wait: **TestFlight** public link (up to 10,000
+  testers) — but TestFlight builds expire every 90 days, so Unlisted is better for the long term.
+- Keep the **age rating** honest; unlisted doesn’t change review standards.
+
+---
+
 ## 6) ⭐ App Review notes — REQUIRED (or it WILL be rejected)
 The app is **invite-only with admin approval**, so a reviewer can’t get in on their own.
 In **App Review Information → Notes**, give them a working way in:
