@@ -312,6 +312,61 @@
 .bg-winbanner.us { color: #1e6b47; animation: bg-win 1s ease infinite alternate; }
 @keyframes bg-win { from { transform: scale(1); } to { transform: scale(1.06); } }
 
+/* ===========================================================
+   STAGE 2 — أشكل, الدبل, المشاريع
+   =========================================================== */
+
+/* أشكل bid button + mode chip (blue family) */
+.bg-bid.ashkal { background: linear-gradient(#4a7fd4, #2b5aa8); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
+.bg-chip-ashkal { background: linear-gradient(#5b8fdf, #2b5aa8); color: #fff; }
+
+/* دبل/تربل/كورة/قهوة buttons (red gradient) + the ×N chip */
+.bg-bid.dbl { background: linear-gradient(#d4574a, #a83a2b); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
+.bg-bid.dbl b { font-size: 20px; }
+.bg-chip-mult { background: linear-gradient(#d4574a, #8c2f27); color: #fff; }
+
+/* «مشروع» pill above the hand (trick 1 only) */
+.bg-projpill {
+  display: block; margin: 0 auto 2px; border: none; cursor: pointer;
+  background: linear-gradient(#f3d98c, #e0b95a); color: #5c430e;
+  font: inherit; font-size: 14px; font-weight: 800;
+  border-radius: 999px; padding: 8px 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .25), inset 0 0 0 1px rgba(255, 255, 255, .4);
+  animation: bg-pillpulse 1.2s ease-in-out infinite;
+}
+@keyframes bg-pillpulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+.bg-projpill[disabled] { opacity: .5; animation: none; cursor: default; }
+
+/* seat chip: this player declared a project */
+.bg-tag.proj { background: #f3d98c; }
+
+/* trick-2 reveal overlay */
+.bg-projbd { cursor: pointer; }
+.bg-projmodal h3 { margin-bottom: 10px; }
+.bg-projrow {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  border: 1px solid var(--line); border-radius: 12px;
+  padding: 8px 10px; margin-bottom: 8px;
+}
+.bg-projrow.cancelled { opacity: .45; }
+.bg-projrow.cancelled .bg-projcards { filter: grayscale(1); }
+.bg-projwho { display: flex; flex-direction: column; gap: 2px; font-size: 13px; min-width: 0; }
+.bg-projwho b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bg-projwho span { color: var(--ink-soft); font-size: 12px; font-weight: 700; }
+.bg-projcards { display: flex; direction: ltr; padding-left: 12px; }
+.bg-projcards .bg-pcard.mini { margin-left: -12px; }
+.bg-pcard.mini { width: 34px; height: 50px; border-radius: 6px; }
+.bg-pcard.mini .bg-pc-pip { font-size: 16px; }
+.bg-pcard.mini .bg-pc-corner { font-size: 9px; top: 2px; left: 3px; }
+.bg-pcard.mini .bg-pc-corner i { font-size: 8px; }
+.bg-pcard.mini .bg-pc-corner.flip { display: none; }
+.bg-projhint { text-align: center; color: var(--ink-soft); font-size: 12px; margin: 8px 0 0; }
+
+/* round-end: one line per declared project */
+.bg-projlines { font-size: 12px; color: var(--ink-soft); text-align: center; margin: -4px 0 10px; }
+.bg-projlines div { padding: 1px 0; }
+.bg-projlines .cancelled { text-decoration: line-through; opacity: .6; }
+
 /* ---------- mobile portrait tuning (thumb-size targets) ---------- */
 @media (max-width: 430px) {
   .bg-felt { height: clamp(280px, 42vh, 380px); }
