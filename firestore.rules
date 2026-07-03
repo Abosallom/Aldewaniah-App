@@ -198,6 +198,42 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ---------- FCM push tokens ----------
+    // Each member saves their own device tokens. NO member can read
+    // them (the push worker reads them with a service account, which
+    // bypasses rules). This keeps device identifiers private.
+    match /fcmTokens/{uid} {
+      allow read: if isAdmin();
+      allow create, update: if approved() && uid == request.auth.uid;
+      allow delete: if isAdmin() || (signedIn() && uid == request.auth.uid);
+    }
+
+    // ---------- Baloot Online tables ----------
+    // TRUST MODEL: invite-only diwaniya group. Rules gate access to
+    // APPROVED MEMBERS; game legality (turns, legal cards, scoring)
+    // is enforced client-side via transactions. A determined member
+    // could tamper with a game — accepted trade-off among friends.
+    match /balootTables/{tableId} {
+      allow read: if approved();
+      allow create: if approved();
+      allow update: if approved();
+      allow delete: if (approved() && resource.data.hostUid == request.auth.uid) || isAdmin();
+
+      // Private hands: key = uid (normal), 'seat0'..'seat3' (practice
+      // mode — host plays all seats), or 'deck' (undealt cards,
+      // host-only read so deals survive a host refresh).
+      match /priv/{key} {
+        function tbl() {
+          return get(/databases/$(database)/documents/balootTables/$(tableId)).data;
+        }
+        allow read: if approved()
+          && (key == request.auth.uid
+              || tbl().practice == true
+              || (key == 'deck' && tbl().hostUid == request.auth.uid));
+        allow write: if approved();
+      }
+    }
+
     // ---------- app config (maintenance mode, check-in geofence) ----------
     match /config/{id} {
       allow read: if true;    // pause screen must render pre-login

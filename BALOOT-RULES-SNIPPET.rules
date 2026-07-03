@@ -1,0 +1,56 @@
+// ============================================================
+// BALOOT ONLINE (بلوت أونلاين) — Firestore rules snippet
+//
+// HOW TO MERGE: paste the match block below inside the existing
+//   service cloud.firestore {
+//     match /databases/{database}/documents {
+//       ... existing blocks ...
+//       <PASTE HERE>
+//     }
+//   }
+// It reuses the helpers already defined in firestore.rules:
+//   approved()  — signed-in, allowlisted, approved member
+//   isAdmin()   — approved member with admin == true
+//
+// TRUST MODEL (read this once): this is an invite-only diwaniya
+// group. The rules only gate access to APPROVED MEMBERS; game
+// legality (whose turn it is, which card is legal, scoring) is
+// enforced client-side through Firestore transactions. A
+// determined member could technically tamper with a game — that
+// is an accepted trade-off for a private friends group.
+// ============================================================
+
+    // ---------- Baloot Online tables ----------
+    match /balootTables/{tableId} {
+      // Public game state: any approved member can watch, create
+      // tables, and write moves (transactions keep them honest).
+      allow read: if approved();
+      allow create: if approved();
+      allow update: if approved();
+      // Only the table's host — or an admin — can tear it down.
+      allow delete: if (approved() && resource.data.hostUid == request.auth.uid) || isAdmin();
+
+      // Private hands.
+      //   key = the player's uid            (normal games)
+      //   key = 'seat0'..'seat3'            (practice mode: the host
+      //                                      plays all seats, so hands
+      //                                      are readable by design)
+      //   key = 'deck'                      (undealt rest of the deck;
+      //                                      host-only read so the host
+      //                                      can finish the deal after
+      //                                      the buy, even after a
+      //                                      page refresh)
+      match /priv/{key} {
+        function tbl() {
+          return get(/databases/$(database)/documents/balootTables/$(tableId)).data;
+        }
+        allow read: if approved()
+          && (key == request.auth.uid
+              || tbl().practice == true
+              || (key == 'deck' && tbl().hostUid == request.auth.uid));
+        // Writes are open to approved members: the host deals into
+        // everyone's hand docs, and each player removes their own
+        // played cards. Trust-based (see note above).
+        allow write: if approved();
+      }
+    }

@@ -1,9 +1,10 @@
 /* Aldewaniah App — service worker (offline shell cache) */
-const CACHE = 'aldewaniah-v68';
+const CACHE = 'aldewaniah-v69';
 const ASSETS = [
   './',
   './index.html',
   './css/styles.css',
+  './css/baloot-game.css',
   './js/native.js',
   './js/boot.js',
   './js/i18n.js',
@@ -18,6 +19,7 @@ const ASSETS = [
   './js/install.js',
   './js/notify.js',
   './js/chat-notify.js',
+  './js/push.js',
   './js/ai-assistant.js',
   './js/maintenance.js',
   './js/modules/home.js',
@@ -35,6 +37,7 @@ const ASSETS = [
   './js/modules/split.js',
   './js/modules/calendar.js',
   './js/modules/polls.js',
+  './js/modules/baloot-game.js',
   './js/modules/admin.js',
   './manifest.json',
   './assets/ALDEWANYAar.png',

@@ -26,7 +26,12 @@
         try { localStorage.setItem(KEY, '0'); } catch (e) {}
         if (cb) cb(false); return;
       }
-      const set = (ok) => { try { localStorage.setItem(KEY, ok ? '1' : '0'); } catch (e) {} if (cb) cb(ok && granted()); };
+      const set = (ok) => {
+        try { localStorage.setItem(KEY, ok ? '1' : '0'); } catch (e) {}
+        // permission granted → also register this device for closed-app push
+        if (ok && granted() && window.Push && Push.register) { try { Push.register(); } catch (e) {} }
+        if (cb) cb(ok && granted());
+      };
       try {
         if (!window.Notification) { set(false); return; }
         if (Notification.permission === 'granted') { set(true); return; }

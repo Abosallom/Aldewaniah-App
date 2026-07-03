@@ -400,7 +400,12 @@
       async function sendMsg(payload) {
         // Identity = uid (opaque). Phones are NOT stored in member-readable messages.
         const doc = Object.assign({ text: '', name: myName, uid: myUid, at: firebase.firestore.FieldValue.serverTimestamp() }, payload);
-        try { await db.collection('messages').add(doc); }
+        try {
+          await db.collection('messages').add(doc);
+          // push notification to other members' devices (fire & forget)
+          if (window.Push) Push.notify({ kind: 'chat', title: 'الديوانية — الدردشة',
+            body: myName + ': ' + (payload.text || (payload.imageKey ? '📷 صورة' : payload.audioKey ? '🎤 رسالة صوتية' : payload.videoKey ? '🎥 فيديو' : '…')) });
+        }
         catch (e) { if (payload.text) { input.value = payload.text; } }
       }
     }

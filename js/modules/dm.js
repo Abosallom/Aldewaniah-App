@@ -313,6 +313,9 @@
       try {
         await tRef.collection('msgs').add(msg);
         await tRef.set(meta, { merge: true });
+        // push notification to the other participant only (fire & forget)
+        if (window.Push) Push.notify({ kind: 'dm', toUid: other,
+          title: '✉️ رسالة خاصة — ' + myName(), body: msg.text || '📷 صورة' });
       } catch (e) { if (payload.text) input.value = payload.text; }
     }
     function sendText() {

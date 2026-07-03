@@ -13,7 +13,7 @@
     font-src 'self' data: https://fonts.gstatic.com;
     img-src 'self' data: blob: https://aldewaniah-media.mulhaqdb.workers.dev;
     media-src 'self' blob: https://aldewaniah-media.mulhaqdb.workers.dev;
-    connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://aldewaniah-media.mulhaqdb.workers.dev https://aldewaniah-ai.mulhaqdb.workers.dev https://api.aladhan.com https://formsubmit.co https://www.google.com;
+    connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://fcm.googleapis.com https://aldewaniah-media.mulhaqdb.workers.dev https://aldewaniah-ai.mulhaqdb.workers.dev https://aldewaniah-push.mulhaqdb.workers.dev https://api.aladhan.com https://formsubmit.co https://www.google.com;
     frame-src 'self' https://www.google.com https://www.recaptcha.net https://aldewaniah-45158.firebaseapp.com https://challonge.com https://brackethq.com;
     object-src 'none';
     base-uri 'self';
@@ -30,6 +30,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/baloot-game.css" />
   <style>
     /* Loading splash (inline so it shows before the stylesheet loads) */
     #splash{ position:fixed; inset:0; z-index:1000;
@@ -79,6 +80,7 @@
   <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-messaging-compat.js"></script>
   <script src="js/firebase-config.js"></script>
 
   <!-- Core scripts (order matters) -->
@@ -109,6 +111,7 @@
   <script src="js/modules/split.js"></script>
   <script src="js/modules/calendar.js"></script>
   <script src="js/modules/polls.js"></script>
+  <script src="js/modules/baloot-game.js"></script>
 
   <!-- Boot: App.start() + splash + refresh button + service-worker auto-update.
        (External file — no inline scripts, so the CSP can block injected code.) -->
@@ -119,6 +122,7 @@
   <script src="js/install.js"></script>
   <script src="js/notify.js"></script>
   <script src="js/chat-notify.js"></script>
+  <script src="js/push.js"></script>
   <script src="js/ai-assistant.js"></script>
   <script src="js/maintenance.js"></script>
 </body>
