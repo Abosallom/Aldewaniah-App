@@ -367,6 +367,66 @@
 .bg-projlines div { padding: 1px 0; }
 .bg-projlines .cancelled { text-decoration: line-through; opacity: .6; }
 
+/* ===========================================================
+   STAGE 3 — bots, turn timers, deal & buy animations
+   =========================================================== */
+
+/* avatar wrapper: carries the timer ring + the dealer's question bubble */
+.bg-avwrap { position: relative; }
+.bg-avatar.bot { font-size: 20px; }
+
+/* shrinking turn-timer ring (duration mirrors TURN_MS = 20s in the JS) */
+.bg-ring { position: absolute; inset: -6px; pointer-events: none; }
+.bg-ring svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
+.bg-ring circle { fill: none; stroke-width: 3.5; }
+.bg-ring .track { stroke: rgba(0, 0, 0, .3); }
+.bg-ring .left {
+  stroke: var(--gold); stroke-linecap: round;
+  stroke-dasharray: 150.8;                 /* 2π · r24 */
+  animation: bg-ringout 20s linear forwards;
+}
+@keyframes bg-ringout { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 150.8; } }
+
+/* «أول؟ / ثاني؟ / دبل؟» — the dealer's question on the current bidder */
+.bg-ask {
+  position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+  background: #fff; color: #1c2b22; font-size: 12px; font-weight: 800;
+  border-radius: 10px; padding: 3px 10px; white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .35); z-index: 7;
+  animation: bg-askpop .25s ease;
+}
+.bg-ask::after {
+  content: ''; position: absolute; bottom: -4px; left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 8px; height: 8px; background: #fff;
+}
+@keyframes bg-askpop { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
+/* top seat: the bubble drops BELOW the avatar so the felt doesn't clip it */
+.bg-pos-t .bg-ask { top: auto; bottom: -24px; }
+.bg-pos-t .bg-ask::after { bottom: auto; top: -4px; }
+
+/* the مشترى flying from the center to whoever receives it (dealRest) */
+.bg-fly-b { animation: bg-flyb .65s ease-in .35s forwards; }
+.bg-fly-t { animation: bg-flyt .65s ease-in .35s forwards; }
+.bg-fly-l { animation: bg-flyl .65s ease-in .35s forwards; }
+.bg-fly-r { animation: bg-flyr .65s ease-in .35s forwards; }
+@keyframes bg-flyb { to { transform: translate(-50%, 200%) scale(.5); opacity: 0; } }
+@keyframes bg-flyt { to { transform: translate(-50%, -280%) scale(.5); opacity: 0; } }
+@keyframes bg-flyl { to { transform: translate(-420%, -50%) scale(.5); opacity: 0; } }
+@keyframes bg-flyr { to { transform: translate(320%, -50%) scale(.5); opacity: 0; } }
+
+/* dealing animation: card backs flying dealer → seats (overlay on body) */
+.bg-dealov { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+.bg-dealcard {
+  position: absolute; width: 38px; height: 54px; border-radius: 6px;
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, .14) 0 4px, transparent 4px 8px),
+    linear-gradient(160deg, #7d2c3b, #5a1f2b);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .35), inset 0 0 0 2px rgba(255, 255, 255, .55);
+  opacity: .96;
+  transition: left .34s ease, top .34s ease;
+}
+
 /* ---------- mobile portrait tuning (thumb-size targets) ---------- */
 @media (max-width: 430px) {
   .bg-felt { height: clamp(280px, 42vh, 380px); }

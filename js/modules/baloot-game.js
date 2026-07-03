@@ -1,5 +1,5 @@
 /* ===========================================================
-   بلوت أونلاين (Baloot Online) — STAGE 1 + STAGE 2
+   بلوت أونلاين (Baloot Online) — STAGE 1 + STAGE 2 + STAGE 3
    Real-time 4-player Baloot tables for members, following the
    famous Kamelna (كملنا) rules & feel:
 
@@ -22,6 +22,51 @@
    - أشكل: a round-2 bid that plays & scores exactly like صن,
      but the flipped card goes to the declarer (a round-2 صن
      sends it to the dealer instead — that's the whole point).
+
+   STAGE 3 (this version) — «الإحساس» the Kamelna feel:
+   - Faithful buy presentation: animated 3+2 deal from the dealer,
+     the flipped مشترى stays face-up in the CENTER for the whole
+     auction, the dealer "asks" «أول؟/ثاني؟» with a speech bubble
+     on the current bidder, and on a buy the flip card flies to
+     whoever receives it before the rest of the deal animates out.
+   - روبوتات: empty seats become bots (سالم/فهد/ماجد 🤖). The old
+     practice mode is replaced — the host plays ONLY their seat and
+     the host's client drives the bots (like it already drives the
+     deal). Old `practice:true` tables are read gracefully: their
+     virtual seats are simply treated as bots.
+   - Turn timers: 20s per human turn with a shrinking ring on the
+     avatar; timeout auto-acts (بس / lowest legal card). Round-end
+     auto-advances after 6s with a countdown on the host's button.
+
+   ---- STAGE 3 RESEARCH NOTES (buy flow as Kamelna presents it) ----
+   Sources checked 2026-07 (kammelna.com preferred where conflicting):
+   · kammelna.com + FAQ (kammelna.com/Home/FAQ, kammelna.com/baloot/):
+     Kamelna is 4 players / 32 cards to 152; it explicitly supports
+     playing "لوحدك مع ثلاث لاعبين افتراضيين" (AI seats) or mixing
+     humans + AI — that is the model for our bots.
+   · rb3haa.com/قوانين-البلوت + sport360x.com/قوانين-البلوت +
+     ar.wikipedia.org/wiki/بلوت + balootx.com/تعليم-بلوت:
+     - Deal: 5 cards each (3 then 2), then ONE card is flipped
+       FACE-UP IN THE MIDDLE OF THE TABLE (وسط الطاولة) — it stays
+       visible to everyone for the whole auction.
+     - The DEALER opens the auction saying «أول», asking each player
+       starting from his right; a refusal is «بس» (also «وله» in some
+       regions — we keep Kamelna's بس). If all four refuse the dealer
+       says «ثاني» and asks again; in round 2 حكم may be any OTHER
+       suit (and Kamelna adds أشكل). 8 refusals → «ورق», redeal with
+       the deal passing on.
+     - On a buy the buyer takes the flipped card («شريت»), then the
+       rest is dealt: 3 cards to everyone, 2 to whoever received the
+       flip (the flip is his 3rd) → everyone holds 8.
+     - Round-1 حكم must be the flip's suit; صن outranks a pending
+       حكم; round-2 صن sends the flip to the DEALER (أشكل keeps it).
+       (All of this was already in the stage-1/2 engine — unchanged.)
+   · Kamelna Google Play page (play.google.com …com.remalit.kammelna):
+     fast automatic pacing — AI seats answer instantly, humans get a
+     short visible turn timer. The exact seconds are not published;
+     we use 20s per human turn (spec default) with auto-بس / lowest
+     legal card on timeout.
+   ------------------------------------------------------------------
 
    Data lives in Firestore:
      balootTables/{code}            public game state (see deal())
@@ -380,6 +425,100 @@
   }
 
   /* ======================================================================
+     STAGE 3 · BOT BRAIN — pure functions (no Firestore, no DOM) so they
+     can be unit-tested. Bots only ever act through the same doBid /
+     playCard transactions as humans, and botPlayChoice picks FROM
+     legalMoves() — an illegal bot move is structurally impossible.
+     ====================================================================== */
+
+  /** Cheapest card: lowest بنط first, then weakest in trick strength
+      (dumping a 7 before a Q, and never a J of trump by accident). */
+  function cheapest(cards, mode, trump) {
+    return cards.slice().sort(function (a, b) {
+      var d = cardPoints(a, mode, trump) - cardPoints(b, mode, trump);
+      if (d) return d;
+      return strength(a, mode, trump) - strength(b, mode, trump);
+    })[0];
+  }
+
+  /** Bidding heuristic (never دبل, never أشكل — bots keep it simple):
+      · حكم candidate suit = J, or 9+A together (round 1: the flip suit,
+        remembering the flip card itself joins the buyer's hand).
+      · صن when the hand holds 3+ aces/tens spread over the hand.
+      Returns {a:'sun'|'hokum'|'pass', suit} — round-2 حكم picks the best
+      non-flip suit. Respects pendHokum (can't حكم over a pending حكم;
+      صن legally beats it, so صن is still allowed). */
+  function botBidChoice(hand, p) {
+    var r = p.bidRound || 1;
+    var flipS = suitOf(p.flip);
+    function suitCards(s) { return hand.filter(function (c) { return suitOf(c) === s; }); }
+    function has(cs, rk) { return cs.some(function (c) { return rankOf(c) === rk; }); }
+    var acesTens = hand.filter(function (c) { var rk = rankOf(c); return rk === 'A' || rk === '10'; }).length;
+    var sunOK = acesTens >= 3;
+
+    if (r === 1) {
+      // the flip card counts toward my trumps if I buy it
+      var cs = suitCards(flipS).concat([p.flip]);
+      var hokumOK = has(cs, 'J') || (has(cs, '9') && has(cs, 'A'));
+      if (sunOK) return { a: 'sun' };                 // صن outranks a pending حكم
+      if (hokumOK && !p.pendHokum) return { a: 'hokum', suit: null };
+      return { a: 'pass' };
+    }
+    // round 2: صن first, else the strongest non-flip حكم suit
+    if (sunOK) return { a: 'sun' };
+    if (!p.pendHokum) {
+      var best = null, bestScore = 0;
+      SUITS.forEach(function (s) {
+        if (s === flipS) return;
+        var sc = suitCards(s);
+        if (sc.length < 3) return;
+        if (!(has(sc, 'J') || (has(sc, '9') && has(sc, 'A')))) return;
+        var score = sc.length + (has(sc, 'J') ? 2 : 0) + (has(sc, '9') ? 1.5 : 0) + (has(sc, 'A') ? 1 : 0);
+        if (score > bestScore) { bestScore = score; best = s; }
+      });
+      if (best) return { a: 'hokum', suit: best };
+    }
+    return { a: 'pass' };
+  }
+
+  /** Play heuristic — always a member of legalMoves():
+      · leading: trump boss (J of trump) if my team bought in حكم,
+        else the strongest card of my longest suit;
+      · partner currently winning → throw the cheapest card;
+      · else the cheapest card that currently WINS the trick, if any;
+      · else the cheapest card full stop. */
+  function botPlayChoice(hand, table, mode, trump, seat, buyer) {
+    var legal = legalMoves(hand, table, mode, trump, seat);
+    if (legal.length === 1) return legal[0];
+
+    if (!table || !table.length) {                    // leading a trick
+      if (mode === 'hokum' && buyer != null && (seat % 2) === (buyer % 2)) {
+        if (legal.indexOf('J' + trump) >= 0) return 'J' + trump;
+      }
+      var bySuit = {};
+      legal.forEach(function (c) { (bySuit[suitOf(c)] = bySuit[suitOf(c)] || []).push(c); });
+      var suits = Object.keys(bySuit).sort(function (a, b) { return bySuit[b].length - bySuit[a].length; });
+      var pick = bySuit[suits[0]];
+      return pick.slice().sort(function (a, b) { return strength(b, mode, trump) - strength(a, mode, trump); })[0];
+    }
+
+    var win = winnerOf(table, mode, trump);
+    if ((win.seat % 2) === (seat % 2)) return cheapest(legal, mode, trump);
+    var led = suitOf(table[0].card);
+    var wv = playVal(win.card, led, mode, trump);
+    var winners = legal.filter(function (c) { return playVal(c, led, mode, trump) > wv; });
+    if (winners.length) return cheapest(winners, mode, trump);
+    return cheapest(legal, mode, trump);
+  }
+
+  // exposed for the /tmp node smoke test (harmless in the browser)
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { newDeck: newDeck, shuffle: shuffle, legalMoves: legalMoves,
+      winnerOf: winnerOf, scoreRound: scoreRound, findProjects: findProjects,
+      botBidChoice: botBidChoice, botPlayChoice: botPlayChoice, suitOf: suitOf };
+  }
+
+  /* ======================================================================
      2) MODULE — lobby, table UI, Firestore sync.
      ====================================================================== */
   var LSKEY = 'aldewaniah.balootGame.table';
@@ -405,8 +544,8 @@
         bg_create: 'إنشاء طاولة', bg_join: 'انضمام بالرمز', bg_code: 'رمز الطاولة',
         bg_join_btn: 'انضمام', bg_resume: 'العودة إلى طاولتك', bg_no_table: 'لا توجد طاولة بهذا الرمز',
         bg_table_ended: 'انتهت الطاولة', bg_err: 'حدث خطأ، حاول مرة أخرى', bg_copied: 'تم نسخ الرمز ✅',
-        bg_share_code: 'شارك الرمز مع أصحابك', bg_practice: 'تجربة (لاعب واحد)',
-        bg_practice_hint: 'تلعب مكان جميع المقاعد الفارغة لتجربة اللعبة بنفسك',
+        bg_share_code: 'شارك الرمز مع أصحابك', bg_practice: 'أكمل بالروبوتات 🤖',
+        bg_practice_hint: 'المقاعد الفارغة تلعب تلقائيًا — أنت تلعب مقعدك فقط',
         bg_sit: 'اجلس هنا', bg_empty_seat: 'مقعد فارغ', bg_start: 'ابدأ اللعب',
         bg_need4: 'بانتظار اكتمال المقاعد (٤ لاعبين)', bg_leave_seat: 'مغادرة المقعد',
         bg_exit: 'خروج', bg_end_table: 'إنهاء الطاولة', bg_end_confirm: 'إنهاء الطاولة للجميع؟',
@@ -429,7 +568,11 @@
         bg_proj_400: 'أربعمية', bg_proj_baloot: 'بلوت',
         bg_double: 'دبل', bg_triple: 'تربل', bg_kawra: 'كورة', bg_qahwa: 'قهوة',
         bg_double_q: 'الدبل — ترفع الرهان؟',
-        bg_coffee: 'قهوة! هذه الجولة تحسم اللعبة كاملة'
+        bg_coffee: 'قهوة! هذه الجولة تحسم اللعبة كاملة',
+        // STAGE 3
+        bg_ask1: 'أول؟', bg_ask2: 'ثاني؟', bg_ask_dbl: 'دبل؟',
+        bg_bought: 'شريت!', bg_timeout_pass: 'انتهى الوقت ⏱',
+        bg_bot_seat: 'روبوت'
       },
       en: {
         bg_title: 'Baloot Online', bg_sub: 'Private Baloot tables — Kamelna rules',
@@ -437,8 +580,8 @@
         bg_create: 'Create table', bg_join: 'Join with a code', bg_code: 'Table code',
         bg_join_btn: 'Join', bg_resume: 'Return to your table', bg_no_table: 'No table with that code',
         bg_table_ended: 'The table was closed', bg_err: 'Something went wrong, try again', bg_copied: 'Code copied ✅',
-        bg_share_code: 'Share the code with your friends', bg_practice: 'Practice (single player)',
-        bg_practice_hint: 'You play every empty seat to test the game yourself',
+        bg_share_code: 'Share the code with your friends', bg_practice: 'Fill with bots 🤖',
+        bg_practice_hint: 'Empty seats play automatically — you play only your own seat',
         bg_sit: 'Sit here', bg_empty_seat: 'Empty seat', bg_start: 'Start game',
         bg_need4: 'Waiting for 4 players', bg_leave_seat: 'Leave seat',
         bg_exit: 'Exit', bg_end_table: 'Close table', bg_end_confirm: 'Close the table for everyone?',
@@ -461,7 +604,11 @@
         bg_proj_400: 'Four hundred', bg_proj_baloot: 'Baloot',
         bg_double: 'Double', bg_triple: 'Triple', bg_kawra: 'Kawra', bg_qahwa: 'Qahwa',
         bg_double_q: 'Doubling — raise the stakes?',
-        bg_coffee: 'Qahwa! This deal decides the whole game'
+        bg_coffee: 'Qahwa! This deal decides the whole game',
+        // STAGE 3
+        bg_ask1: 'Awwal?', bg_ask2: 'Thani?', bg_ask_dbl: 'Double?',
+        bg_bought: 'Bought!', bg_timeout_pass: 'Time is up ⏱',
+        bg_bot_seat: 'Bot'
       }
     },
 
@@ -501,7 +648,13 @@
         collectSig: null, collectTimer: null, sweepTimer: null,
         prevSig: '', prevCount: 0,   // trick animation bookkeeping
         lastActing: null, suitPick: false, suitPickKey: '',
-        projShownRound: 0, projTimerRound: 0, projTimer: null // trick-2 reveal overlay
+        projShownRound: 0, projTimerRound: 0, projTimer: null, // trick-2 reveal overlay
+        // STAGE 3: pacing engine
+        turnSig: '', turnStartAt: 0,          // current turn signature + local start time
+        turnTimer: null, backupTimer: null,   // human timeout / host backup
+        botTimer: null, botTries: 0,          // bot action scheduler
+        dealAnimKey: '', restAnimKey: '', lastPhase: null, dealOv: null, // deal animation
+        autoNextKey: '', autoNextTimer: null, autoNextInt: null // roundEnd auto-advance
       };
 
       session = {
@@ -513,6 +666,10 @@
           clearTimeout(st.privRetryTimer);
           clearTimeout(st.collectTimer); clearTimeout(st.sweepTimer);
           clearTimeout(st.projTimer);
+          clearTimeout(st.turnTimer); clearTimeout(st.backupTimer);
+          clearTimeout(st.botTimer);
+          clearTimeout(st.autoNextTimer); clearInterval(st.autoNextInt);
+          if (st.dealOv) { try { st.dealOv.remove(); } catch (e) {} st.dealOv = null; }
         }
       };
 
@@ -532,14 +689,32 @@
         }
         return -1;
       }
+      /** STAGE 3: a bot seat = a seat created with bot:true, OR a legacy
+          practice-mode "virtual" seat (old tables upgrade gracefully —
+          their virtual guests simply become bot-driven). */
+      function isBotSeat(i) {
+        var s = st.pub && st.pub.seats && st.pub.seats[i];
+        return !!(s && (s.bot || s.virtual));
+      }
+      function hasBots() {
+        var p = st.pub; if (!p || !p.seats) return false;
+        return p.seats.some(function (s, i) { return isBotSeat(i); });
+      }
+      /** STAGE 3: humans control ONLY their own seat — bots are driven by
+          the host's pacing engine, never through the UI. */
       function controlsSeat(i) {
         var p = st.pub; if (!p || !p.seats || !p.seats[i]) return false;
-        if (p.practice) return isHost() || p.seats[i].uid === myUid;
+        if (isBotSeat(i)) return false;
         return p.seats[i].uid === myUid;
       }
+      /** Priv doc key: bots (and every seat of a LEGACY practice table,
+          which has practice:true but no bots map) live at 'seatN';
+          humans live at their uid. `practice:true` is kept on bot tables
+          purely so the existing rules keep 'seatN' host-readable. */
       function privKey(i) {
         var p = st.pub;
-        if (p && p.practice) return 'seat' + i;
+        if (isBotSeat(i)) return 'seat' + i;
+        if (p && p.practice && !p.bots) return 'seat' + i; // legacy practice table
         return (p && p.seats && p.seats[i] && p.seats[i].uid) || ('seat' + i);
       }
       function privRef(i) { return st.ref.collection('priv').doc(privKey(i)); }
@@ -551,18 +726,9 @@
       function relPos(seat) { // rotate so I'm at the bottom; play order runs counter-clockwise
         return ['b', 'r', 't', 'l'][(seat - viewSeat() + 4) % 4];
       }
-      /** In practice mode the host acts for whoever's turn it is. */
-      function actingSeat() {
-        var p = st.pub, mine = mySeat();
-        if (!p) return mine;
-        if (p.practice && isHost()) {
-          if ((p.phase === 'bidding' || p.phase === 'playing') && p.turn >= 0) return p.turn;
-          if (p.phase === 'doubling' && p.doubleTurn != null) return p.doubleTurn; // STAGE 2
-          if (st.lastActing != null) return st.lastActing;
-          return mine >= 0 ? mine : 0;
-        }
-        return mine;
-      }
+      /** STAGE 3: everyone (host included) acts only for their own seat —
+          bots replaced the old "host plays every empty seat" practice. */
+      function actingSeat() { return mySeat(); }
       function myTeamKey() { return 't' + (viewSeat() % 2); }
       function themTeamKey() { return 't' + (1 - viewSeat() % 2); }
 
@@ -669,7 +835,9 @@
             subscribePrivs();
             hostAutomation();
             scheduleCollect();
+            pacing();          // STAGE 3: bots + turn timers + auto-advance
             paint();
+            dealAnimations();  // STAGE 3: needs the freshly painted felt
           } catch (e) { /* defensive: never let a paint error kill the stream */ }
         }, function () { toast(I18n.t('bg_err')); });
       }
@@ -684,8 +852,16 @@
       function subscribePrivs() {
         var p = st.pub; if (!p) return;
         var want = [];
-        if (p.practice) { want = ['seat0', 'seat1', 'seat2', 'seat3']; }
-        else if (myUid) { want = [myUid]; }
+        if (p.practice && !p.bots) {
+          // LEGACY practice table: every hand lives at seat0..seat3
+          want = isHost() ? ['seat0', 'seat1', 'seat2', 'seat3'] : (myUid ? [myUid] : []);
+        } else {
+          if (myUid) want = [myUid];
+          // STAGE 3: the host also reads the bot hands (rule: practice==true)
+          if (isHost()) {
+            for (var bi = 0; bi < 4; bi++) if (isBotSeat(bi)) want.push('seat' + bi);
+          }
+        }
         want.forEach(function (key) {
           if (st.privSubs[key]) return;
           st.privSubs[key] = st.ref.collection('priv').doc(key).onSnapshot(function (doc) {
@@ -718,11 +894,18 @@
         if (!p || !isHost()) return;
         if (p.phase === 'dealRest' && st.guard !== 'rest' + p.roundNo) {
           st.guard = 'rest' + p.roundNo;
-          dealRest().catch(function () { st.guard = ''; toast(I18n.t('bg_err')); });
+          // STAGE 3: wait for the flip card's flight to the buyer first
+          setTimeout(function () {
+            dealRest().catch(function () { st.guard = ''; toast(I18n.t('bg_err')); });
+          }, 1050);
         }
-        if (p.phase === 'redeal' && st.guard !== 'deal' + (p.roundNo + 1)) {
+        // ورق (all passed) or the roundEnd auto-advance both land here
+        if ((p.phase === 'redeal' || p.phase === 'dealing') && st.guard !== 'deal' + (p.roundNo + 1)) {
           st.guard = 'deal' + (p.roundNo + 1);
-          deal(p.dealer).catch(function () { st.guard = ''; toast(I18n.t('bg_err')); });
+          setTimeout(function () {
+            deal(st.pub && st.pub.dealer != null ? st.pub.dealer : p.dealer)
+              .catch(function () { st.guard = ''; toast(I18n.t('bg_err')); });
+          }, p.phase === 'redeal' ? 900 : 250);
         }
       }
 
@@ -799,7 +982,7 @@
          Round 1: حكم = flip suit · صن ends the auction instantly.
          Round 2: حكم = any other suit. 8 passes → ورق (redeal, dealer+1).
          ====================================================================== */
-      async function doBid(action, chosenSuit) {
+      async function doBid(action, chosenSuit, tick) {
         var actSeat = st.pub && st.pub.turn;
         st.suitPick = false;
         try {
@@ -807,9 +990,11 @@
             var snap = await tx.get(st.ref);
             var p = snap.data();
             if (!p || p.phase !== 'bidding' || p.turn !== actSeat) throw new Error('turn');
+            if (tick && p.botTick === tick) throw new Error('tick'); // STAGE 3: two-tab guard
             var r = p.bidRound || 1;
             var bids = (p.bids || []).slice();
             var upd = { updatedAt: ts() };
+            if (tick) upd.botTick = tick;
 
             if (action === 'sun' || action === 'ashkal') {
               // صن/أشكل end the auction on the spot — nothing outbids them,
@@ -861,7 +1046,7 @@
          PLAYING A CARD — transaction validates turn/phase/legality, then the
          player removes the card from their own priv hand doc.
          ====================================================================== */
-      async function playCard(seat, card) {
+      async function playCard(seat, card, tick) {
         var key = privKey(seat);
         var hand = (st.hands[key] || []).slice();
         try {
@@ -869,6 +1054,7 @@
             var snap = await tx.get(st.ref);
             var p = snap.data();
             if (!p || p.phase !== 'playing' || p.turn !== seat) throw new Error('turn');
+            if (tick && p.botTick === tick) throw new Error('tick'); // STAGE 3: two-tab guard
             var table = (p.table || []).slice();
             if (table.length >= 4) throw new Error('full');
             var legal = legalMoves(hand, table, p.mode, p.trump, seat);
@@ -876,11 +1062,13 @@
             table.push({ seat: seat, card: card });
             var hc = (p.handCounts || [8, 8, 8, 8]).slice();
             hc[seat] = Math.max(0, hc[seat] - 1);
-            tx.update(st.ref, {
+            var upd = {
               table: table, handCounts: hc,
               turn: table.length < 4 ? (seat + 1) % 4 : -1,   // -1 freezes input during the sweep
               updatedAt: ts()
-            });
+            };
+            if (tick) upd.botTick = tick;
+            tx.update(st.ref, upd);
           });
           // optimistic local update + authoritative priv-doc update
           st.hands[key] = hand.filter(function (c) { return c !== card; });
@@ -895,14 +1083,16 @@
          call قهوة — this one deal decides the whole game. بس passes; when
          both seats of the asking team pass, the chain stops and play begins.
          ====================================================================== */
-      async function doDouble(action) {
+      async function doDouble(action, tick) {
         var actSeat = st.pub && st.pub.doubleTurn;
         try {
           await db.runTransaction(async function (tx) {
             var snap = await tx.get(st.ref);
             var p = snap.data();
             if (!p || p.phase !== 'doubling' || p.doubleTurn !== actSeat) throw new Error('turn');
+            if (tick && p.botTick === tick) throw new Error('tick'); // STAGE 3: two-tab guard
             var upd = { updatedAt: ts() };
+            if (tick) upd.botTick = tick;
             if (action === 'raise') {
               var cur = p.mult || 1;
               var next = cur >= 4 ? 'coffee' : cur + 1;   // 1→2→3→4→قهوة
@@ -995,12 +1185,12 @@
               var c = root.querySelector('.bg-center');
               if (c) c.classList.add('bg-sweep-' + relPos(win.seat));
             } catch (e) {}
-          }, 620);
+          }, 550);
 
           var delay = -1;
-          if (controlsSeat(p.table[3].seat)) delay = 900;
-          else if (isHost()) delay = 1600;
-          else if (mySeat() >= 0) delay = 2400;
+          if (controlsSeat(p.table[3].seat)) delay = 800;
+          else if (isHost()) delay = isBotSeat(p.table[3].seat) ? 850 : 1500; // host drives bot tricks
+          else if (mySeat() >= 0) delay = 2200;
           if (delay > 0) st.collectTimer = setTimeout(function () { collectTrick(sig); }, delay);
         } else {
           st.collectSig = null;
@@ -1061,6 +1251,204 @@
       }
 
       /* ======================================================================
+         STAGE 3 · PACING ENGINE — one signature per "turn state". When it
+         changes, every client (re)schedules exactly one thing:
+         · bot seat  → the HOST's client plays it after 700–1200ms (guarded
+           by the transaction turn-check + a botTick marker, so a second
+           host tab can never double-move);
+         · my seat   → a 20s timeout that auto-acts (بس / lowest legal card);
+         · other human, bidding/doubling → host backup timeout at 23s (the
+           host cannot backup PLAYS — it can't read human hands by design).
+         Also drives the 6s «التالية» auto-advance on the round summary.
+         ====================================================================== */
+      var TURN_MS = 20000; // Kamelna shows a short turn timer; exact length unpublished → 20s
+
+      function turnSigOf(p) {
+        if (!p) return '';
+        if (p.phase === 'bidding') {
+          return 'b|' + p.roundNo + '|' + (p.bidRound || 1) + '|' + p.turn + '|' + (p.bids || []).length;
+        }
+        if (p.phase === 'doubling') {
+          return 'd|' + p.roundNo + '|' + p.doubleTurn + '|' + p.mult + '|' + (p.doubleLeft || []).length;
+        }
+        if (p.phase === 'playing') {
+          var tw = p.tricksWon || {};
+          return 'p|' + p.roundNo + '|' + p.turn + '|' + (p.table || []).length +
+                 '|' + ((tw.t0 || []).length + (tw.t1 || []).length);
+        }
+        return p.phase + '|' + (p.roundNo || 0);
+      }
+      function actorOf(p) {
+        if (!p) return -1;
+        if (p.phase === 'doubling') return (p.doubleTurn != null) ? p.doubleTurn : -1;
+        if (p.phase === 'bidding' || p.phase === 'playing') return (p.turn != null) ? p.turn : -1;
+        return -1;
+      }
+
+      function pacing() {
+        var p = st.pub; if (!p) return;
+        var sig = turnSigOf(p);
+        if (sig !== st.turnSig) {
+          st.turnSig = sig; st.turnStartAt = Date.now(); st.botTries = 0;
+          clearTimeout(st.turnTimer); clearTimeout(st.backupTimer); clearTimeout(st.botTimer);
+          var act = actorOf(p);
+          if (act >= 0 && (p.table || []).length < 4) {
+            if (isBotSeat(act)) {
+              if (isHost()) {
+                st.botTimer = setTimeout(function () { botAct(sig); }, 700 + Math.floor(Math.random() * 500));
+              }
+            } else if (controlsSeat(act)) {
+              st.turnTimer = setTimeout(function () { autoAct(sig, act); }, TURN_MS);
+            } else if (isHost() && p.phase !== 'playing') {
+              st.backupTimer = setTimeout(function () { autoAct(sig, act); }, TURN_MS + 3000);
+            }
+          }
+        }
+        // roundEnd summary: host auto-advances after 6s with a countdown
+        if (p.phase === 'roundEnd' && isHost()) {
+          if (st.autoNextKey !== 'n' + p.roundNo) {
+            st.autoNextKey = 'n' + p.roundNo;
+            clearTimeout(st.autoNextTimer); clearInterval(st.autoNextInt);
+            var end = Date.now() + 6000;
+            st.autoNextTimer = setTimeout(nextRound, 6050);
+            st.autoNextInt = setInterval(function () {
+              var s = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+              try {
+                var b = root.querySelector('.bg-nextbtn');
+                if (b) b.textContent = I18n.t('bg_next_round') + ' · ' + s;
+              } catch (e) {}
+              if (s <= 0) clearInterval(st.autoNextInt);
+            }, 300);
+          }
+        } else if (p.phase !== 'roundEnd' && st.autoNextKey) {
+          st.autoNextKey = '';
+          clearTimeout(st.autoNextTimer); clearInterval(st.autoNextInt);
+        }
+      }
+
+      /** One bot action (host client only). Re-validates the turn signature,
+          skips if another host tab already ticked this exact state, retries
+          briefly if the bot's hand hasn't streamed in yet. */
+      async function botAct(sig) {
+        var p = st.pub;
+        if (!p || !isHost() || turnSigOf(p) !== sig) return;
+        if (p.botTick === sig) return;                    // second tab already moved
+        var act = actorOf(p);
+        if (act < 0 || !isBotSeat(act)) return;
+        try {
+          if (p.phase === 'doubling') { await doDouble('pass', sig); return; }  // bots never دبل
+          var hand = st.hands[privKey(act)] || [];
+          if (!hand.length) {                             // priv doc still loading
+            if (st.botTries++ < 10) st.botTimer = setTimeout(function () { botAct(sig); }, 450);
+            return;
+          }
+          if (p.phase === 'bidding') {
+            var ch = botBidChoice(hand, p);
+            await doBid(ch.a, ch.suit || null, sig);
+          } else if (p.phase === 'playing') {
+            // declare projects automatically before the bot's first card
+            var tw = p.tricksWon || {};
+            var isT1 = !((tw.t0 || []).length) && !((tw.t1 || []).length);
+            if (isT1 && hand.length === 8 && !((p.declared || {})[act]) &&
+                findProjects(hand, p.mode, p.trump).length) {
+              await declareProject(act);
+            }
+            var card = botPlayChoice(hand, p.table || [], p.mode, p.trump, act, p.buyer);
+            await playCard(act, card, sig);
+          }
+        } catch (e) { /* transaction turn-check lost a race — snapshot rules */ }
+      }
+
+      /** Turn-timer expiry: بس on bids/doubles, lowest legal card on plays. */
+      async function autoAct(sig, seat) {
+        var p = st.pub;
+        if (!p || turnSigOf(p) !== sig) return;
+        if (p.botTick === sig) return;
+        try {
+          if (controlsSeat(seat)) toast(I18n.t('bg_timeout_pass')); // it was MY turn
+          if (p.phase === 'bidding') await doBid('pass', null, sig);
+          else if (p.phase === 'doubling') await doDouble('pass', sig);
+          else if (p.phase === 'playing' && controlsSeat(seat)) {
+            var hand = st.hands[privKey(seat)] || [];
+            if (!hand.length) return;
+            var legal = legalMoves(hand, p.table || [], p.mode, p.trump, seat);
+            await playCard(seat, cheapest(legal, p.mode, p.trump), sig);
+          }
+        } catch (e) {}
+      }
+
+      /* ======================================================================
+         STAGE 3 · DEAL ANIMATION — card backs fly from the dealer's seat to
+         each seat in Kamelna's 3-then-2 rhythm (and 3/3/3+2 after a buy).
+         The overlay lives on document.body so snapshot repaints (which wipe
+         `root`) can't kill it mid-flight.
+         ====================================================================== */
+      function runDealAnim(kind) {
+        try {
+          var p = st.pub; if (!p) return;
+          var felt = root.querySelector('.bg-felt'); if (!felt) return;
+          var rect = felt.getBoundingClientRect(); if (!rect.width) return;
+          if (st.dealOv) { try { st.dealOv.remove(); } catch (e) {} }
+          var ov = UI.el('div', { class: 'bg-dealov' });
+          st.dealOv = ov;
+          document.body.appendChild(ov);
+
+          var POS = { b: [0.5, 0.88], t: [0.5, 0.12], l: [0.09, 0.5], r: [0.91, 0.5] };
+          var from = POS[relPos(p.dealer)];
+          var order = []; for (var k = 1; k <= 4; k++) order.push((p.dealer + k) % 4);
+          var plan = [];
+          if (kind === 'first') {                       // 3 to each, then 2 to each
+            order.forEach(function (s) { plan.push(s, s, s); });
+            order.forEach(function (s) { plan.push(s, s); });
+          } else {                                      // rest: 3 each, 2 to the flip's seat
+            var flipSeat = (p.mode === 'ashkal' || (p.buyRound || 1) === 1) ? p.buyer : p.dealer;
+            order.forEach(function (s) {
+              var n = (s === flipSeat) ? 2 : 3;
+              for (var j = 0; j < n; j++) plan.push(s);
+            });
+          }
+          plan.forEach(function (s, i) {
+            var c = UI.el('div', { class: 'bg-dealcard' });
+            c.style.left = (rect.left + rect.width * from[0] - 19) + 'px';
+            c.style.top = (rect.top + rect.height * from[1] - 27) + 'px';
+            c.style.transitionDelay = (i * 60) + 'ms';
+            ov.appendChild(c);
+          });
+          requestAnimationFrame(function () { requestAnimationFrame(function () {
+            for (var i = 0; i < ov.children.length; i++) {
+              var to = POS[relPos(plan[i])];
+              ov.children[i].style.left = (rect.left + rect.width * to[0] - 19) + 'px';
+              ov.children[i].style.top = (rect.top + rect.height * to[1] - 27) + 'px';
+              ov.children[i].classList.add('go');
+            }
+          }); });
+          setTimeout(function () {
+            try { ov.remove(); } catch (e) {}
+            if (st.dealOv === ov) st.dealOv = null;
+          }, plan.length * 60 + 900);
+        } catch (e) {}
+      }
+
+      /** Fire the right deal animation exactly once per phase transition
+          (never on reload/rejoin — only when we SAW the previous phase). */
+      function dealAnimations() {
+        var p = st.pub; if (!p) return;
+        var prev = st.lastPhase;
+        st.lastPhase = p.roundNo + '|' + p.phase;
+        if (p.phase === 'bidding' && (p.handCounts || [])[0] === 5 &&
+            st.dealAnimKey !== 'f' + p.roundNo) {
+          st.dealAnimKey = 'f' + p.roundNo;
+          if (prev && prev !== st.lastPhase) runDealAnim('first');
+          return;
+        }
+        if ((p.phase === 'doubling' || p.phase === 'playing') &&
+            st.restAnimKey !== 'r' + p.roundNo && prev === p.roundNo + '|dealRest') {
+          st.restAnimKey = 'r' + p.roundNo;
+          runDealAnim('rest');
+        }
+      }
+
+      /* ======================================================================
          LOBBY-PHASE ACTIONS (seats / practice / start / teardown)
          ====================================================================== */
       async function sit(i) {
@@ -1105,12 +1493,19 @@
         try {
           var seats = (p.seats || []).slice();
           if (p.practice) {
-            var n = 2;
-            seats = seats.map(function (s) {
-              return s || { uid: myUid, name: I18n.t('bg_bot') + ' ' + (n++), virtual: true };
+            // STAGE 3: empty seats become bots. practice stays TRUE so the
+            // existing priv rule keeps 'seatN' docs host-readable; the new
+            // `bots` map is what tells the client this is the NEW scheme
+            // (humans at uid docs, bots at seatN docs).
+            if (mySeat() < 0) { toast(I18n.t('bg_sit')); return; }
+            var names = ['سالم', 'فهد', 'ماجد'], ni = 0, bots = {};
+            seats = seats.map(function (s, i) {
+              if (s) return s;
+              bots[i] = true;
+              return { uid: null, name: (names[ni++] || I18n.t('bg_bot_seat')) + ' 🤖', bot: true };
             });
-            await st.ref.update({ seats: seats, updatedAt: ts() });
-            st.pub = Object.assign({}, p, { seats: seats }); // deal() needs the filled seats now
+            await st.ref.update({ seats: seats, bots: bots, updatedAt: ts() });
+            st.pub = Object.assign({}, p, { seats: seats, bots: bots }); // deal() needs them now
           } else if (seats.some(function (s) { return !s; })) {
             toast(I18n.t('bg_need4')); return;
           }
@@ -1118,18 +1513,34 @@
         } catch (e) { toast(I18n.t('bg_err')); }
       }
 
+      /** STAGE 3: next round goes through a phase-checked transaction
+          (roundEnd → dealing) so the 6s auto-advance and a manual tap
+          can never double-deal; hostAutomation performs the actual deal. */
       async function nextRound() {
         if (!isHost()) return;
-        try { await deal(((st.pub.dealer || 0) + 1) % 4); } catch (e) { toast(I18n.t('bg_err')); }
+        try {
+          await db.runTransaction(async function (tx) {
+            var snap = await tx.get(st.ref);
+            var p = snap.data();
+            if (!p || p.phase !== 'roundEnd') throw new Error('phase');
+            tx.update(st.ref, { phase: 'dealing', dealer: ((p.dealer || 0) + 1) % 4, updatedAt: ts() });
+          });
+        } catch (e) { /* already advanced — fine */ }
       }
 
       async function newGame() {
         if (!isHost()) return;
         try {
-          await st.ref.update({ totals: { t0: 0, t1: 0 }, updatedAt: ts() });
-          st.pub = Object.assign({}, st.pub, { totals: { t0: 0, t1: 0 } });
-          await deal(((st.pub.dealer || 0) + 1) % 4);
-        } catch (e) { toast(I18n.t('bg_err')); }
+          await db.runTransaction(async function (tx) {
+            var snap = await tx.get(st.ref);
+            var p = snap.data();
+            if (!p || p.phase !== 'gameEnd') throw new Error('phase');
+            tx.update(st.ref, {
+              totals: { t0: 0, t1: 0 }, phase: 'dealing',
+              dealer: ((p.dealer || 0) + 1) % 4, updatedAt: ts()
+            });
+          });
+        } catch (e) { /* already restarted — fine */ }
       }
 
       async function endTable() {
@@ -1289,8 +1700,31 @@
         var isTurn = (p.turn === i && (p.phase === 'bidding' || p.phase === 'playing')) ||
                      (p.phase === 'doubling' && p.doubleTurn === i); // STAGE 2
         var partner = (i % 2 === viewSeat() % 2) && i !== viewSeat();
+
+        // STAGE 3: avatar wrapper carries the shrinking turn-timer ring
+        var av = UI.el('div', { class: 'bg-avatar' + (isBotSeat(i) ? ' bot' : '') },
+          isBotSeat(i) ? '🤖' : UI.initials(name));
+        var avKids = [av];
+        if (isTurn && !isBotSeat(i) &&
+            (p.phase === 'bidding' || p.phase === 'playing' || p.phase === 'doubling')) {
+          var elapsed = Math.max(0, (Date.now() - (st.turnStartAt || Date.now())) / 1000);
+          var ring = UI.el('div', { class: 'bg-ring' });
+          ring.innerHTML =
+            '<svg viewBox="0 0 54 54"><circle class="track" cx="27" cy="27" r="24"/>' +
+            '<circle class="left" cx="27" cy="27" r="24" style="animation-delay:-' +
+            elapsed.toFixed(2) + 's"/></svg>';
+          avKids.push(ring);
+        }
+        // STAGE 3: the dealer's question rides on the current bidder's seat
+        if (p.phase === 'bidding' && p.turn === i) {
+          avKids.push(UI.el('div', { class: 'bg-ask' },
+            I18n.t((p.bidRound || 1) === 1 ? 'bg_ask1' : 'bg_ask2')));
+        }
+        if (p.phase === 'doubling' && p.doubleTurn === i) {
+          avKids.push(UI.el('div', { class: 'bg-ask' }, I18n.t('bg_ask_dbl')));
+        }
         var kids = [
-          UI.el('div', { class: 'bg-avatar' }, UI.initials(name)),
+          UI.el('div', { class: 'bg-avwrap' }, avKids),
           UI.el('div', { class: 'bg-name' }, name)
         ];
         if (partner) kids.push(UI.el('div', { class: 'bg-tag' }, I18n.t('bg_partner')));
@@ -1301,6 +1735,10 @@
         if (p.phase === 'bidding') {
           var b = lastBid(p, i);
           if (b) kids.push(UI.el('div', { class: 'bg-bidlbl' }, b));
+        }
+        // STAGE 3: the winning buyer's chip while the flip card flies over
+        if (p.phase === 'dealRest' && p.buyer === i) {
+          kids.push(UI.el('div', { class: 'bg-bidlbl' }, I18n.t('bg_bought') + ' ' + lastBid(p, i)));
         }
         // STAGE 2: «مشروع» chip — everyone sees WHO declared, not WHAT
         if (p.phase === 'playing' && p.declared && p.declared[i]) {
@@ -1333,7 +1771,18 @@
           }
           return c;
         }
-        if (p.phase === 'dealRest' || p.phase === 'redeal') {
+        if (p.phase === 'dealRest') {
+          // STAGE 3: the مشترى flies from the middle to whoever receives it
+          // (round-1 buyer / أشكل declarer / the dealer on a round-2 صن·حكم)
+          var flipSeat = (p.mode === 'ashkal' || (p.buyRound || 1) === 1) ? p.buyer : p.dealer;
+          if (p.flip && flipSeat != null) {
+            c.appendChild(UI.el('div', { class: 'bg-flipwrap bg-fly-' + relPos(flipSeat) },
+              [cardEl(p.flip, 'bg-flipcard')]));
+          }
+          c.appendChild(UI.el('div', { class: 'bg-turnhint soft' }, I18n.t('bg_dealing')));
+          return c;
+        }
+        if (p.phase === 'redeal' || p.phase === 'dealing') {
           c.appendChild(UI.el('div', { class: 'bg-turnhint' },
             I18n.t(p.phase === 'redeal' ? 'bg_redeal' : 'bg_dealing')));
           return c;
@@ -1371,10 +1820,6 @@
         if (act < 0) {
           wrap.appendChild(UI.el('div', { class: 'bg-banner' }, I18n.t('bg_spectator')));
           return wrap;
-        }
-        if (p.practice && isHost() && act !== mySeat()) {
-          wrap.appendChild(UI.el('div', { class: 'bg-banner' },
-            I18n.t('bg_playing_as') + ': ' + seatName(act)));
         }
         var hand = sortHand(st.hands[privKey(act)] || [], p.mode, p.trump);
         var canAct = p.phase === 'playing' && p.turn === act && controlsSeat(act);
@@ -1425,14 +1870,10 @@
           body.appendChild(UI.el('button', { class: 'bg-bid pass', onclick: function () { st.suitPick = false; paint(); } },
             I18n.t('bg_back')));
         } else {
-          body.appendChild(UI.el('div', { class: 'bg-sheet-flip' }, [
-            UI.el('div', { class: 'bg-fliplbl' }, I18n.t('bg_flip')),
-            cardEl(p.flip, 'bg-flipcard big')
-          ]));
-          if (p.practice && isHost() && act !== mySeat()) {
-            body.appendChild(UI.el('div', { class: 'bg-banner tight' },
-              I18n.t('bg_playing_as') + ': ' + seatName(act)));
-          }
+          // STAGE 3: no flip card here — the مشترى stays visible on the felt.
+          // The sheet only carries the dealer's question + the answers.
+          body.appendChild(UI.el('div', { class: 'bg-sheet-title' },
+            I18n.t(r === 1 ? 'bg_ask1' : 'bg_ask2')));
           var hokumTaken = !!p.pendHokum;
           var hokumBtn = UI.el('button', { class: 'bg-bid hokum', onclick: function () {
             if (hokumTaken) return;
@@ -1466,15 +1907,10 @@
       /* STAGE 2 bottom sheet for the دبل chain — same look as bidding.
          Only the NEXT step of the chain is offered: دبل → تربل → كورة → قهوة. */
       function doubleSheet(p) {
-        var act = p.doubleTurn;
         var cur = (typeof p.mult === 'number') ? p.mult : 1;
         var nextKey = { 1: 'bg_double', 2: 'bg_triple', 3: 'bg_kawra', 4: 'bg_qahwa' }[cur] || 'bg_double';
         var body = UI.el('div', { class: 'bg-sheet-body' });
         body.appendChild(UI.el('div', { class: 'bg-sheet-title' }, I18n.t('bg_double_q')));
-        if (p.practice && isHost() && act !== mySeat()) {
-          body.appendChild(UI.el('div', { class: 'bg-banner tight' },
-            I18n.t('bg_playing_as') + ': ' + seatName(act)));
-        }
         body.appendChild(UI.el('div', { class: 'bg-bidrow' }, [
           UI.el('button', { class: 'bg-bid dbl', onclick: function () { doDouble('raise'); } }, [
             UI.el('span', null, I18n.t(nextKey)),
@@ -1583,7 +2019,8 @@
             projLines
           ].concat(callouts).concat([
             isHost()
-              ? UI.el('button', { class: 'btn btn-green btn-block', onclick: nextRound }, I18n.t('bg_next_round'))
+              ? UI.el('button', { class: 'btn btn-green btn-block bg-nextbtn', onclick: nextRound },
+                  I18n.t('bg_next_round') + ' · 6')          // STAGE 3: 6s auto-advance
               : UI.el('p', { class: 'muted', style: 'text-align:center' }, I18n.t('bg_wait_host'))
           ]))
         ]);
