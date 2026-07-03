@@ -288,6 +288,7 @@
         privSubs: {},         // priv doc key -> unsubscribe
         pubUnsub: null,
         guard: '',            // host automation guard (deal/dealRest once)
+        privRetryTimer: null, // re-attach timer for killed priv listeners
         collectSig: null, collectTimer: null, sweepTimer: null,
         prevSig: '', prevCount: 0,   // trick animation bookkeeping
         lastActing: null, suitPick: false, suitPickKey: ''
@@ -299,6 +300,7 @@
           Object.keys(st.privSubs).forEach(function (k) { try { st.privSubs[k](); } catch (e) {} });
           st.privSubs = {};
           st.pubUnsub = null;
+          clearTimeout(st.privRetryTimer);
           clearTimeout(st.collectTimer); clearTimeout(st.sweepTimer);
         }
       };
@@ -458,7 +460,13 @@
         }, function () { toast(I18n.t('bg_err')); });
       }
 
-      /** Listen to the private hand docs I'm allowed to read. */
+      /** Listen to the private hand docs I'm allowed to read.
+          IMPORTANT: in practice mode the seat0..seat3 listens are first
+          attached from the LOCAL echo of the `practice:true` write, so the
+          server can evaluate their rule (tbl().practice == true) before the
+          flag commits → PERMISSION_DENIED. Firestore kills a denied listener
+          permanently, so on error we must drop it and retry — otherwise the
+          dead unsubscribe fn stays in st.privSubs and hands never load. */
       function subscribePrivs() {
         var p = st.pub; if (!p) return;
         var want = [];
@@ -471,7 +479,18 @@
               st.hands[key] = (doc.exists && (doc.data().cards || [])) || [];
               paint();
             } catch (e) {}
-          }, function () {});
+          }, function () {
+            // Listener terminated (permission race / transient error):
+            // clean it out and re-attach shortly. One shared timer is
+            // enough — subscribePrivs() re-adds every missing key.
+            try { st.privSubs[key](); } catch (e) {}
+            delete st.privSubs[key];
+            delete st.hands[key];
+            clearTimeout(st.privRetryTimer);
+            st.privRetryTimer = setTimeout(function () {
+              if (st.pub && st.ref) subscribePrivs();
+            }, 1200);
+          });
         });
       }
 
