@@ -108,6 +108,9 @@
     member() { return _member; },
     getDb() { return db; },
     phone() { return (fbAuth && fbAuth.currentUser && fbAuth.currentUser.phoneNumber) || null; },
+    /** Firebase UID of the signed-in user — the identity used in all
+        member-readable documents (phones stay private/admin-only). */
+    uid() { return (fbAuth && fbAuth.currentUser && fbAuth.currentUser.uid) || null; },
 
     init() {
       if (!isConfigured() || !window.firebase) { this.renderBox(); return; }

@@ -73,7 +73,7 @@
         try {
           await db.collection('polls').add({
             q: question, options: options.slice(0, 5), votes: {}, closed: false,
-            by: me, byName: myName, phone: me,
+            byUid: uid, byName: myName,
             at: firebase.firestore.FieldValue.serverTimestamp()
           });
           q.value = ''; opts.innerHTML = ''; addOptInput(); addOptInput();
@@ -101,7 +101,7 @@
           const v = votes[k];
           if (typeof v === 'number' && v >= 0 && v < counts.length) { counts[v]++; total++; if (k === uid) myChoice = v; }
         });
-        const canManage = admin || d.phone === me;
+        const canManage = admin || (d.byUid ? d.byUid === uid : d.phone === me);
 
         const head = UI.el('div', { class: 'sp-head' }, [
           UI.el('div', { class: 'pl-q' }, (d.closed ? '🔒 ' : '') + (d.q || '—')),

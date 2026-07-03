@@ -49,7 +49,8 @@
         return;
       }
       const db = Auth.getDb();
-      const me = (Auth.phone && Auth.phone()) || '';
+      const me = (Auth.phone && Auth.phone()) || '';           // legacy docs only
+      const uid = (Auth.uid && Auth.uid()) || '';
       const myName = ((Auth.member && Auth.member()) || {}).name || '';
       const admin = !!(Auth.isAdmin && Auth.isAdmin());
 
@@ -75,7 +76,7 @@
         try {
           await db.collection('events').add({
             title: t, date: d, time: time.value || '', note: (note.value || '').trim(),
-            by: me, byName: myName, phone: me,
+            byUid: uid, byName: myName,
             at: firebase.firestore.FieldValue.serverTimestamp()
           });
           title.value = ''; note.value = ''; time.value = '';
@@ -88,7 +89,7 @@
       }
 
       function row(id, d) {
-        const canDel = admin || d.phone === me;
+        const canDel = admin || (d.byUid ? d.byUid === uid : d.phone === me);
         const isToday = d.date === todayStr();
         const day = UI.el('div', { class: 'cal-date' + (isToday ? ' today' : '') }, [
           UI.el('div', { class: 'cal-dnum' }, (d.date || '').slice(8, 10) || '—'),

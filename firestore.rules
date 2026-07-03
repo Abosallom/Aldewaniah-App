@@ -1,0 +1,207 @@
+rules_version = '2';
+// ============================================================
+// Aldewaniah — Firestore security rules (V2, 2026-07-03)
+// Single source of truth. Publish via Firebase console:
+// Firestore Database → Rules → paste → Publish.
+//
+// Identity model:
+//  - members/  is keyed by PHONE (E.164) — admin-managed allowlist.
+//  - Everything member-readable stores the Firebase UID, never the
+//    phone. Legacy docs (pre-V2) may still carry `phone`; rules
+//    accept both during the transition.
+// ============================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function signedIn() { return request.auth != null; }
+    function ph() { return request.auth.token.phone_number; }
+    function me() { return request.auth.uid; }
+    function memberData() {
+      return get(/databases/$(database)/documents/members/$(ph())).data;
+    }
+    function isMemberDoc() {
+      return signedIn() && ph() != null
+        && exists(/databases/$(database)/documents/members/$(ph()));
+    }
+    function approved() {
+      return isMemberDoc()
+        && (memberData().status == 'approved' || memberData().approved == true);
+    }
+    function isAdmin() { return approved() && memberData().admin == true; }
+    // co-admins with the "requests" permission can manage join requests
+    function canRequests() {
+      return isAdmin()
+        || (approved() && memberData().get('perms', {}).get('requests', false) == true);
+    }
+
+    // ---------- members (allowlist, keyed by phone) ----------
+    match /members/{id} {
+      allow get: if signedIn() && (id == ph() || canRequests());
+      allow list: if canRequests();
+      // A new user may create ONLY their own pending doc (no self-approve/admin)
+      allow create: if signedIn() && id == ph()
+        && request.resource.data.status == 'pending'
+        && request.resource.data.get('admin', false) == false
+        && request.resource.data.get('perms', {}) == {};
+      // Admin manages everyone; co-admin only pending docs and can't grant admin
+      allow update: if isAdmin()
+        || (canRequests() && resource.data.status == 'pending'
+            && request.resource.data.get('admin', false) == false);
+      allow delete: if isAdmin()
+        || (canRequests() && resource.data.status == 'pending')
+        || (signedIn() && id == ph());   // in-app account deletion
+    }
+
+    // ---------- uidmap (phone -> uid bridge; admin read only) ----------
+    match /uidmap/{id} {
+      allow read: if isAdmin();
+      allow create, update: if signedIn() && id == ph();
+      allow delete: if isAdmin() || (signedIn() && id == ph()); // account deletion
+    }
+
+    // ---------- directory (phone-free profiles, keyed by uid) ----------
+    match /directory/{uid} {
+      allow read: if approved();
+      allow create, update: if (approved() && uid == me()) || isAdmin();
+      allow delete: if isAdmin() || (signedIn() && uid == me());
+    }
+
+    // ---------- profiles (legacy, orphaned) ----------
+    match /profiles/{id} {
+      allow read: if isAdmin() || (signedIn() && id == ph());
+      allow write: if false;
+    }
+
+    // ---------- group chat ----------
+    match /messages/{id} {
+      allow read: if approved();
+      allow create: if approved()
+        && (request.resource.data.get('uid', '') == me()
+            || request.resource.data.get('phone', '') == ph());
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // ---------- private messages (DMs) ----------
+    match /dms/{tid} {
+      function otherUid() {
+        return resource.data.members[0] == me()
+          ? resource.data.members[1] : resource.data.members[0];
+      }
+      allow read: if approved() && me() in resource.data.members;
+      // Create: I must be one of the two participants. The official-admin
+      // mark (admins.{uid}=true) may only be set for MYSELF and only if I
+      // really am an admin — it can't be spoofed or set for someone else.
+      allow create: if approved()
+        && me() in request.resource.data.members
+        && request.resource.data.members.size() == 2
+        && (!('admins' in request.resource.data)
+            || (request.resource.data.admins.keys().hasOnly([me()]) && isAdmin()));
+      // Update (names/last/unread/my own admin mark): participants only;
+      // members list is immutable; my admins flag changes only if isAdmin();
+      // the other participant's admins flag can never be changed by me.
+      allow update: if approved() && me() in resource.data.members
+        && request.resource.data.members == resource.data.members
+        && (request.resource.data.get('admins', {}).get(me(), false)
+              == resource.data.get('admins', {}).get(me(), false) || isAdmin())
+        && request.resource.data.get('admins', {}).get(otherUid(), false)
+              == resource.data.get('admins', {}).get(otherUid(), false);
+      allow delete: if isAdmin();
+
+      match /msgs/{mid} {
+        function threadMembers() {
+          return get(/databases/$(database)/documents/dms/$(tid)).data.members;
+        }
+        allow read: if approved() && me() in threadMembers();
+        allow create: if approved() && me() in threadMembers()
+          && request.resource.data.uid == me()
+          && (request.resource.data.get('admin', false) == false || isAdmin());
+        allow update: if false;
+        allow delete: if isAdmin() || (approved() && resource.data.uid == me());
+      }
+    }
+
+    // ---------- check-ins (attendance; uid-keyed, no phones) ----------
+    match /checkins/{id} {
+      allow read: if approved();
+      allow create: if approved()
+        && (request.resource.data.get('uid', '') == me()
+            || request.resource.data.get('phone', '') == ph());
+      allow update: if isAdmin()
+        || (approved() && (resource.data.get('uid', '') == me()
+                           || resource.data.get('phone', '') == ph()));
+      allow delete: if isAdmin()
+        || (approved() && (resource.data.get('uid', '') == me()
+                           || resource.data.get('phone', '') == ph()));
+    }
+
+    // ---------- gallery metadata (legacy; media lives on R2) ----------
+    match /gallery/{id} {
+      allow read: if approved();
+      allow create: if approved() && request.resource.data.byPhone == ph();
+      allow update: if false;
+      allow delete: if isAdmin() || (approved() && resource.data.byPhone == ph());
+    }
+
+    // ---------- splits (قطّة) ----------
+    match /splits/{id} {
+      allow read: if approved();
+      allow create: if approved()
+        && (request.resource.data.get('byUid', '') == me()
+            || request.resource.data.get('phone', '') == ph());
+      allow update: if approved();   // paid[] toggling by any member
+      allow delete: if isAdmin()
+        || (approved() && (resource.data.get('byUid', '') == me()
+                           || resource.data.get('phone', '') == ph()));
+    }
+
+    // ---------- events (calendar) ----------
+    match /events/{id} {
+      allow read: if approved();
+      allow create: if approved()
+        && (request.resource.data.get('byUid', '') == me()
+            || request.resource.data.get('phone', '') == ph());
+      allow update: if isAdmin()
+        || (approved() && (resource.data.get('byUid', '') == me()
+                           || resource.data.get('phone', '') == ph()));
+      allow delete: if isAdmin()
+        || (approved() && (resource.data.get('byUid', '') == me()
+                           || resource.data.get('phone', '') == ph()));
+    }
+
+    // ---------- polls ----------
+    match /polls/{id} {
+      allow read: if approved();
+      allow create: if approved()
+        && (request.resource.data.get('byUid', '') == me()
+            || request.resource.data.get('phone', '') == ph());
+      allow update: if approved();   // votes map (uid-keyed) + open/close
+      allow delete: if isAdmin()
+        || (approved() && (resource.data.get('byUid', '') == me()
+                           || resource.data.get('phone', '') == ph()));
+    }
+
+    // ---------- suggestions (to admin; admin-only read) ----------
+    match /suggestions/{id} {
+      allow read: if isAdmin();
+      allow create: if approved() && request.resource.data.phone == ph();
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // ---------- reports (UGC moderation; admin-only read) ----------
+    match /reports/{id} {
+      allow read: if isAdmin();
+      allow create: if approved();
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    // ---------- app config (maintenance mode, check-in geofence) ----------
+    match /config/{id} {
+      allow read: if true;    // pause screen must render pre-login
+      allow write: if isAdmin();
+    }
+  }
+}

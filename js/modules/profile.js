@@ -26,7 +26,8 @@
         pr_locked: 'الأعضاء للأعضاء المعتمدين فقط',
         pr_no_info: 'لم يضِف هذا العضو معلومات بعد', pr_close: 'إغلاق',
         pr_edit_one: 'تعديل', pr_delete: 'حذف', pr_del_confirm: 'حذف ملف هذا العضو؟',
-        pr_report: 'إبلاغ', pr_reported: 'تم الإبلاغ، شكرًا لك ✅', pr_report_fail: 'تعذّر الإبلاغ، حاول لاحقًا'
+        pr_report: 'إبلاغ', pr_reported: 'تم الإبلاغ، شكرًا لك ✅', pr_report_fail: 'تعذّر الإبلاغ، حاول لاحقًا',
+        pr_msg: 'مراسلة'
       },
       en: {
         pr_title: 'Members', pr_sub: 'Meet the Dewaniah members', pr_mine: 'My profile',
@@ -36,7 +37,8 @@
         pr_locked: 'Members area is for approved members only',
         pr_no_info: "This member hasn't added any info yet", pr_close: 'Close',
         pr_edit_one: 'Edit', pr_delete: 'Delete', pr_del_confirm: "Delete this member's profile?",
-        pr_report: 'Report', pr_reported: 'Reported, thank you ✅', pr_report_fail: 'Could not report, try later'
+        pr_report: 'Report', pr_reported: 'Reported, thank you ✅', pr_report_fail: 'Could not report, try later',
+        pr_msg: 'Message'
       }
     },
 
@@ -122,6 +124,7 @@
         if (!rows.length) rows.push(UI.el('p', { class: 'muted', style: 'text-align:center;margin-top:8px' }, I18n.t('pr_no_info')));
         const admin = isAdminUser();
         const actions = UI.el('div', { class: 'flex-between', style: 'justify-content:flex-end;gap:10px;margin-top:16px;flex-wrap:wrap' }, [
+          (!isMe && window.DM) ? UI.el('button', { class: 'btn btn-green', onclick: () => { close(); DM.open(p.id, p.name || ''); } }, '✉️  ' + I18n.t('pr_msg')) : null,
           (isMe || admin) ? UI.el('button', { class: 'btn btn-ghost', onclick: () => { close(); editEntry(p.id); } }, '✏️  ' + I18n.t(isMe ? 'pr_edit' : 'pr_edit_one')) : null,
           (admin && !isMe) ? UI.el('button', { class: 'btn btn-ghost', style: 'color:var(--maroon);border-color:var(--maroon)', onclick: () => { close(); UI.confirm(I18n.t('pr_del_confirm'), () => delEntry(p.id)); } }, '🗑️  ' + I18n.t('pr_delete')) : null,
           (!isMe) ? UI.el('button', { class: 'btn btn-ghost', onclick: () => { close(); reportProfile(p); } }, '⚑  ' + I18n.t('pr_report')) : null,

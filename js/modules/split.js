@@ -45,7 +45,8 @@
         return;
       }
       const db = Auth.getDb();
-      const me = (Auth.phone && Auth.phone()) || '';
+      const me = (Auth.phone && Auth.phone()) || '';           // legacy docs only
+      const uid = (Auth.uid && Auth.uid()) || '';
       const myName = ((Auth.member && Auth.member()) || {}).name || '';
       const admin = !!(Auth.isAdmin && Auth.isAdmin());
 
@@ -72,7 +73,7 @@
         try {
           await db.collection('splits').add({
             title: t, total: amt, count: n, paid: [],
-            by: me, byName: myName, phone: me,
+            byUid: uid, byName: myName,
             at: firebase.firestore.FieldValue.serverTimestamp()
           });
           name.value = ''; total.value = ''; people.value = '';
@@ -80,7 +81,8 @@
         createBtn.disabled = false;
       }
 
-      function hasPaid(d) { return (d.paid || []).some((p) => p && p.phone === me); }
+      const isMine = (p) => p && (p.uid ? p.uid === uid : p.phone === me); // uid new, phone legacy
+      function hasPaid(d) { return (d.paid || []).some(isMine); }
 
       async function togglePaid(id) {
         const ref = db.collection('splits').doc(id);
@@ -89,9 +91,9 @@
             const snap = await tx.get(ref);
             if (!snap.exists) return;
             const d = snap.data();
-            const wasPaid = (d.paid || []).some((p) => p && p.phone === me);
-            const paid = (d.paid || []).filter((p) => p && p.phone !== me); // drop my old entry
-            if (!wasPaid) paid.push({ name: myName, phone: me });           // toggle on
+            const wasPaid = (d.paid || []).some(isMine);
+            const paid = (d.paid || []).filter((p) => !isMine(p)); // drop my old entry
+            if (!wasPaid) paid.push({ name: myName, uid: uid });    // toggle on (no phone stored)
             tx.update(ref, { paid: paid });
           });
         } catch (e) { alert(e.message || 'Error'); }
@@ -106,7 +108,7 @@
         const paidCount = (d.paid || []).length;
         const remaining = Math.max(0, (d.count - paidCount)) * share;
         const mine = hasPaid(d);
-        const canDel = admin || d.phone === me;
+        const canDel = admin || (d.byUid ? d.byUid === uid : d.phone === me);
 
         const head = UI.el('div', { class: 'sp-head' }, [
           UI.el('div', { class: 'sp-name' }, d.title || '—'),

@@ -51,9 +51,9 @@
     try { if (navigator.vibrate) navigator.vibrate([90, 50, 90]); } catch (e) {}
   }
 
-  let unsub = null, firstLoad = true, myPhone = '';
-  function start(phone) {
-    myPhone = phone || '';
+  let unsub = null, firstLoad = true, myPhone = '', myUid = '';
+  function start(phone, uid) {
+    myPhone = phone || ''; myUid = uid || '';
     if (unsub) { try { unsub(); } catch (e) {} unsub = null; }
     firstLoad = true;
     let db; try { db = firebase.firestore(); } catch (e) { return; }
@@ -62,7 +62,8 @@
         snap.docChanges().forEach((ch) => {
           if (ch.type !== 'added') return;
           const m = ch.doc.data() || {};
-          if (m.phone && m.phone === myPhone) return;       // not my own messages
+          if (m.uid && m.uid === myUid) return;             // not my own messages
+          if (m.phone && m.phone === myPhone) return;       // (legacy messages)
           notify(m.name || '', m);
         });
       }
@@ -71,7 +72,7 @@
   }
 
   firebase.auth().onAuthStateChanged((user) => {
-    if (user && user.phoneNumber) start(user.phoneNumber);   // members only
+    if (user && user.phoneNumber) start(user.phoneNumber, user.uid);   // members only
     else { if (unsub) { try { unsub(); } catch (e) {} unsub = null; } }
   });
 })();

@@ -978,3 +978,49 @@ html{ scroll-behavior:smooth; }
 
 .chat-flag{ align-self:flex-end; background:none; border:none; color:var(--ink-soft); opacity:.45; font-size:.95rem; cursor:pointer; padding:0 4px; }
 .chat-flag:active{ opacity:1; transform:scale(.9); }
+
+/* ===== Private messages (DM) ===== */
+.chat-seg{ display:flex; gap:6px; background:rgba(26,39,68,.06); border:1px solid var(--line);
+  border-radius:14px; padding:4px; margin-bottom:8px; flex:0 0 auto; }
+.chat-seg-btn{ flex:1; position:relative; border:0; background:transparent; padding:8px 10px;
+  border-radius:11px; font-family:inherit; font-weight:700; font-size:.9rem; color:var(--ink-soft);
+  cursor:pointer; transition:all .18s ease; }
+.chat-seg-btn.active{ background:var(--navy); color:#fff; box-shadow:0 3px 10px rgba(26,39,68,.25); }
+.dm-seg-badge{ position:absolute; top:2px; inset-inline-end:6px; background:var(--maroon); color:#fff;
+  font-size:.62rem; font-weight:800; min-width:16px; height:16px; border-radius:8px; line-height:16px;
+  padding:0 4px; }
+.dm-new{ margin-bottom:10px; flex:0 0 auto; }
+.dm-list{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+  display:flex; flex-direction:column; gap:8px; padding-bottom:8px; }
+.dm-row{ display:flex; align-items:center; gap:10px; background:#fff; border:1px solid var(--line);
+  border-radius:14px; padding:10px 12px; cursor:pointer; transition:transform .12s ease, box-shadow .2s; }
+.dm-row:active{ transform:scale(.985); }
+.dm-row.official{ border-color:var(--gold); background:linear-gradient(160deg,#fff, #faf5e9); }
+.dm-av{ width:42px; height:42px; font-size:.85rem; flex:0 0 auto; object-fit:cover; }
+.dm-av.official{ background:var(--maroon); color:var(--gold); }
+.dm-mid{ flex:1; min-width:0; }
+.dm-name{ font-weight:800; color:var(--navy); font-size:.95rem; }
+.dm-row.official .dm-name{ color:var(--maroon); }
+.dm-last{ color:var(--ink-soft); font-size:.8rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dm-side{ display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex:0 0 auto; }
+.dm-when{ font-size:.68rem; color:var(--ink-soft); }
+.dm-badge{ background:var(--maroon); color:#fff; font-size:.68rem; font-weight:800; min-width:18px;
+  height:18px; border-radius:9px; text-align:center; line-height:18px; padding:0 5px; }
+.dm-head{ align-items:center; }
+.dm-head-name{ flex:1; text-align:center; font-weight:800; color:var(--navy); font-size:.95rem; }
+.dm-backbtn{ font-weight:800; }
+.dm-pick-modal{ max-height:70vh; overflow:auto; }
+.dm-pick{ display:flex; flex-direction:column; gap:6px; }
+.dm-pick-row{ display:flex; align-items:center; gap:10px; border:1px solid var(--line); background:#fff;
+  border-radius:12px; padding:8px 10px; cursor:pointer; font-family:inherit; text-align:start;
+  transition:background .15s; }
+.dm-pick-row:hover{ background:var(--cream); }
+.dm-pick-name{ font-weight:700; color:var(--navy); }
+
+/* Official (admin) message bubble — distinct from member bubbles */
+.chat-bubble.official{ background:linear-gradient(160deg,var(--maroon),#5a252c); color:#fff;
+  border:1.5px solid var(--gold); box-shadow:0 4px 16px rgba(114,47,55,.35); }
+.chat-bubble.official .chat-text{ color:#fff; }
+.chat-bubble.official .chat-time{ color:rgba(255,255,255,.75); }
+.dm-official-tag{ font-size:.68rem; font-weight:800; color:var(--gold); letter-spacing:.4px;
+  margin-bottom:2px; }

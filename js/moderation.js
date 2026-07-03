@@ -12,10 +12,11 @@
 
   window.Moderation = {
     blocked() { return list(); },
-    isBlocked(phone) { return !!phone && list().indexOf(phone) >= 0; },
-    block(phone) { if (!phone) return; const a = list(); if (a.indexOf(phone) < 0) { a.push(phone); save(a); } },
-    unblock(phone) { save(list().filter((p) => p !== phone)); },
-    toggle(phone) { if (this.isBlocked(phone)) this.unblock(phone); else this.block(phone); return this.isBlocked(phone); },
+    // id = the sender's uid (new content) or phone (legacy content)
+    isBlocked(id) { return !!id && list().indexOf(id) >= 0; },
+    block(id) { if (!id) return; const a = list(); if (a.indexOf(id) < 0) { a.push(id); save(a); } },
+    unblock(id) { save(list().filter((p) => p !== id)); },
+    toggle(id) { if (this.isBlocked(id)) this.unblock(id); else this.block(id); return this.isBlocked(id); },
     async report(kind, targetId, targetName, reason) {
       try {
         const db = window.Auth && Auth.getDb && Auth.getDb();

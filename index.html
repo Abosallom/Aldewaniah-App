@@ -8,10 +8,10 @@
        the Aladhan prayer API, FormSubmit, Google Fonts, and the bracket iframes. -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://www.recaptcha.net https://apis.google.com;
+    script-src 'self' https://www.gstatic.com https://www.google.com https://www.recaptcha.net https://apis.google.com;
     style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     font-src 'self' data: https://fonts.gstatic.com;
-    img-src 'self' data: blob: https:;
+    img-src 'self' data: blob: https://aldewaniah-media.mulhaqdb.workers.dev;
     media-src 'self' blob: https://aldewaniah-media.mulhaqdb.workers.dev;
     connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://aldewaniah-media.mulhaqdb.workers.dev https://aldewaniah-ai.mulhaqdb.workers.dev https://api.aladhan.com https://formsubmit.co https://www.google.com;
     frame-src 'self' https://www.google.com https://www.recaptcha.net https://aldewaniah-45158.firebaseapp.com https://challonge.com https://brackethq.com;
@@ -55,7 +55,7 @@
     <div class="brand">
       <img src="assets/icon-192.png" alt="" class="brand-logo" />
       <span class="brand-name" data-i18n="appName">الديوانية</span>
-      <button class="app-refresh" aria-label="Refresh" title="تحديث / Refresh" onclick="try{location.reload()}catch(e){}">
+      <button class="app-refresh" id="appRefresh" aria-label="Refresh" title="تحديث / Refresh">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
       </button>
     </div>
@@ -78,11 +78,11 @@
   <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-storage-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-database-compat.js"></script>
   <script src="js/firebase-config.js"></script>
 
   <!-- Core scripts (order matters) -->
+  <script src="js/native.js"></script>
   <script src="js/i18n.js"></script>
   <script src="js/store.js"></script>
   <script src="js/content.js"></script>
@@ -94,6 +94,7 @@
   <script src="js/modules/home.js"></script>
   <script src="js/modules/tournaments.js"></script>
   <script src="js/modules/chat.js"></script>
+  <script src="js/modules/dm.js"></script>
   <script src="js/modules/sections.js"></script>
   <script src="js/modules/admin.js"></script>
 
@@ -109,18 +110,9 @@
   <script src="js/modules/calendar.js"></script>
   <script src="js/modules/polls.js"></script>
 
-  <!-- Boot the app after all modules have registered -->
-  <script>App.start();</script>
-
-  <!-- Reveal the app once it's booted (spin the logo briefly first) -->
-  <script>
-    (function () {
-      var s = document.getElementById('splash');
-      if (!s) return;
-      var hide = function () { s.classList.add('hide'); setTimeout(function () { if (s && s.parentNode) s.parentNode.removeChild(s); }, 500); };
-      setTimeout(hide, 650);
-    })();
-  </script>
+  <!-- Boot: App.start() + splash + refresh button + service-worker auto-update.
+       (External file — no inline scripts, so the CSP can block injected code.) -->
+  <script src="js/boot.js"></script>
 
   <!-- Member login (after App so it can refresh views on sign-in) -->
   <script src="js/auth.js"></script>
@@ -129,40 +121,5 @@
   <script src="js/chat-notify.js"></script>
   <script src="js/ai-assistant.js"></script>
   <script src="js/maintenance.js"></script>
-
-  <script>
-    /* Auto-update: keep the app on the latest version without quitting/reopening.
-       When a new version is deployed, the new service worker installs in the
-       background; once ready we activate it and reload the page once. We also
-       re-check for updates periodically and whenever the app regains focus. */
-    if ('serviceWorker' in navigator) {
-      let updating = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (updating) window.location.reload();
-      });
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').then((reg) => {
-          const promote = (worker) => {
-            if (!worker) return;
-            worker.addEventListener('statechange', () => {
-              // A NEW version finished installing (controller exists = this is an
-              // update, not the first install) -> activate it now.
-              if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-                updating = true;
-                worker.postMessage({ type: 'SKIP_WAITING' });
-              }
-            });
-          };
-          if (reg.waiting && navigator.serviceWorker.controller) {
-            updating = true; reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-          }
-          reg.addEventListener('updatefound', () => promote(reg.installing));
-          const check = () => { reg.update().catch(() => {}); };
-          setInterval(check, 60000); // check for a new version every minute
-          document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
-        }).catch(() => {});
-      });
-    }
-  </script>
 </body>
 </html>

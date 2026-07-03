@@ -49,7 +49,8 @@
         ch_hold_hint: 'اضغط مطوّلاً 🎤 للصوت و 🎥 للفيديو',
         ch_attachments: 'المرفقات', ch_no_attach: 'لا توجد رسائل صوتية بعد', ch_media: 'الوسائط', ch_no_media: 'لا توجد وسائط بعد',
         ch_notif_on: '🔔 تنبيهات الدردشة مفعّلة', ch_notif_off: '🔕 تفعيل تنبيهات الدردشة',
-        ch_del: 'حذف', ch_del_confirm: 'حذف هذه الرسالة؟' },
+        ch_del: 'حذف', ch_del_confirm: 'حذف هذه الرسالة؟',
+        ch_seg_group: 'المجموعة', ch_seg_priv: 'الخاص' },
       en: { ch_title: 'Chat', ch_sub: 'Members group chat', ch_ph: 'Type a message…', ch_send: 'Send',
         ch_empty: 'No messages yet — say hi', ch_locked: 'Chat is for members only',
         ch_photo: 'Photo', ch_voice_msg: '🎤 Voice note', ch_video_msg: '🎥 Video',
@@ -60,7 +61,8 @@
         ch_hold_hint: 'Hold 🎤 for voice, 🎥 for video',
         ch_attachments: 'Attachments', ch_no_attach: 'No voice notes yet', ch_media: 'Media', ch_no_media: 'No media yet',
         ch_notif_on: '🔔 Chat alerts on', ch_notif_off: '🔕 Turn on chat alerts',
-        ch_del: 'Delete', ch_del_confirm: 'Delete this message?' }
+        ch_del: 'Delete', ch_del_confirm: 'Delete this message?',
+        ch_seg_group: 'Group', ch_seg_priv: 'Private' }
     },
 
     render(view) {
@@ -70,12 +72,28 @@
         view.appendChild(UI.el('p', { class: 'muted', style: 'text-align:center' }, I18n.t('ch_locked')));
         return;
       }
+      // Sub-route: #chat = group, #chat/priv[...] = private messages (DM module)
+      const sub = (location.hash || '').replace(/^#/, '').split('/').slice(1).join('/');
+      if (sub.indexOf('priv') === 0 && window.DM) { DM.render(view, sub); return; }
+
       const db = Auth.getDb();
       const me = (Auth.phone && Auth.phone()) || '';
+      const myUid = (Auth.uid && Auth.uid()) || '';
       const myName = ((Auth.member && Auth.member()) || {}).name || '';
+      const senderKey = (m) => m.uid || m.phone || '';
 
       const screen = UI.el('div', { class: 'chat-screen' });
       view.appendChild(screen);
+
+      /* group | private segmented switch */
+      if (window.DM) {
+        screen.appendChild(UI.el('div', { class: 'chat-seg' }, [
+          UI.el('button', { class: 'chat-seg-btn active' }, I18n.t('ch_seg_group')),
+          UI.el('button', { class: 'chat-seg-btn', id: 'segPriv', onclick: () => { location.hash = 'chat/priv'; } },
+            [document.createTextNode(I18n.t('ch_seg_priv')), UI.el('span', { class: 'dm-seg-badge', style: 'display:none' })])
+        ]));
+        if (DM.paintSegBadge) DM.paintSegBadge();
+      }
 
       /* head: notifications toggle + Media + Attachments panels */
       const headKids = [];
@@ -169,8 +187,8 @@
       }
 
       function rowEl(id, m, prev, animate) {
-        const mine = m.phone === me;
-        const grouped = !!(prev && prev.phone === m.phone && sameWindow(prev, m));
+        const mine = m.uid ? (m.uid === myUid) : (!!m.phone && m.phone === me);
+        const grouped = !!(prev && senderKey(prev) === senderKey(m) && sameWindow(prev, m));
         const media = mediaNode(m);
         const isMediaOnly = !!media && !m.text && !m.audioKey;
         const bubbleKids = [(!mine && !grouped) ? UI.el('div', { class: 'chat-name' }, m.name || '—') : null];
@@ -197,7 +215,7 @@
             alert(I18n.t(okR ? 'ch_reported' : 'ch_report_fail'));
           }),
           it('🚫  ' + I18n.t('ch_block_user'), () => {
-            if (window.Moderation) { Moderation.block(m.phone); if (window.App && App.refresh) App.refresh(); }
+            if (window.Moderation) { Moderation.block(m.uid || m.phone); if (window.App && App.refresh) App.refresh(); }
           }),
           UI.el('button', { class: 'chat-sheet-it cancel', onclick: close }, I18n.t('ch_cancel'))
         ]);
@@ -210,7 +228,7 @@
 
       try {
         unsub = db.collection('messages').orderBy('at', 'desc').limit(150).onSnapshot(async (snap) => {
-          const docs = []; snap.forEach((d) => { const m = d.data(); if (!(window.Moderation && Moderation.isBlocked(m.phone))) docs.push({ id: d.id, m: m }); }); docs.reverse();
+          const docs = []; snap.forEach((d) => { const m = d.data(); if (!(window.Moderation && (Moderation.isBlocked(m.uid) || Moderation.isBlocked(m.phone)))) docs.push({ id: d.id, m: m }); }); docs.reverse();
           lastDocs = docs;
           const keys = docs.map((d) => d.id);
           const allMedia = []; docs.forEach((d) => mediaKeysOf(d.m).forEach((k) => allMedia.push(k)));
@@ -226,7 +244,7 @@
 
           const wasNear = atBottom;
           if (prefix) {
-            const mineIncoming = docs.slice(renderedKeys.length).some((d) => d.m.phone === me);
+            const mineIncoming = docs.slice(renderedKeys.length).some((d) => (d.m.uid ? d.m.uid === myUid : d.m.phone === me));
             for (let i = renderedKeys.length; i < docs.length; i++) list.appendChild(rowEl(docs[i].id, docs[i].m, docs[i - 1] && docs[i - 1].m, true));
             if (wasNear || mineIncoming) toBottom(true);
           } else {
@@ -380,7 +398,8 @@
         sendMsg({ text: text });
       }
       async function sendMsg(payload) {
-        const doc = Object.assign({ text: '', name: myName, phone: me, at: firebase.firestore.FieldValue.serverTimestamp() }, payload);
+        // Identity = uid (opaque). Phones are NOT stored in member-readable messages.
+        const doc = Object.assign({ text: '', name: myName, uid: myUid, at: firebase.firestore.FieldValue.serverTimestamp() }, payload);
         try { await db.collection('messages').add(doc); }
         catch (e) { if (payload.text) { input.value = payload.text; } }
       }

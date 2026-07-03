@@ -5,6 +5,9 @@
    and a step-by-step guide for iPhone (Safari has no auto-prompt).
    =========================================================== */
 (function () {
+  // Inside the native (App Store) shell? Never show "install this website"
+  // UI in a native app — App Review reads it as a repackaged website (4.2).
+  if (window.NativeShell && NativeShell.isNative()) return;
   // Already running as an installed app? Then never show the banner.
   const standalone = window.matchMedia('(display-mode: standalone)').matches
     || window.navigator.standalone === true;

@@ -90,10 +90,12 @@
 
   function checkinPage(view) {
     const db = Auth.getDb && Auth.getDb();
-    const phone = (Auth.phone && Auth.phone()) || '';
+    const uid = (Auth.uid && Auth.uid()) || '';
     const name = ((Auth.member && Auth.member()) || {}).name || '';
     const day = todayKey();
-    const docId = phone.replace(/[^0-9]/g, '') + '_' + day;
+    // Doc id is keyed by UID (one check-in per member per day). Phones are not
+    // stored in check-ins — they are readable by all members.
+    const docId = uid + '_' + day;
 
     const btnWrap = UI.el('div', { class: 'card', style: 'text-align:center' });
     view.appendChild(btnWrap);
@@ -133,7 +135,7 @@
           if (dist > (geo.radius || 100)) { busy = false; paintBtn(); alert(I18n.t('home_loc_far') + ' (~' + Math.round(dist) + ' m)'); return; }
         }
         await db.collection(COLLECTION).doc(docId).set({
-          phone: phone, name: name, day: day,
+          uid: uid, name: name, day: day,
           at: firebase.firestore.FieldValue.serverTimestamp()
         });
         busy = false;
@@ -143,7 +145,7 @@
       if (!db) return;
       // Keep a record (mark removed) instead of deleting, so the admin can see
       // who checked in and then cancelled. Re-checking in clears this.
-      try { await db.collection(COLLECTION).doc(docId).set({ phone: phone, name: name, day: day, removed: true, removedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }); } catch (e) {}
+      try { await db.collection(COLLECTION).doc(docId).set({ uid: uid, name: name, day: day, removed: true, removedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true }); } catch (e) {}
     }
 
     function paintList(rows) {
