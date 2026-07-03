@@ -198,6 +198,11 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ---------- gift codes (subscription gifts; STRICTLY admin-only) ----------
+    match /giftcodes/{id} {
+      allow read, write: if isAdmin();
+    }
+
     // ---------- FCM push tokens ----------
     // Each member saves their own device tokens. NO member can read
     // them (the push worker reads them with a service account, which
