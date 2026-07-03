@@ -1,6 +1,21 @@
 # Resubmit to the App Store — version 1.1 (build 2)
 
-Everything in the code is done. These are the only steps left, in order.
+## Apple's ACTUAL rejection (read 2026-07-03, submission dffa8303…)
+Reviewed July 2 on an iPad Air 11" (M3). Three issues — **none of them the web-wrapper concern**:
+1. **2.3.8 Placeholder icons** — build 1.0 shipped the Capacitor template's white placeholder icon. → **FIXED**: the real dallah icon is now in the iOS project (`AppIcon.appiconset`); it ships with the next archive.
+2. **2.1 Demo account failed** — Apple couldn't sign in with reviewer@aldewaniah.com / AppleSupport. → **YOU must verify this** (step 0 below).
+3. **2.1(b) Business model questions** — they suspect paid content. → Answered in the reply **already drafted in the Resolution Center** (open the App Review page → Continue Draft).
+
+## Already done in App Store Connect (2026-07-03)
+- Version changed to **1.1**, saved.
+- App Review **Notes rewritten** (free app, demo account steps, feature walkthrough incl. new DMs).
+- **Resolution Center reply drafted** answering all 3 issues (saved as draft — send it in step 3).
+
+## Step 0 — verify the demo account (2 minutes, do this FIRST)
+1. Open https://app.aldewaniah.com → دخول الأعضاء → **البريد الإلكتروني / Email** tab.
+2. Sign in with reviewer@aldewaniah.com / **AppleSupport** (capital A, capital S, no spaces).
+3. If it works → done, go to step 1.
+4. If it fails: Firebase console → Authentication → Users → the reviewer row → ⋮ menu → **Reset password** won't help (no mailbox) — instead click the row's ⋮ → **Edit user** and set a new password (e.g. `Review2026!`), then tell Claude the new password so the ASC notes + draft reply get updated before sending.
 
 ## 1. Push the website update (2 minutes)
 1. Open **GitHub Desktop** — you'll see the commit "V2: private DMs…" already made.
@@ -15,13 +30,11 @@ The web files are already synced into the iOS project and the version is already
 4. In the Organizer window: **Distribute App → App Store Connect → Upload** → keep defaults → Upload.
 5. Wait for the email "build processed" (~10–30 min).
 
-## 3. In App Store Connect (5 minutes)
-1. Go to appstoreconnect.apple.com → **Aldewaniah** → the rejected 1.0 version.
-2. Change the version number field to **1.1**.
-3. In the **Build** section, remove the old build and select the new **1.1 (2)**.
-4. Update the **"What's New"** / description if asked — you can write: "Private member-to-member messages, official admin messages, privacy improvements."
-5. In **App Review Information → Notes**, replace the notes with the text below.
-6. Reply in the **Resolution Center** thread (App Review page) with the reply below, then **Submit for Review**.
+## 3. In App Store Connect (3 minutes — most is already done)
+1. Go to appstoreconnect.apple.com → **Aldewaniah** → version 1.1 (already renamed).
+2. In the **Build** section, remove the old build 1.0(1) and select the new **1.1 (2)** once processing finishes.
+3. Open **App Review** (left menu) → the rejection thread → **Continue Draft** → check the reply → **Reply** (send).
+4. Click **Resubmit to App Review**.
 
 ### App Review notes (paste this)
 ```
