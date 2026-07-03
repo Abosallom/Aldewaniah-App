@@ -1024,3 +1024,17 @@ html{ scroll-behavior:smooth; }
 .chat-bubble.official .chat-time{ color:rgba(255,255,255,.75); }
 .dm-official-tag{ font-size:.68rem; font-weight:800; color:var(--gold); letter-spacing:.4px;
   margin-bottom:2px; }
+
+/* ===== Admin: gift codes — big tap-to-copy blocks (mobile friendly) ===== */
+.gift-code{ display:flex; width:100%; align-items:center; justify-content:space-between; gap:10px;
+  background:var(--cream); border:1.5px dashed var(--gold); border-radius:12px;
+  padding:14px 14px; cursor:pointer; font-family:inherit; min-height:52px;
+  transition:background .15s, transform .1s, border-color .15s; }
+.gift-code:active{ transform:scale(.985); }
+.gift-code.copied{ background:#e8f6ec; border-color:#2e7d4f; }
+.gift-code.used{ opacity:.55; border-style:solid; }
+.gift-code-txt{ font-family:ui-monospace,Menlo,Consolas,monospace; direction:ltr; unicode-bidi:embed;
+  font-weight:800; font-size:clamp(.82rem, 3.4vw, 1.05rem); letter-spacing:1px; color:var(--navy);
+  word-break:break-all; text-align:left; user-select:all; -webkit-user-select:all; }
+.gift-code-hint{ flex:0 0 auto; font-size:.72rem; font-weight:700; color:var(--ink-soft); white-space:nowrap; }
+.gift-code.copied .gift-code-hint{ color:#2e7d4f; }

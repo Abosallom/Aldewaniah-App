@@ -401,27 +401,40 @@
 
         if (!rows.length) { wrap.appendChild(UI.el('p', { class: 'muted', style: 'text-align:center' }, I18n.t('adm_gift_none'))); return; }
 
-        /* code list */
+        /* code list — the whole code block is ONE BIG tap-to-copy button
+           (thumb-friendly on phones; shows "نُسخ ✓" feedback in place) */
         rows.slice().reverse().forEach((r) => {
           const isAvail = r.status === 'available';
-          const codeEl = UI.el('span', { style: 'font-family:ui-monospace,Menlo,monospace;direction:ltr;unicode-bidi:embed;font-weight:700;letter-spacing:.5px' }, r.code);
-          const copyBtn = UI.el('button', { class: 'btn btn-ghost', style: 'padding:4px 10px;font-size:.8rem', onclick: () => {
-            try { navigator.clipboard.writeText(r.code); copyBtn.textContent = I18n.t('adm_gift_copied'); setTimeout(() => { copyBtn.textContent = I18n.t('adm_gift_copy'); }, 1500); } catch (e) {}
-          } }, I18n.t('adm_gift_copy'));
+          const codeBtn = UI.el('button', { class: 'gift-code' + (isAvail ? '' : ' used'), type: 'button' }, [
+            UI.el('span', { class: 'gift-code-txt' }, r.code),
+            UI.el('span', { class: 'gift-code-hint' }, '📋 ' + I18n.t('adm_gift_copy'))
+          ]);
+          codeBtn.onclick = () => {
+            const done = () => {
+              codeBtn.classList.add('copied');
+              codeBtn.lastChild.textContent = '✓ ' + I18n.t('adm_gift_copied');
+              setTimeout(() => { codeBtn.classList.remove('copied'); codeBtn.lastChild.textContent = '📋 ' + I18n.t('adm_gift_copy'); }, 1600);
+            };
+            try { navigator.clipboard.writeText(r.code).then(done).catch(() => {
+              // fallback for older mobile browsers
+              const ta2 = document.createElement('textarea'); ta2.value = r.code; document.body.appendChild(ta2);
+              ta2.select(); try { document.execCommand('copy'); done(); } catch (e) {} ta2.remove();
+            }); } catch (e) {}
+          };
           const kids = [
-            UI.el('div', { class: 'flex-between' }, [codeEl,
-              UI.el('div', null, [copyBtn,
-                isAvail ? UI.el('button', { style: 'border:none;background:none;color:var(--maroon);cursor:pointer;font-size:1.15rem;margin-inline-start:6px',
-                  onclick: () => UI.confirm(I18n.t('adm_gift_del'), async () => { await db.collection('giftcodes').doc(r.id).delete(); loadGifts(wrap); }) }, '×') : null])
-            ]),
-            UI.el('div', { class: 'card-meta' },
-              isAvail ? ('✅ ' + I18n.t('adm_gift_available'))
-                      : ((r.sentDM ? '📨 ' + I18n.t('adm_gift_assigned') : '⚠️ ' + I18n.t('adm_gift_assigned_nodm')) + ' ' + (r.toName || r.toPhone || '—')))
+            codeBtn,
+            UI.el('div', { class: 'flex-between', style: 'margin-top:6px;align-items:center' }, [
+              UI.el('div', { class: 'card-meta', style: 'margin:0' },
+                isAvail ? ('✅ ' + I18n.t('adm_gift_available'))
+                        : ((r.sentDM ? '📨 ' + I18n.t('adm_gift_assigned') : '⚠️ ' + I18n.t('adm_gift_assigned_nodm')) + ' ' + (r.toName || r.toPhone || '—'))),
+              isAvail ? UI.el('div', null, [
+                UI.el('button', { class: 'btn btn-ghost', style: 'padding:8px 14px;font-size:.85rem',
+                  onclick: () => giveTo(r) }, '🎁 ' + I18n.t('adm_gift_give')),
+                UI.el('button', { style: 'border:none;background:none;color:var(--maroon);cursor:pointer;font-size:1.3rem;padding:8px;margin-inline-start:2px',
+                  onclick: () => UI.confirm(I18n.t('adm_gift_del'), async () => { await db.collection('giftcodes').doc(r.id).delete(); loadGifts(wrap); }) }, '×')
+              ]) : null
+            ])
           ];
-          if (isAvail) {
-            kids.push(UI.el('button', { class: 'btn btn-ghost', style: 'margin-top:6px;padding:6px 12px;font-size:.85rem',
-              onclick: () => giveTo(r) }, '🎁 ' + I18n.t('adm_gift_give')));
-          }
           wrap.appendChild(UI.el('div', { class: 'card' }, kids));
         });
 
