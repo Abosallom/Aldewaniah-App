@@ -36,8 +36,9 @@
         html: '<img src="assets/icon-192.png" alt="">' });
       document.body.appendChild(fab);
     }
-    // Hide on the Chat tab so it never overlaps the chat send button.
-    const onChat = (location.hash || '').replace('#', '').split('?')[0] === 'chat';
+    // Hide on the Chat tab (group AND private sub-routes like #chat/priv/...)
+    // so it never overlaps the chat/DM send button.
+    const onChat = (location.hash || '').replace('#', '').split('?')[0].split('/')[0] === 'chat';
     fab.style.display = (isMember() && !onChat) ? 'flex' : 'none';
   }
 
