@@ -902,7 +902,14 @@
         // STAGE 6 — نِسَب كملنا (layout proportions + HUD)
         bg_share: 'مشاركة', bg_end: 'إنهاء',
         // STAGE 7 — إصلاحات جولة الاختبار
-        bg_confirm: 'تأكيد', bg_proj_declared: 'تم إعلان المشروع ✅'
+        bg_confirm: 'تأكيد', bg_proj_declared: 'تم إعلان المشروع ✅',
+        // STAGE 8 — النشرة (شكل كملنا) + ضدّ + استبدال مؤقت
+        bg_our_team: 'فريقنا', bg_their_team: 'فريقهم',
+        bg_nashra_game: 'اللعبة:', bg_nashra_buyer: 'المشتري أو المبدّل:',
+        bg_nashra_result: 'نتيجة الشراء:', bg_nashra_rabha: 'رابحة',
+        bg_nashra_khsrana: 'خسرانة', bg_nashra_score: 'النتيجة',
+        bg_versus: 'ضدّ',
+        bg_swapped: 'تم استبدالك مؤقتًا — اضغط للعودة'
       },
       en: {
         bg_title: 'Baloot Online', bg_sub: 'Private Baloot tables — Kamelna rules',
@@ -951,7 +958,14 @@
         // STAGE 6 — Kamelna layout proportions + HUD
         bg_share: 'Share', bg_end: 'End',
         // STAGE 7 — playtest fixes
-        bg_confirm: 'Confirm', bg_proj_declared: 'Project declared ✅'
+        bg_confirm: 'Confirm', bg_proj_declared: 'Project declared ✅',
+        // STAGE 8 — Nashra (Kamelna round sheet) + versus + temp swap
+        bg_our_team: 'Our team', bg_their_team: 'Their team',
+        bg_nashra_game: 'Game:', bg_nashra_buyer: 'Buyer / caller:',
+        bg_nashra_result: 'Buy result:', bg_nashra_rabha: 'Made it',
+        bg_nashra_khsrana: 'Fell short', bg_nashra_score: 'Score',
+        bg_versus: 'VS',
+        bg_swapped: 'You were temporarily covered — tap to return'
       }
     },
 
@@ -1012,7 +1026,9 @@
         pendingFly: null,                     // table cards awaiting a FLIP-in
         prevHandLen: 0, handRound: -1,        // deal-in reveal tracking
         shownUs: null, shownThem: null,       // HUD score count-up
-        sfxMult: null, sfxPhase: null         // sound-cue edge detection
+        sfxMult: null, sfxPhase: null,        // sound-cue edge detection
+        versusShown: '', versusPrevPhase: null, // STAGE 8: «ضدّ» splash once per game
+        swapToastShown: ''                    // STAGE 8: 60s rejoin-grace toast guard
       };
 
       session = {
@@ -1067,6 +1083,21 @@
           var t = UI.el('div', { class: 'bg-toast' }, msg);
           (st.ov || root).appendChild(t);
           setTimeout(function () { try { t.remove(); } catch (e) {} }, 1900);
+        } catch (e) {}
+      }
+
+      /** STAGE 8: a longer, TAPPABLE toast — Kamelna's «تم استبدالك مؤقتًا»
+          rejoin-grace copy. Tapping it dismisses the banner; my seat was
+          never actually reassigned (bots only drive uid-less seats), so my
+          input re-enables on my next turn with no engine change. Auto-hides
+          after ~6s if untouched. */
+      function swapToast(msg) {
+        try {
+          var t = UI.el('div', { class: 'bg-toast bg-swaptoast' }, msg);
+          var kill = function () { try { t.remove(); } catch (e) {} };
+          t.onclick = kill;
+          (st.ov || root).appendChild(t);
+          setTimeout(kill, 6000);
         } catch (e) {}
       }
 
@@ -1294,6 +1325,7 @@
             pacing();          // STAGE 3: bots + turn timers + auto-advance
             maybeSay();        // STAGE 4: تعابير speech bubbles
             soundCues();       // STAGE 5: دبل drum / win / lose cues
+            versusSplash();    // STAGE 8: «ضدّ» match-start splash
             paint();
             dealAnimations();  // STAGE 3: needs the freshly painted felt
           } catch (e) { /* defensive: never let a paint error kill the stream */ }
@@ -1316,6 +1348,34 @@
             else Sfx.win();
           }
         }
+      }
+
+      /** STAGE 8: «ضدّ» match-start splash — a centered gold word briefly
+          scales+fades over the table when a game BEGINS (lobby/dealing →
+          first deal). Guarded so it fires once per game and NEVER on a
+          rejoin: it only shows when THIS client saw the pre-deal phase
+          transition (st.sfxPhase already held a non-bidding phase). Honors
+          prefers-reduced-motion (CSS animation simply degrades to a short
+          static hold, still auto-removed). */
+      function versusSplash() {
+        var p = st.pub; if (!p || !st.ov) { return; }
+        var prev = st.versusPrevPhase;                    // phase THIS fn saw last
+        st.versusPrevPhase = p.phase;
+        // game start = the very first bidding turn of round 1
+        if (p.phase !== 'bidding' || (p.roundNo || 0) !== 1) return;
+        var key = st.code + '|' + (p.createdAt ? serverMs(p.createdAt) : 'g');
+        if (st.versusShown === key) return;
+        st.versusShown = key;
+        // only when we WATCHED the deal happen (skip cold rejoins that land
+        // straight in bidding): the previous phase we saw was a pre-deal one.
+        if (prev !== 'lobby' && prev !== 'dealing' && prev !== 'redeal') return;
+        try {
+          var sp = UI.el('div', { class: 'bg-versus' }, [
+            UI.el('span', { class: 'bg-versus-word' }, I18n.t('bg_versus'))
+          ]);
+          st.ov.appendChild(sp);
+          setTimeout(function () { try { sp.remove(); } catch (e) {} }, 1300);
+        } catch (e) {}
       }
 
       /** Listen to the private hand docs I'm allowed to read.
@@ -1974,7 +2034,11 @@
           return;
         }
         try {
-          toast(I18n.t('bg_timeout_pass'));               // it was MY turn
+          // STAGE 8: friendlier Kamelna rejoin-grace copy — a dismissible
+          // «تم استبدالك مؤقتًا — اضغط للعودة» banner. My seat is never
+          // reassigned (it carries my uid), so control returns to me on my
+          // next turn automatically; the tap just clears the banner.
+          swapToast(I18n.t('bg_swapped'));                // it was MY turn
           if (p.phase === 'bidding') await doBid('pass', null, sig, seat);
           else if (p.phase === 'doubling') await doDouble('pass', sig, seat);
           else if (p.phase === 'playing') {
@@ -2455,9 +2519,25 @@
         if (p.phase === 'doubling' && p.doubleTurn === i) {
           avKids.push(UI.el('div', { class: 'bg-ask' }, I18n.t('bg_ask_dbl')));
         }
+        // STAGE 8: Kamelna HORIZONTAL CAPSULE — a round avatar at one end and
+        // a dark gold-framed name plate carrying the name + a tiny muted
+        // 4-suit strip (♠♥♦♣). The avatar keeps the timer circle / fan /
+        // bubbles; the plate is just the name column.
+        var suitStrip = UI.el('div', { class: 'bg-suits' }, [
+          UI.el('span', { class: 'bl' }, '♠'),
+          UI.el('span', { class: 'rd' }, '♥'),
+          UI.el('span', { class: 'rd' }, '♦'),
+          UI.el('span', { class: 'bl' }, '♣')
+        ]);
+        var nameplate = UI.el('div', { class: 'bg-nameplate' }, [
+          UI.el('div', { class: 'bg-name' }, name),
+          suitStrip
+        ]);
         var kids = [
-          UI.el('div', { class: 'bg-avwrap' }, avKids),
-          UI.el('div', { class: 'bg-name' }, name)
+          UI.el('div', { class: 'bg-plate' }, [
+            UI.el('div', { class: 'bg-avwrap' }, avKids),
+            nameplate
+          ])
         ];
         if (partner) kids.push(UI.el('div', { class: 'bg-tag' }, I18n.t('bg_partner')));
         if (p.dealer === i) kids.push(UI.el('div', { class: 'bg-tag dealer' }, I18n.t('bg_dealer')));
@@ -2987,57 +3067,78 @@
         ]);
       }
 
-      /* Round summary: أبناط → نقاط, خسران/كبوت callouts, running totals.
-         STAGE 2 adds: a المشاريع row, one line per declared project, and a
-         دبل/قهوة callout when the round was multiplied. */
+      /* STAGE 8 · النشرة — Kamelna's round-end sheet, replicated from the
+         live game. A titled «النشرة» card with, in order:
+           · «اللعبة:»            mode (صن / حكم ♦)
+           · «المشتري أو المبدّل:» which TEAM bought (فريقنا / فريقهم)
+           · «نتيجة الشراء:»       رابحة (green) if the buyer made it,
+                                   else خسرانة (red)
+           · a «لنا | لهم» 2-col table with «الأبناط» and «النتيجة» rows.
+         Every value is re-read from the existing scoreRound output on
+         p.roundScores — nothing is recomputed here:
+           · rs.bnt[teamKey]  = raw أبناط this round (الأبناط row)
+           · rs.pts[teamKey]  = game نقاط this round (النتيجة row)
+           · rs.buyerTeam     = the buying team index (0|1)
+           · rs.khosran/kaboot/winTeam decide رابحة vs خسرانة for the buyer.
+         The «قيدها» full-history sheet stays reachable from the action bar. */
       function roundEndModal(p) {
         var rs = p.roundScores || { bnt: { t0: 0, t1: 0 }, pts: { t0: 0, t1: 0 } };
         var usK = myTeamKey(), thK = themTeamKey();
-        var buyerName = (rs.buyer != null) ? seatName(rs.buyer) : '';
         var modeTxt = rs.mode === 'sun' ? ('☀️ ' + I18n.t('bg_sun'))
                     : rs.mode === 'ashkal' ? I18n.t('bg_ashkal')
                     : (I18n.t('bg_hokum') + ' ' + (rs.trump ? SUIT_CHAR[rs.trump] : ''));
 
-        var pj = rs.projPts || { t0: 0, t1: 0 };
-        var bl = rs.balootPts || { t0: 0, t1: 0 };
-        var hasProj = ((pj.t0 || 0) + (pj.t1 || 0) + (bl.t0 || 0) + (bl.t1 || 0)) > 0;
+        // which SIDE (from my perspective) bought — rs.buyerTeam is a team
+        // index (0|1); viewSeat()%2 is MY team index. Same parity ⇒ فريقنا.
+        var buyerTeam = (rs.buyerTeam != null) ? rs.buyerTeam
+                      : (rs.buyer != null ? rs.buyer % 2 : null);
+        var buyerIsUs = (buyerTeam != null) && (buyerTeam === (viewSeat() % 2));
+        var buyerSide = (buyerTeam == null) ? ''
+                      : (buyerIsUs ? I18n.t('bg_our_team') : I18n.t('bg_their_team'));
 
-        var rowKids = [
-          resRow('', I18n.t('bg_us'), I18n.t('bg_them'), true),
-          resRow(I18n.t('bg_abnat'), String(rs.bnt[usK] || 0), String(rs.bnt[thK] || 0))
-        ];
-        if (hasProj) {
-          rowKids.push(resRow(I18n.t('bg_projects'),
-            String((pj[usK] || 0) + (bl[usK] || 0)),
-            String((pj[thK] || 0) + (bl[thK] || 0))));
-        }
-        rowKids.push(resRow(I18n.t('bg_points'), String(rs.pts[usK] || 0), String(rs.pts[thK] || 0)));
-        rowKids.push(resRow(I18n.t('bg_totals'), String((p.totals && p.totals[usK]) || 0), String((p.totals && p.totals[thK]) || 0)));
-        var rows = UI.el('div', { class: 'bg-restable' }, rowKids);
+        // نتيجة الشراء: the buyer made it unless it was خسران (or a كبوت
+        // AGAINST them). winTeam === buyerTeam ⇒ رابحة, else خسرانة.
+        var buyerWon = (rs.winTeam != null && buyerTeam != null)
+                     ? (rs.winTeam === buyerTeam) : !rs.khosran;
 
-        // one small line per declared project (cancelled ones struck out)
-        var projLines = null;
-        if (rs.projItems && rs.projItems.length) {
-          projLines = UI.el('div', { class: 'bg-projlines' }, rs.projItems.map(function (it) {
-            return UI.el('div', { class: it.cancelled ? 'cancelled' : '' },
-              seatName(it.seat) + ' · ' + projLabel(it.type) + ' ' +
-              (it.cancelled ? '(' + I18n.t('bg_proj_cancelled') + ')' : '+' + projectValue(it.type, rs.mode)));
-          }));
-        }
+        // «الأبناط» = raw أبناط; «النتيجة» = game نقاط (both straight from rs)
+        var nashra = UI.el('div', { class: 'bg-nashra' }, [
+          UI.el('div', { class: 'bg-nashra-title' }, I18n.t('bg_totals')),
+          nashraLine(I18n.t('bg_nashra_game'),
+            UI.el('span', { class: 'bg-nashra-mode' }, modeTxt)),
+          nashraLine(I18n.t('bg_nashra_buyer'),
+            UI.el('span', { class: 'bg-nashra-side' }, buyerSide)),
+          nashraLine(I18n.t('bg_nashra_result'),
+            UI.el('span', { class: 'bg-nashra-res ' + (buyerWon ? 'win' : 'lose') },
+              buyerWon ? I18n.t('bg_nashra_rabha') : I18n.t('bg_nashra_khsrana'))),
+          UI.el('div', { class: 'bg-nashra-tbl' }, [
+            UI.el('div', { class: 'bg-nashra-trow head' }, [
+              UI.el('span', { class: 'k' }, ''),
+              UI.el('span', { class: 'us' }, I18n.t('bg_us')),
+              UI.el('span', { class: 'them' }, I18n.t('bg_them'))
+            ]),
+            UI.el('div', { class: 'bg-nashra-trow' }, [
+              UI.el('span', { class: 'k' }, I18n.t('bg_abnat')),
+              UI.el('span', { class: 'us' }, String((rs.bnt && rs.bnt[usK]) || 0)),
+              UI.el('span', { class: 'them' }, String((rs.bnt && rs.bnt[thK]) || 0))
+            ]),
+            UI.el('div', { class: 'bg-nashra-trow score' }, [
+              UI.el('span', { class: 'k' }, I18n.t('bg_nashra_score')),
+              UI.el('span', { class: 'us' }, String((rs.pts && rs.pts[usK]) || 0)),
+              UI.el('span', { class: 'them' }, String((rs.pts && rs.pts[thK]) || 0))
+            ])
+          ])
+        ]);
 
         var callouts = [];
         if (rs.coffee) callouts.push(UI.el('div', { class: 'bg-callout red' }, '☕ ' + I18n.t('bg_coffee')));
         else if (rs.mult >= 2) callouts.push(UI.el('div', { class: 'bg-callout red' },
           I18n.t({ 2: 'bg_double', 3: 'bg_triple', 4: 'bg_kawra' }[rs.mult] || 'bg_double') + ' ×' + rs.mult));
         if (rs.kaboot) callouts.push(UI.el('div', { class: 'bg-callout gold' }, I18n.t('bg_kaboot')));
-        if (rs.khosran) callouts.push(UI.el('div', { class: 'bg-callout red' }, I18n.t('bg_khosran')));
 
         return UI.el('div', { class: 'bg-modalbd' }, [
-          UI.el('div', { class: 'bg-modal' }, [
-            UI.el('h3', null, I18n.t('bg_round_end')),
-            UI.el('p', { class: 'bg-resmeta' }, modeTxt + ' · ' + I18n.t('bg_buyer') + ': ' + buyerName),
-            rows,
-            projLines
+          UI.el('div', { class: 'bg-modal bg-nashra-modal' }, [
+            nashra
           ].concat(callouts).concat([
             isHost()
               ? UI.el('button', { class: 'btn btn-green btn-block bg-nextbtn', onclick: nextRound },
@@ -3047,11 +3148,11 @@
         ]);
       }
 
-      function resRow(label, us, them, head) {
-        return UI.el('div', { class: 'bg-resrow' + (head ? ' head' : '') }, [
-          UI.el('span', { class: 'lbl' }, label),
-          UI.el('span', null, us),
-          UI.el('span', null, them)
+      /* STAGE 8: one «label: value» line inside the النشرة card. */
+      function nashraLine(label, valueEl) {
+        return UI.el('div', { class: 'bg-nashra-line' }, [
+          UI.el('span', { class: 'bg-nashra-lbl' }, label),
+          valueEl
         ]);
       }
 
