@@ -58,8 +58,11 @@
         adm_gift_distribute: '🎁 توزيع كود لكل عضو (رسالة خاصة)', adm_gift_dist_confirm: 'سيُرسَل كود واحد لكل عضو معتمد (عدا حساب المراجعة) برسالة خاصة رسمية. متابعة؟',
         adm_gift_dist_done: 'تم إرسال {n} كود ✓', adm_gift_notenough: 'الأكواد المتاحة أقل من عدد الأعضاء! المتاح: {a}، المطلوب: {n}',
         adm_gift_unreachable: 'لم يُرسل لهؤلاء لأنهم لم يفتحوا التطبيق بعد (اطلب منهم فتحه ثم أعد التوزيع): {names}',
-        adm_gift_pullback: 'سحب جميع الأكواد الموزّعة', adm_gift_pullback_confirm: 'سيتم حذف رسالة الكود من محادثة كل عضو وإرجاع جميع الأكواد إلى «متاح». متابعة؟',
+        adm_gift_pullback: 'سحب جميع الأكواد الموزّعة',
         adm_gift_pulledback: 'تم سحب {n} كود ✓ — الأكواد الآن متاحة',
+        adm_gift_wd_one: 'سحب الكود', adm_gift_wd_reason: 'سبب السحب', adm_gift_wd_reason_ph: 'مثال: أُرسل بالخطأ، أو الكود مخصص لعضو آخر…',
+        adm_gift_wd_note: 'سيُحذف الكود من محادثة العضو، وإذا كتبت سببًا سيصله إشعار رسمي به. اتركه فارغًا للسحب بدون إشعار.',
+        adm_gift_wd_go: 'سحب', adm_gift_wd_last: 'آخر سحب: من {name} — السبب: {reason}',
         adm_gift_give_nouid: 'العضو {name} لم يفتح التطبيق بعد، لا يمكن مراسلته. اطلب منه فتح التطبيق مرة ثم أعد المحاولة.',
         adm_gift_available: 'متاح', adm_gift_assigned: 'أُرسل إلى',
         adm_gift_give: 'إعطاء لعضو', adm_gift_pick: 'اختر العضو', adm_gift_copy: 'نسخ', adm_gift_copied: 'نُسخ ✓',
@@ -100,8 +103,11 @@
         adm_gift_distribute: '🎁 Send a code to every member (private DM)', adm_gift_dist_confirm: 'One code will be DM-ed to every approved member (except the review account). Continue?',
         adm_gift_dist_done: 'Sent {n} codes ✓', adm_gift_notenough: 'Not enough available codes! Available: {a}, needed: {n}',
         adm_gift_unreachable: 'Not sent to these (they haven\'t opened the app yet — ask them to, then distribute again): {names}',
-        adm_gift_pullback: 'Pull back all sent codes', adm_gift_pullback_confirm: 'The code message will be deleted from each member\'s chat and all codes reset to "available". Continue?',
+        adm_gift_pullback: 'Pull back all sent codes',
         adm_gift_pulledback: 'Pulled back {n} codes ✓ — now available',
+        adm_gift_wd_one: 'Withdraw code', adm_gift_wd_reason: 'Withdrawal reason', adm_gift_wd_reason_ph: 'e.g. sent by mistake, or reserved for another member…',
+        adm_gift_wd_note: 'The code message is removed from the member\'s chat; if you write a reason they get an official notice with it. Leave empty to withdraw silently.',
+        adm_gift_wd_go: 'Withdraw', adm_gift_wd_last: 'Last withdrawal: from {name} — reason: {reason}',
         adm_gift_give_nouid: '{name} hasn\'t opened the app yet, can\'t message them. Ask them to open it once, then try again.',
         adm_gift_available: 'Available', adm_gift_assigned: 'Sent to',
         adm_gift_give: 'Give to member', adm_gift_pick: 'Pick the member', adm_gift_copy: 'Copy', adm_gift_copied: 'Copied ✓',
@@ -377,6 +383,60 @@
         catch (e) { return null; }
       }
 
+      /* Withdraw ONE assigned code: remove its message from the member's
+         chat, optionally tell them why (official DM), and return the code
+         to "available". The reason is kept on the code doc for the admin. */
+      async function withdrawCode(r, reason) {
+        const me = Auth.uid();
+        if (r.toUid) {
+          const tid = me < r.toUid ? me + '_' + r.toUid : r.toUid + '_' + me;
+          try {
+            const snap = await db.collection('dms').doc(tid).collection('msgs').orderBy('at', 'desc').limit(80).get();
+            for (const d of snap.docs) {
+              const t = (d.data() || {}).text || '';
+              if (t.indexOf('Tira') >= 0 || t.indexOf('طِرا') >= 0 || t.indexOf(r.code) >= 0) await d.ref.delete();
+            }
+          } catch (e) {}
+          if (reason) {
+            try {
+              await sendGiftDM(r.toUid, r.toName || '',
+                'تم سحب كود هدية طِرا الذي أُرسل لك.\nYour Tira gift code has been withdrawn.\n\nالسبب / Reason:\n' + reason);
+            } catch (e) {}
+          }
+        }
+        await db.collection('giftcodes').doc(r.id).update({
+          status: 'available',
+          toName: firebase.firestore.FieldValue.delete(),
+          toPhone: firebase.firestore.FieldValue.delete(),
+          toUid: firebase.firestore.FieldValue.delete(),
+          sentDM: firebase.firestore.FieldValue.delete(),
+          assignedAt: firebase.firestore.FieldValue.delete(),
+          lastWithdraw: { from: r.toName || r.toPhone || '', reason: reason || '',
+            at: firebase.firestore.FieldValue.serverTimestamp() }
+        });
+      }
+
+      /* Small modal asking for the withdrawal reason; onGo(reason) runs on confirm. */
+      function askWithdrawReason(title, onGo) {
+        const bd = UI.el('div', { class: 'modal-backdrop' });
+        bd.onclick = (e) => { if (e.target === bd) bd.remove(); };
+        const ta = UI.el('textarea', { class: 'fld', rows: '3', placeholder: I18n.t('adm_gift_wd_reason_ph') });
+        const goBtn = UI.el('button', { class: 'btn', style: 'background:var(--maroon)', onclick: () => {
+          const reason = (ta.value || '').trim();
+          bd.remove(); onGo(reason);
+        } }, I18n.t('adm_gift_wd_go'));
+        bd.appendChild(UI.el('div', { class: 'modal' }, [
+          UI.el('h3', { style: 'margin:0 0 8px' }, title),
+          UI.el('div', { class: 'field' }, [UI.el('label', null, I18n.t('adm_gift_wd_reason')), ta]),
+          UI.el('div', { class: 'muted', style: 'font-size:.8rem;margin:4px 0 10px' }, I18n.t('adm_gift_wd_note')),
+          UI.el('div', { class: 'flex-between', style: 'justify-content:flex-end;gap:10px' }, [
+            UI.el('button', { class: 'btn btn-ghost', onclick: () => bd.remove() }, I18n.t('cancel')), goBtn
+          ])
+        ]));
+        document.body.appendChild(bd);
+        ta.focus();
+      }
+
       async function loadGifts(wrap) {
         wrap.innerHTML = '<div class="muted" style="text-align:center;padding:10px">…</div>';
         let rows = [];
@@ -512,37 +572,17 @@
         const assigned = rows.filter((r) => r.status === 'assigned');
         if (assigned.length) {
           const pbMsg = UI.el('div', { class: 'muted', style: 'font-size:.85rem;text-align:center;margin:6px 0' });
-          const pbBtn = UI.el('button', { class: 'btn btn-block', style: 'color:var(--maroon);border-color:var(--maroon)', onclick: async () => {
-            if (!window.confirm(I18n.t('adm_gift_pullback_confirm'))) return;
-            pbBtn.disabled = true;
-            const me = Auth.uid();
-            let done = 0;
-            for (const r of assigned) {
-              try {
-                if (r.toUid) {
-                  const tid = me < r.toUid ? me + '_' + r.toUid : r.toUid + '_' + me;
-                  try {
-                    const snap = await db.collection('dms').doc(tid).collection('msgs').orderBy('at', 'desc').limit(80).get();
-                    for (const d of snap.docs) {
-                      const t = (d.data() || {}).text || '';
-                      if (t.indexOf('Tira') >= 0 || t.indexOf('طِرا') >= 0 || t.indexOf(r.code) >= 0) await d.ref.delete();
-                    }
-                  } catch (e) {}
-                }
-                await db.collection('giftcodes').doc(r.id).update({
-                  status: 'available',
-                  toName: firebase.firestore.FieldValue.delete(),
-                  toPhone: firebase.firestore.FieldValue.delete(),
-                  toUid: firebase.firestore.FieldValue.delete(),
-                  sentDM: firebase.firestore.FieldValue.delete(),
-                  assignedAt: firebase.firestore.FieldValue.delete()
-                });
-                done++;
-              } catch (e) {}
-              pbMsg.textContent = I18n.t('adm_gift_working') + ' ' + done + '/' + assigned.length;
-            }
-            pbMsg.textContent = I18n.t('adm_gift_pulledback').replace('{n}', done);
-            loadGifts(wrap);
+          const pbBtn = UI.el('button', { class: 'btn btn-block', style: 'color:var(--maroon);border-color:var(--maroon)', onclick: () => {
+            askWithdrawReason(I18n.t('adm_gift_pullback'), async (reason) => {
+              pbBtn.disabled = true;
+              let done = 0;
+              for (const r of assigned) {
+                try { await withdrawCode(r, reason); done++; } catch (e) {}
+                pbMsg.textContent = I18n.t('adm_gift_working') + ' ' + done + '/' + assigned.length;
+              }
+              pbMsg.textContent = I18n.t('adm_gift_pulledback').replace('{n}', done);
+              loadGifts(wrap);
+            });
           } }, '↩️ ' + I18n.t('adm_gift_pullback') + ' (' + assigned.length + ')');
           wrap.appendChild(pbBtn);
           wrap.appendChild(pbMsg);
@@ -581,9 +621,20 @@
                   onclick: () => giveTo(r) }, '🎁 ' + I18n.t('adm_gift_give')),
                 UI.el('button', { style: 'border:none;background:none;color:var(--maroon);cursor:pointer;font-size:1.3rem;padding:8px;margin-inline-start:2px',
                   onclick: () => UI.confirm(I18n.t('adm_gift_del'), async () => { await db.collection('giftcodes').doc(r.id).delete(); loadGifts(wrap); }) }, '×')
-              ]) : null
+              ]) : UI.el('button', { class: 'btn btn-ghost', style: 'padding:8px 14px;font-size:.85rem;color:var(--maroon);border-color:var(--maroon)',
+                onclick: () => askWithdrawReason(I18n.t('adm_gift_wd_one') + ' — ' + (r.toName || ''), async (reason) => {
+                  try { await withdrawCode(r, reason); } catch (e) { alert(e.message || 'Error'); }
+                  loadGifts(wrap);
+                }) }, '↩️ ' + I18n.t('adm_gift_wd_one'))
             ])
           ];
+          // show the last withdrawal (who it was taken from + the reason)
+          if (r.lastWithdraw && (r.lastWithdraw.from || r.lastWithdraw.reason)) {
+            kids.push(UI.el('div', { class: 'card-meta', style: 'margin-top:4px;color:var(--maroon)' },
+              '↩️ ' + I18n.t('adm_gift_wd_last')
+                .replace('{name}', r.lastWithdraw.from || '—')
+                .replace('{reason}', r.lastWithdraw.reason || '—')));
+          }
           wrap.appendChild(UI.el('div', { class: 'card' }, kids));
         });
 
