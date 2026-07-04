@@ -157,21 +157,21 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
     repeating-linear-gradient(0deg, rgba(0, 0, 0, .06) 0 1px, transparent 1px 4px),
     /* band 1 (upper) — big navy/teal triangles between beige stripes */
     linear-gradient(#d9c79a, #d9c79a) 0 6% / 100% 3px no-repeat,
-    conic-gradient(from 120deg at 50% 0, #1f3d47 0 120deg, transparent 120deg) 0 12% / 56px 26px repeat-x,
+    conic-gradient(from 120deg at 50% 0, #1A2744 0 120deg, transparent 120deg) 0 12% / 56px 26px repeat-x,
     conic-gradient(from -60deg at 50% 100%, #3e7a6e 0 120deg, transparent 120deg) 28px 12% / 56px 26px repeat-x,
     linear-gradient(#d9c79a, #d9c79a) 0 18% / 100% 3px no-repeat,
     /* band 2 (center, boldest) — beige/navy triangles between navy stripes */
-    linear-gradient(#1f3d47, #1f3d47) 0 42% / 100% 4px no-repeat,
+    linear-gradient(#1A2744, #1A2744) 0 42% / 100% 4px no-repeat,
     conic-gradient(from 120deg at 50% 0, #d9c79a 0 120deg, transparent 120deg) 0 50% / 64px 30px repeat-x,
-    conic-gradient(from -60deg at 50% 100%, #1f3d47 0 120deg, transparent 120deg) 32px 50% / 64px 30px repeat-x,
-    linear-gradient(#1f3d47, #1f3d47) 0 58% / 100% 4px no-repeat,
+    conic-gradient(from -60deg at 50% 100%, #1A2744 0 120deg, transparent 120deg) 32px 50% / 64px 30px repeat-x,
+    linear-gradient(#1A2744, #1A2744) 0 58% / 100% 4px no-repeat,
     /* band 3 (lower) — teal/navy triangles mirrored */
     linear-gradient(#d9c79a, #d9c79a) 0 82% / 100% 3px no-repeat,
     conic-gradient(from 120deg at 50% 0, #3e7a6e 0 120deg, transparent 120deg) 0 88% / 56px 26px repeat-x,
-    conic-gradient(from -60deg at 50% 100%, #1f3d47 0 120deg, transparent 120deg) 28px 88% / 56px 26px repeat-x,
+    conic-gradient(from -60deg at 50% 100%, #1A2744 0 120deg, transparent 120deg) 28px 88% / 56px 26px repeat-x,
     linear-gradient(#d9c79a, #d9c79a) 0 94% / 100% 3px no-repeat,
     /* rust-maroon wool base with tonal variation */
-    linear-gradient(180deg, #8a3a2c, #7a2f24 45%, #86382a 70%, #6e2a20);
+    linear-gradient(180deg, #722F37, #5E262D 45%, #6B2C33 70%, #521F26);
   box-shadow:
     inset 0 0 60px rgba(0, 0, 0, .38),
     0 8px 22px rgba(0, 0, 0, .28);
@@ -725,3 +725,15 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
   .bg-center[class*="bg-sweep-"] .bg-tslot,
   .bg-hand .bg-pcard, .bg-dealcard { transition: none !important; }
 }
+
+/* ===== Native-app feel (research-verified iOS fixes) =====
+   The game must never behave like a webpage: no text selection,
+   no long-press magnifier/callout, no gray tap flash, no double-tap
+   zoom, no rubber-band scrolling. */
+.bg-stage, .bg-stage * {
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.bg-stage { overscroll-behavior: none; }
