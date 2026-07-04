@@ -879,7 +879,9 @@
         bg_hidden_until2: 'تنكشف المشاريع مع بداية اللعبة الثانية',
         bg_round_col: 'الجولة',
         // STAGE 5 — الإخراج الكامل
-        bg_sound: 'الصوت'
+        bg_sound: 'الصوت',
+        // STAGE 6 — نِسَب كملنا (layout proportions + HUD)
+        bg_share: 'مشاركة', bg_end: 'إنهاء'
       },
       en: {
         bg_title: 'Baloot Online', bg_sub: 'Private Baloot tables — Kamelna rules',
@@ -924,7 +926,9 @@
         bg_hidden_until2: 'Projects are revealed on trick 2',
         bg_round_col: 'Round',
         // STAGE 5 — full-screen game feel
-        bg_sound: 'Sound'
+        bg_sound: 'Sound',
+        // STAGE 6 — Kamelna layout proportions + HUD
+        bg_share: 'Share', bg_end: 'End'
       }
     },
 
@@ -1823,7 +1827,9 @@
           st.dealOv = ov;
           document.body.appendChild(ov);
 
-          var POS = { b: [0.5, 0.88], t: [0.5, 0.12], l: [0.09, 0.5], r: [0.91, 0.5] };
+          // STAGE 6: top/bottom seats sit on the SAND outside the rug now,
+          // so their flight targets moved just past the rug's edges
+          var POS = { b: [0.5, 1.06], t: [0.5, -0.06], l: [0.04, 0.5], r: [0.96, 0.5] };
           var from = POS[relPos(p.dealer)];
           var order = []; for (var k = 1; k <= 4; k++) order.push((p.dealer + k) % 4);
           var plan = [];
@@ -2100,19 +2106,29 @@
 
         var board = UI.el('div', { class: 'bg-board' });
         var felt = UI.el('div', { class: 'bg-felt' });
-        for (var i = 0; i < 4; i++) felt.appendChild(seatChip(p, i));
         felt.appendChild(centerArea(p));
         board.appendChild(felt);
+        // STAGE 6: Kamelna composition — the top chip sits on the SAND above
+        // the rug and the bottom "chip" is the call area under it (my own
+        // avatar lives in the bottom plate instead), so those two mount on
+        // the board; the side chips overlap the rug's edges (felt children).
+        for (var i = 0; i < 4; i++) {
+          var chip = seatChip(p, i);
+          var pos = relPos(i);
+          if (pos === 'l' || pos === 'r') felt.appendChild(chip);
+          else board.appendChild(chip);
+        }
         m.appendChild(board);
 
-        // STAGE 4: Kamelna-style INLINE bid/دبل bar docked above the hand
-        // (replaces the old covering bottom-sheet — same logic & guards)
+        m.appendChild(handArea(p));
+
+        // STAGE 6: Kamelna order — the wide bid/دبل pills dock UNDER the
+        // hand fan, right above the action bar (same logic & guards)
         if (p.phase === 'bidding' && p.turn >= 0 && controlsSeat(p.turn)) m.appendChild(bidSheet(p));
         if (p.phase === 'doubling' && p.doubleTurn != null && controlsSeat(p.doubleTurn)) {
           m.appendChild(doubleSheet(p));               // STAGE 2: دبل chain
         }
 
-        m.appendChild(handArea(p));
         m.appendChild(actionBar(p));                   // STAGE 4: قيدها/المشاريع/تعابير
 
         var reveal = projectOverlay(p);                // STAGE 2: trick-2 showdown
@@ -2126,24 +2142,19 @@
         runTableAnims();                               // STAGE 5: FLIP the new trick cards
       }
 
-      /* STAGE 5: the floating game HUD — dark chips like Kamelna's top
-         row: خروج/إنهاء · 🔊 · mode/دبل chips · the لنا/لهم score unit
-         with «جلسة <code>» under it (tap = copy). Scores count up. */
+      /* STAGE 6: the Kamelna HUD — small dark icon-over-label buttons on
+         both sides (تعابير/مشاركة · الصوت/خروج/إنهاء) around a central
+         لنا/لهم numeric-pill unit with «جلسة <code>» beneath (tap = copy).
+         Scores count up. Mode/دبل chips moved to the bottom plate row. */
+      function hudBtn(icon, label, cls, onclick) {
+        return UI.el('button', { class: 'bg-hudbtn' + (cls ? ' ' + cls : ''), onclick: onclick }, [
+          UI.el('b', null, icon),
+          UI.el('span', null, label)
+        ]);
+      }
       function topBar(p) {
         var us = (p.totals && p.totals[myTeamKey()]) || 0;
         var them = (p.totals && p.totals[themTeamKey()]) || 0;
-        var modeChip;
-        if (p.mode === 'sun') modeChip = UI.el('span', { class: 'bg-chip bg-chip-sun' }, '☀️ ' + I18n.t('bg_sun'));
-        else if (p.mode === 'ashkal') modeChip = UI.el('span', { class: 'bg-chip bg-chip-ashkal' }, I18n.t('bg_ashkal'));
-        else if (p.mode === 'hokum') {
-          modeChip = UI.el('span', { class: 'bg-chip bg-chip-hokum' + (p.trump === 'H' || p.trump === 'D' ? ' redsuit' : '') },
-            I18n.t('bg_hokum') + ' ' + SUIT_CHAR[p.trump]);
-        } else modeChip = UI.el('span', { class: 'bg-chip' }, I18n.t('bg_flip'));
-
-        // STAGE 2: دبل chip — ×2 / ×3 / ×4 / ☕ next to the mode
-        var multChip = null;
-        if (p.mult === 'coffee') multChip = UI.el('span', { class: 'bg-chip bg-chip-mult' }, '☕ ' + I18n.t('bg_qahwa'));
-        else if (p.mult >= 2) multChip = UI.el('span', { class: 'bg-chip bg-chip-mult' }, '×' + p.mult);
 
         var usB = UI.el('b', { class: 'us' }, String(us));
         var themB = UI.el('b', { class: 'them' }, String(them));
@@ -2152,25 +2163,37 @@
         st.shownUs = us; st.shownThem = them;
 
         return UI.el('div', { class: 'bg-hud' }, [
-          UI.el('button', { class: 'bg-hudbtn', onclick: exitView }, I18n.t('bg_exit')),
-          isHost() ? UI.el('button', { class: 'bg-hudbtn danger', onclick: function () {
-            UI.confirm(I18n.t('bg_end_confirm'), endTable);
-          } }, I18n.t('bg_end_table')) : null,
-          UI.el('button', { class: 'bg-hudbtn', title: I18n.t('bg_sound'), onclick: function () {
-            Sfx.toggle(); paint();
-          } }, Sfx.enabled() ? '🔊' : '🔇'),
+          mySeat() >= 0 ? hudBtn('😀', I18n.t('bg_emotes'), '', function () { st.modal = 'emotes'; paint(); }) : null,
+          hudBtn('⇪', I18n.t('bg_share'), '', copyCode),
           UI.el('span', { class: 'bg-hudgrow' }),
-          modeChip,
-          multChip,
           UI.el('button', { class: 'bg-hudscore', onclick: copyCode }, [
             UI.el('span', { class: 'bg-hudrow' }, [
-              UI.el('small', null, I18n.t('bg_us')), usB,
-              UI.el('span', { class: 'bg-hudsep' }),
-              UI.el('small', null, I18n.t('bg_them')), themB
+              UI.el('span', { class: 'bg-scorepill' }, [UI.el('small', null, I18n.t('bg_us')), usB]),
+              UI.el('span', { class: 'bg-scorepill' }, [UI.el('small', null, I18n.t('bg_them')), themB])
             ]),
             UI.el('span', { class: 'bg-hudsess' }, I18n.t('bg_session') + ' ' + st.code)
-          ])
+          ]),
+          UI.el('span', { class: 'bg-hudgrow' }),
+          hudBtn(Sfx.enabled() ? '🔊' : '🔇', I18n.t('bg_sound'), '', function () { Sfx.toggle(); paint(); }),
+          hudBtn('✕', I18n.t('bg_exit'), '', exitView),
+          isHost() ? hudBtn('⏻', I18n.t('bg_end'), 'danger', function () {
+            UI.confirm(I18n.t('bg_end_confirm'), endTable);
+          }) : null
         ]);
+      }
+
+      /** STAGE 6: mode + دبل chips (they now ride the bottom plate row). */
+      function modeChips(p) {
+        var out = [];
+        if (p.mode === 'sun') out.push(UI.el('span', { class: 'bg-chip mini bg-chip-sun' }, '☀️ ' + I18n.t('bg_sun')));
+        else if (p.mode === 'ashkal') out.push(UI.el('span', { class: 'bg-chip mini bg-chip-ashkal' }, I18n.t('bg_ashkal')));
+        else if (p.mode === 'hokum') {
+          out.push(UI.el('span', { class: 'bg-chip mini bg-chip-hokum' + (p.trump === 'H' || p.trump === 'D' ? ' redsuit' : '') },
+            I18n.t('bg_hokum') + ' ' + SUIT_CHAR[p.trump]));
+        }
+        if (p.mult === 'coffee') out.push(UI.el('span', { class: 'bg-chip mini bg-chip-mult' }, '☕ ' + I18n.t('bg_qahwa')));
+        else if (p.mult >= 2) out.push(UI.el('span', { class: 'bg-chip mini bg-chip-mult' }, '×' + p.mult));
+        return out;
       }
 
       /* STAGE 4: tight fan of mini card backs (max 8) shown by each seat —
@@ -2214,20 +2237,14 @@
         avKids.push(av);
         if (isTurn && !isBotSeat(i) &&
             (p.phase === 'bidding' || p.phase === 'playing' || p.phase === 'doubling')) {
-          var elapsed = Math.max(0, (Date.now() - (st.turnStartAt || Date.now())) / 1000);
-          var ring = UI.el('div', { class: 'bg-ring' });
-          ring.innerHTML =
-            '<svg viewBox="0 0 54 54"><circle class="track" cx="27" cy="27" r="24"/>' +
-            '<circle class="left" cx="27" cy="27" r="24" style="animation-delay:-' +
-            elapsed.toFixed(2) + 's"/></svg>';
-          avKids.push(ring);
-          // STAGE 4: remaining-seconds NUMBER inside the ring (Kamelna timer)
-          var num = UI.el('div', { class: 'bg-ringnum' }, String(ringSecs()));
-          avKids.push(num);
+          // STAGE 6: Kamelna timer — the avatar content is REPLACED by a
+          // white circle with a big dark countdown number (no ring overlay).
+          av.classList.add('bg-timer');
+          av.textContent = String(ringSecs());
           clearInterval(st.ringInt);
           st.ringInt = setInterval(function () {
             var s = ringSecs();
-            num.textContent = String(s);
+            av.textContent = String(s);
             if (s <= 0) clearInterval(st.ringInt);
           }, 500);
         }
@@ -2257,6 +2274,15 @@
         // STAGE 3: the winning buyer's chip while the flip card flies over
         if (p.phase === 'dealRest' && p.buyer === i) {
           kids.push(UI.el('div', { class: 'bg-bidlbl' }, I18n.t('bg_bought') + ' ' + lastBid(p, i)));
+        }
+        // STAGE 6: the buyer's CALL pill stays pinned to their chip until the
+        // next phase (Kamelna: حكم/صن/قهوة… persist through دبل + play)
+        if ((p.phase === 'doubling' || p.phase === 'playing') && p.buyer === i && p.mode) {
+          var call = (p.mult === 'coffee') ? I18n.t('bg_qahwa')
+                   : p.mode === 'sun' ? I18n.t('bg_sun')
+                   : p.mode === 'ashkal' ? I18n.t('bg_ashkal')
+                   : I18n.t('bg_hokum') + ' ' + SUIT_CHAR[p.trump];
+          kids.push(UI.el('div', { class: 'bg-bidlbl' }, call));
         }
         // STAGE 2: «مشروع» chip — everyone sees WHO declared, not WHAT
         if (p.phase === 'playing' && p.declared && p.declared[i]) {
@@ -2454,7 +2480,9 @@
         var key = act + '|' + r + '|' + (p.roundNo || 0);
         if (st.suitPickKey !== key) { st.suitPick = false; st.suitPickKey = key; }
 
-        var body = UI.el('div', { class: 'bg-bidbar-in' });
+        // STAGE 6: bare pill row under the hand — the dark panel shell only
+        // wraps the round-2 suit picker (a real sub-dialog)
+        var body = UI.el('div', { class: 'bg-bidbar-in' + (st.suitPick ? ' panel' : '') });
 
         if (st.suitPick) {
           body.appendChild(UI.el('div', { class: 'bg-bidq' }, I18n.t('bg_pick_suit')));
@@ -2470,19 +2498,11 @@
             I18n.t('bg_back')));
         } else {
           // STAGE 3: no flip card here — the مشترى stays visible on the felt.
-          // The bar only carries the dealer's question + the answers.
-          body.appendChild(UI.el('div', { class: 'bg-bidq' },
-            I18n.t(r === 1 ? 'bg_ask1' : 'bg_ask2')));
+          // STAGE 6: no question header either (the dealer's bubble already
+          // asks أول؟/ثاني؟ on the felt) — ONLY the available answers, as
+          // wide equal dark pills filling the row. A taken حكم disappears
+          // instead of dimming (Kamelna shows only what you can say).
           var hokumTaken = !!p.pendHokum;
-          var hokumBtn = UI.el('button', { class: 'bg-bid hokum', onclick: function () {
-            if (hokumTaken) return;
-            if (r === 1) doBid('hokum', null);
-            else { st.suitPick = true; paint(); }
-          } }, [
-            UI.el('span', null, I18n.t('bg_hokum')),
-            r === 1 ? UI.el('b', { class: (suitOf(p.flip) === 'H' || suitOf(p.flip) === 'D') ? 'redsuit' : '' }, SUIT_CHAR[suitOf(p.flip)]) : UI.el('b', null, '?')
-          ]);
-          if (hokumTaken) hokumBtn.setAttribute('disabled', 'true');
           var rowKids = [
             UI.el('button', { class: 'bg-bid sun', onclick: function () { doBid('sun'); } }, I18n.t('bg_sun'))
           ];
@@ -2490,7 +2510,15 @@
             rowKids.push(UI.el('button', { class: 'bg-bid ashkal', onclick: function () { doBid('ashkal'); } },
               I18n.t('bg_ashkal')));
           }
-          rowKids.push(hokumBtn);
+          if (!hokumTaken) {
+            rowKids.push(UI.el('button', { class: 'bg-bid hokum', onclick: function () {
+              if (r === 1) doBid('hokum', null);
+              else { st.suitPick = true; paint(); }
+            } }, [
+              UI.el('span', null, I18n.t('bg_hokum')),
+              r === 1 ? UI.el('b', { class: (suitOf(p.flip) === 'H' || suitOf(p.flip) === 'D') ? 'redsuit' : '' }, SUIT_CHAR[suitOf(p.flip)]) : UI.el('b', null, '?')
+            ]));
+          }
           rowKids.push(UI.el('button', { class: 'bg-bid pass', onclick: function () { doBid('pass'); } }, I18n.t('bg_pass')));
           body.appendChild(UI.el('div', { class: 'bg-bidrow' }, rowKids));
         }
@@ -2508,8 +2536,9 @@
       function doubleSheet(p) {
         var cur = (typeof p.mult === 'number') ? p.mult : 1;
         var nextKey = { 1: 'bg_double', 2: 'bg_triple', 3: 'bg_kawra', 4: 'bg_qahwa' }[cur] || 'bg_double';
+        // STAGE 6: no question header (the دبل؟ bubble on the felt asks) —
+        // just the 2 wide dark pills, e.g. «ثري | بس»
         var body = UI.el('div', { class: 'bg-bidbar-in' });
-        body.appendChild(UI.el('div', { class: 'bg-bidq' }, I18n.t('bg_ask_dbl')));
         body.appendChild(UI.el('div', { class: 'bg-bidrow' }, [
           UI.el('button', { class: 'bg-bid dbl', onclick: function () { doDouble('raise'); } }, [
             UI.el('span', null, I18n.t(nextKey)),
@@ -2536,10 +2565,21 @@
           kids.push(UI.el('button', { class: 'bg-abtn gold', onclick: function () { st.modal = 'emotes'; paint(); } },
             I18n.t('bg_emotes')));
         }
-        kids.push(UI.el('span', { class: 'bg-mechip' }, [
+        // STAGE 6: mode/دبل mini chips ride the plate row (Kamelna keeps
+        // «حكم ♦ / قهوة» next to the local player's plate, not in the HUD)
+        modeChips(p).forEach(function (ch) { kids.push(ch); });
+        // STAGE 6: my name PLATE — dark, gold-edged, name + small flame;
+        // my الموزع tag lives here too (my seat chip is just the call area)
+        var meKids = [
           UI.el('span', { class: 'bg-meav' }, UI.initials(me >= 0 ? seatName(me) : (myName || '؟'))),
-          UI.el('span', { class: 'bg-mename' }, me >= 0 ? seatName(me) : (myName || ''))
-        ]));
+          UI.el('span', { class: 'bg-mename' }, me >= 0 ? seatName(me) : (myName || '')),
+          UI.el('span', { class: 'bg-meflame' }, '🔥')
+        ];
+        if (me >= 0 && p.dealer === me && p.phase !== 'lobby' &&
+            p.phase !== 'roundEnd' && p.phase !== 'gameEnd') {
+          meKids.push(UI.el('span', { class: 'bg-tag dealer' }, I18n.t('bg_dealer')));
+        }
+        kids.push(UI.el('span', { class: 'bg-mechip' }, meKids));
         return UI.el('div', { class: 'bg-actionbar' }, kids);
       }
 

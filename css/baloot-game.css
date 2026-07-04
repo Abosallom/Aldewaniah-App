@@ -82,93 +82,109 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
 .bg-lobby-actions { display: flex; gap: 10px; justify-content: center; }
 .bg-danger { color: #b03030 !important; }
 
-/* ---------- STAGE 5: the floating game HUD ---------- */
+/* ---------- STAGE 6: the Kamelna HUD band ----------
+   Small DARK TRANSLUCENT icon-over-label chips on both sides, the
+   لنا/لهم numeric-pill unit (+ «جلسة CODE» beneath) in the center. */
 .bg-hud {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  padding: 4px 10px 6px;
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 8px 6px;
 }
 .bg-hudbtn {
   border: none; cursor: pointer; font: inherit;
-  min-height: 34px; padding: 5px 11px; border-radius: 11px;
-  background: linear-gradient(#3d424b, #23262c); color: #f2ead6;
-  font-size: 12px; font-weight: 800;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 2px 5px rgba(0, 0, 0, .25);
+  display: inline-flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 1px;
+  min-height: 44px; min-width: 46px; padding: 4px 6px; border-radius: 12px;
+  background: linear-gradient(rgba(64, 69, 79, .92), rgba(26, 29, 35, .92));
+  color: #f2ead6;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 2px 5px rgba(0, 0, 0, .25);
   transition: transform .1s ease;
 }
+.bg-hudbtn b { font-size: 15px; line-height: 1; font-weight: 400; }
+.bg-hudbtn span { font-size: 9px; font-weight: 800; line-height: 1.1; }
 .bg-hudbtn:active { transform: scale(.94); }
 .bg-hudbtn.danger { color: #ffb4a6; }
+/* the lobby bar reuses .bg-hudbtn with plain text — keep it usable there */
+.bg-lobbybar .bg-hudbtn { min-width: 0; padding: 6px 14px; font-size: 12px; font-weight: 800; }
 .bg-hudgrow { flex: 1; }
 .bg-hudscore {
   border: none; cursor: pointer; font: inherit;
-  display: inline-flex; flex-direction: column; align-items: center; gap: 1px;
-  padding: 4px 13px; border-radius: 13px;
-  background: linear-gradient(#3d424b, #23262c); color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 2px 5px rgba(0, 0, 0, .25);
+  display: inline-flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 5px 10px; border-radius: 13px;
+  background: linear-gradient(rgba(64, 69, 79, .92), rgba(26, 29, 35, .92)); color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 2px 5px rgba(0, 0, 0, .25);
 }
-.bg-hudrow { display: inline-flex; align-items: baseline; gap: 6px; }
-.bg-hudrow small { font-size: 10px; font-weight: 800; color: rgba(255, 255, 255, .75); }
-.bg-hudrow b { font-size: 16px; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.bg-hudrow b.us { color: #ffe9b0; }
-.bg-hudrow b.them { color: #ffb9ab; }
-.bg-hudsep { width: 1px; height: 12px; background: rgba(255, 255, 255, .28); align-self: center; }
+.bg-hudrow { display: inline-flex; align-items: center; gap: 9px; }
+/* STAGE 6: لنا/لهم as numeric PILLS — tiny label + light oval number */
+.bg-scorepill { display: inline-flex; align-items: center; gap: 4px; }
+.bg-scorepill small { font-size: 10px; font-weight: 800; color: rgba(255, 255, 255, .85); }
+.bg-scorepill b {
+  font-size: 14px; line-height: 1.25; font-variant-numeric: tabular-nums;
+  border-radius: 999px; padding: 1px 9px; min-width: 32px; text-align: center;
+  color: #232830;
+}
+.bg-scorepill b.us { background: #ffe9b0; }
+.bg-scorepill b.them { background: #ffcfc4; }
 .bg-hudsess { font-size: 9px; font-weight: 700; color: rgba(255, 255, 255, .72); letter-spacing: 1.5px; }
 
-/* mode / دبل chips (they sit on the sand backdrop) */
+/* mode / دبل chips — STAGE 6: they ride the bottom plate row (.mini) */
 .bg-chip {
   display: inline-flex; align-items: center; gap: 4px;
   background: #efe9da; color: var(--ink); border: none; cursor: pointer;
   font-size: 12px; font-weight: 800; border-radius: 999px; padding: 5px 11px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, .18);
 }
+.bg-chip.mini { font-size: 10px; padding: 3px 8px; flex: 0 0 auto; cursor: default; }
 .bg-chip-sun { background: linear-gradient(#f3d98c, #e0b95a); color: #5c430e; }
 .bg-chip-hokum { background: linear-gradient(#3f9c68, #1e6b47); color: #fff; }
 .bg-chip-hokum.redsuit { text-shadow: 0 0 2px #fff; }
 .bg-chip-ashkal { background: linear-gradient(#5b8fdf, #2b5aa8); color: #fff; }
 .bg-chip-mult { background: linear-gradient(#d4574a, #8c2f27); color: #fff; }
 
-/* ---------- the board: sadu rug fills the middle, edge-to-edge ----------
-   Maroon wool base + three woven bands. Each band is a pair of conic-
-   gradient triangle strips (down-pointing over up-pointing, offset half a
-   tile) so the two colours interlock into the classic sadu zig-zag,
-   flanked by thin beige/teal weft lines. ::after draws the framed border. */
-.bg-board { position: relative; flex: 1 1 auto; min-height: 230px; }
+/* ---------- the board: Kamelna composition (STAGE 6) ----------
+   The RUG occupies only the MIDDLE BAND of the board — sand shows above
+   (the top player's chip lives there) and below (the call area / my
+   pills). Side chips straddle the rug's left/right edges.
+   Rug pattern: BOLD horizontal bands — thick rust-maroon fields separated
+   by big beige/teal interlocked triangle rows and thin weft stripes.
+   Each triangle row = a pair of conic-gradient strips (down-pointing over
+   up-pointing, offset half a tile). ::after draws the gold/beige frame. */
+.bg-board { position: relative; flex: 1 1 auto; min-height: 300px; }
 .bg-felt {
-  position: absolute; inset: 4px 0;          /* full width under the HUD */
-  border-radius: 10px;
+  position: absolute; inset: 88px 8px 36px;  /* sand above + below the rug */
+  border-radius: 12px;                        /* slightly rounded corners */
   background:
     /* faint horizontal weave texture over everything */
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, .05) 0 1px, transparent 1px 3px),
-    /* band 1 (upper) — teal/navy zig-zag */
-    linear-gradient(#d9c79a, #d9c79a) 0 9% / 100% 3px no-repeat,
-    conic-gradient(from 120deg at 50% 0, #22434f 0 120deg, transparent 120deg) 0 14% / 34px 15px repeat-x,
-    conic-gradient(from -60deg at 50% 100%, #3e7a72 0 120deg, transparent 120deg) 17px 14% / 34px 15px repeat-x,
-    linear-gradient(#22434f, #22434f) 0 19% / 100% 3px no-repeat,
-    /* band 2 (center, widest) — beige/navy zig-zag */
-    linear-gradient(#d9c79a, #d9c79a) 0 44% / 100% 3px no-repeat,
-    conic-gradient(from 120deg at 50% 0, #d9c79a 0 120deg, transparent 120deg) 0 50% / 38px 18px repeat-x,
-    conic-gradient(from -60deg at 50% 100%, #22434f 0 120deg, transparent 120deg) 19px 50% / 38px 18px repeat-x,
-    linear-gradient(#d9c79a, #d9c79a) 0 56% / 100% 3px no-repeat,
-    /* band 3 (lower) — teal/navy zig-zag mirrored */
-    linear-gradient(#22434f, #22434f) 0 81% / 100% 3px no-repeat,
-    conic-gradient(from 120deg at 50% 0, #3e7a72 0 120deg, transparent 120deg) 0 86% / 34px 15px repeat-x,
-    conic-gradient(from -60deg at 50% 100%, #22434f 0 120deg, transparent 120deg) 17px 86% / 34px 15px repeat-x,
-    linear-gradient(#d9c79a, #d9c79a) 0 91% / 100% 3px no-repeat,
-    /* maroon wool base with tonal variation */
-    linear-gradient(180deg, #7c3036, #6b262d 45%, #782e34 70%, #5f2228);
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, .06) 0 1px, transparent 1px 4px),
+    /* band 1 (upper) — big navy/teal triangles between beige stripes */
+    linear-gradient(#d9c79a, #d9c79a) 0 6% / 100% 3px no-repeat,
+    conic-gradient(from 120deg at 50% 0, #1f3d47 0 120deg, transparent 120deg) 0 12% / 56px 26px repeat-x,
+    conic-gradient(from -60deg at 50% 100%, #3e7a6e 0 120deg, transparent 120deg) 28px 12% / 56px 26px repeat-x,
+    linear-gradient(#d9c79a, #d9c79a) 0 18% / 100% 3px no-repeat,
+    /* band 2 (center, boldest) — beige/navy triangles between navy stripes */
+    linear-gradient(#1f3d47, #1f3d47) 0 42% / 100% 4px no-repeat,
+    conic-gradient(from 120deg at 50% 0, #d9c79a 0 120deg, transparent 120deg) 0 50% / 64px 30px repeat-x,
+    conic-gradient(from -60deg at 50% 100%, #1f3d47 0 120deg, transparent 120deg) 32px 50% / 64px 30px repeat-x,
+    linear-gradient(#1f3d47, #1f3d47) 0 58% / 100% 4px no-repeat,
+    /* band 3 (lower) — teal/navy triangles mirrored */
+    linear-gradient(#d9c79a, #d9c79a) 0 82% / 100% 3px no-repeat,
+    conic-gradient(from 120deg at 50% 0, #3e7a6e 0 120deg, transparent 120deg) 0 88% / 56px 26px repeat-x,
+    conic-gradient(from -60deg at 50% 100%, #1f3d47 0 120deg, transparent 120deg) 28px 88% / 56px 26px repeat-x,
+    linear-gradient(#d9c79a, #d9c79a) 0 94% / 100% 3px no-repeat,
+    /* rust-maroon wool base with tonal variation */
+    linear-gradient(180deg, #8a3a2c, #7a2f24 45%, #86382a 70%, #6e2a20);
   box-shadow:
-    inset 0 0 70px rgba(0, 0, 0, .42),
+    inset 0 0 60px rgba(0, 0, 0, .38),
     0 8px 22px rgba(0, 0, 0, .28);
-  overflow: hidden;
 }
-/* the rug's framed border: dark line · tan band · dark line (under seats) */
+/* the rug's frame: thin dark line · gold/beige band · dark line */
 .bg-felt::after {
   content: ''; position: absolute; inset: 0; border-radius: inherit;
   pointer-events: none; z-index: 1;
   box-shadow:
-    inset 0 0 0 3px #4a3220,
-    inset 0 0 0 10px #c9a76b,
-    inset 0 0 0 12px #8a6844,
-    inset 0 0 0 14px rgba(58, 42, 26, .55);
+    inset 0 0 0 2px #4a3220,
+    inset 0 0 0 8px #c9a76b,
+    inset 0 0 0 9px #8a6844,
+    inset 0 0 0 11px rgba(58, 42, 26, .5);
 }
 /* table-lobby rug: back in normal flow */
 .bg-felt-lobby { position: relative; inset: auto; height: clamp(260px, 38vh, 340px); border-radius: 14px; }
@@ -178,7 +194,12 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
   letter-spacing: .06em; pointer-events: none;
 }
 
-/* ---------- seats — sitting ON the rug border (bottom = you) ---------- */
+/* ---------- seats — STAGE 6: Kamelna player chips ----------
+   Rounded-SQUARE avatar in a thin gold frame, card-back fan peeking from
+   BEHIND/ABOVE it, dark gold-edged name plate (white name + small ★)
+   UNDER it. Top chip sits on the sand above the rug; side chips straddle
+   the rug's edges; the bottom "chip" is just the CALL AREA under the rug
+   (my identity lives in the bottom plate row instead). */
 .bg-seat {
   position: absolute; z-index: 5;
   display: flex; flex-direction: column; align-items: center; gap: 2px;
@@ -189,20 +210,35 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
 .bg-pos-t { top: 2px; left: 50%; transform: translateX(-50%); }
 .bg-pos-l { left: 2px; top: 50%; transform: translateY(-50%); }
 .bg-pos-r { right: 2px; top: 50%; transform: translateY(-50%); }
+/* in-game side chips straddle the rug's left/right edges */
+.bg-board .bg-pos-l { left: -6px; }
+.bg-board .bg-pos-r { right: -6px; }
+/* the bottom seat = call area only: pills/bubbles/timer, no identity
+   (my avatar+name live in the bottom plate row — Kamelna composition) */
+.bg-board > .bg-pos-b .bg-avatar { display: none; }
+.bg-board > .bg-pos-b .bg-avatar.bg-timer { display: flex; }
+.bg-board > .bg-pos-b .bg-name,
+.bg-board > .bg-pos-b .bg-tag { display: none; }
 
 .bg-avatar {
-  width: 52px; height: 52px; border-radius: 50%;
+  width: 52px; height: 52px; border-radius: 15px;   /* rounded square */
   background: linear-gradient(#24365c, #131d33); color: #f2ead6;
   display: flex; align-items: center; justify-content: center;
   font-weight: 800; font-size: 17px;
-  border: 2px solid rgba(255, 255, 255, .4);
+  border: 2px solid #d8b25c;                        /* thin gold frame */
   box-shadow: 0 3px 10px rgba(0, 0, 0, .4);
   transition: box-shadow .2s, border-color .2s;
   position: relative; z-index: 2; /* above the card-back fan */
 }
 .bg-avatar.empty {
   background: rgba(255, 255, 255, .1); color: #fff; font-size: 24px;
-  border-style: dashed;
+  border-style: dashed; border-color: rgba(255, 255, 255, .5);
+}
+/* STAGE 6: the turn timer — avatar content REPLACED by a white circle
+   with a big dark countdown number (Kamelna style, no ring overlay) */
+.bg-avatar.bg-timer {
+  border-radius: 50%; background: #fff; color: #232830;
+  font-size: 22px; font-variant-numeric: tabular-nums;
 }
 .bg-seat-empty:hover .bg-avatar { background: rgba(255, 255, 255, .2); }
 .bg-seat.turn .bg-avatar {
@@ -214,22 +250,36 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
   0%, 100% { box-shadow: 0 0 0 3px rgba(194, 160, 80, .4), 0 0 14px rgba(194, 160, 80, .45); }
   50%      { box-shadow: 0 0 0 6px rgba(194, 160, 80, .25), 0 0 22px rgba(194, 160, 80, .65); }
 }
+/* dark name PLATE under the avatar: gold border, white name, small ★ */
 .bg-name {
-  color: #fff; font-size: 12px; font-weight: 700;
-  max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, .5);
+  color: #fff; font-size: 11px; font-weight: 700;
+  background: rgba(12, 15, 22, .85);
+  border: 1px solid rgba(201, 164, 83, .8);
+  border-radius: 9px; padding: 2px 9px;
+  max-width: 108px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.bg-name::before { content: '★ '; color: #f3c94f; font-size: 9px; }
 .bg-tag {
   font-size: 10px; font-weight: 800; color: #0f4630;
   background: var(--gold); border-radius: 999px; padding: 1px 8px;
 }
-.bg-tag.dealer { background: #e9e2d0; }
+/* STAGE 6: الموزع = small YELLOW tag hanging off the dealer's plate */
+.bg-tag.dealer {
+  background: #f7d04a; color: #5a430a; border-radius: 5px;
+  margin-top: -3px; position: relative; z-index: 6;
+}
 .bg-tag.proj { background: #f3d98c; }
+/* STAGE 6: CALL pill — dark, white text, pinned next to the caller's
+   chip; persists until the next phase (emotes stay white + transient) */
 .bg-bidlbl {
-  font-size: 11px; font-weight: 800; color: #ffe9b0;
-  background: rgba(0, 0, 0, .35); border-radius: 999px; padding: 2px 9px;
+  font-size: 12px; font-weight: 800; color: #fff;
+  background: rgba(12, 15, 22, .88); border-radius: 9px; padding: 3px 11px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .3); white-space: nowrap;
   animation: bg-pop .32s cubic-bezier(.3, 1.6, .5, 1); /* STAGE 5: spring pop */
 }
+/* side callers: the pill hangs beside the chip, toward the rug */
+.bg-pos-l .bg-bidlbl { position: absolute; left: calc(100% + 6px); top: 38%; }
+.bg-pos-r .bg-bidlbl { position: absolute; right: calc(100% + 6px); top: 38%; }
 @keyframes bg-pop { from { transform: scale(.4); opacity: 0; } }
 
 /* ---------- playing cards — programmatic SVG faces (STAGE 5) ---------- */
@@ -243,7 +293,9 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
 }
 .bg-pcard.mini { width: 34px; height: 49px; border-radius: 5px; }
 
-/* ---------- my hand: big ARCHED fan (Kamelna proportions) ---------- */
+/* ---------- my hand: HUGE arched fan (STAGE 6: Kamelna proportions —
+   full-width arc, cards ≈ 22-26% of the screen height, heavy overlap so
+   only the big corner indices peek out) ---------- */
 .bg-handarea { padding: 2px 0 0; }
 .bg-banner {
   text-align: center; font-size: 13px; font-weight: 700; color: #6b4d12;
@@ -253,21 +305,21 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
 .bg-banner.tight { margin: 4px 12px; }
 .bg-hand {
   display: flex; justify-content: center; align-items: flex-end;
-  padding: 16px 10px 6px; min-height: 138px;
+  padding: 18px 8px 4px; min-height: 206px;
 }
 .bg-handslot {                                 /* owns the fan-arc transform */
   transform-origin: 50% 130%;
-  margin: 0 -23px; position: relative;
+  margin: 0 -50px; position: relative;
 }
 .bg-hand .bg-pcard {
-  width: 86px; height: 125px; border-radius: 10px; margin: 0;
+  width: 132px; height: 191px; border-radius: 12px; margin: 0;
   box-shadow: 0 3px 9px rgba(0, 0, 0, .35);
   transition: transform .16s ease, opacity .16s ease, box-shadow .16s ease;
 }
 .bg-hand .bg-pcard.playable { cursor: pointer; }
 .bg-hand .bg-pcard.playable:hover,
 .bg-hand .bg-pcard.playable:active {
-  transform: translateY(-20px);
+  transform: translateY(-26px);
   box-shadow: 0 10px 18px rgba(0, 0, 0, .35), 0 0 0 2px var(--gold);
 }
 .bg-handslot:hover { z-index: 40 !important; }
@@ -283,11 +335,13 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
 /* STAGE 5: the SLOT owns the placement transform; the card inside is free
    for the FLIP fly-in / sweep animations (transform never fights CSS). */
 .bg-tslot { position: absolute; left: 50%; top: 50%; }
-.bg-t-b { transform: translate(-50%, -6%); }
-.bg-t-t { transform: translate(-50%, -94%); }
-.bg-t-l { transform: translate(-128%, -50%) rotate(-7deg); }
-.bg-t-r { transform: translate(28%, -50%) rotate(7deg); }
-.bg-tslot .bg-pcard { width: 78px; height: 113px; border-radius: 10px; }
+/* STAGE 6: trick cards CLUSTER near the center with slight offsets and
+   rotations (Kamelna) instead of sitting far apart toward each seat */
+.bg-t-b { transform: translate(-54%, -24%) rotate(3deg); }
+.bg-t-t { transform: translate(-46%, -76%) rotate(-4deg); }
+.bg-t-l { transform: translate(-94%, -56%) rotate(-9deg); }
+.bg-t-r { transform: translate(-6%, -44%) rotate(8deg); }
+.bg-tslot .bg-pcard { width: 72px; height: 104px; border-radius: 10px; }
 
 /* trick sweep FALLBACK (no WAAPI / reduced motion; class on .bg-center) */
 .bg-center[class*="bg-sweep-"] .bg-tslot { transition: transform .5s ease-in, opacity .5s ease-in; }
@@ -305,7 +359,8 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
   font-size: 12px; font-weight: 800; color: #ffe9b0;
   background: rgba(0, 0, 0, .3); border-radius: 999px; padding: 2px 12px;
 }
-.bg-flipwrap .bg-pcard { width: 82px; height: 119px; border-radius: 10px; }
+/* STAGE 6: the مشترى flip ≈ 40% of the rug's height */
+.bg-flipwrap .bg-pcard { width: 83px; height: 120px; border-radius: 10px; }
 .bg-flipcard { box-shadow: 0 4px 18px rgba(0, 0, 0, .45), 0 0 0 2px var(--gold); }
 .bg-turnhint {
   position: absolute; left: 50%; bottom: 22%; transform: translateX(-50%);
@@ -324,14 +379,17 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
 @keyframes bg-flyl { to { transform: translate(-420%, -50%) scale(.5); opacity: 0; } }
 @keyframes bg-flyr { to { transform: translate(320%, -50%) scale(.5); opacity: 0; } }
 
-/* ---------- STAGE 4/5: INLINE bid/دبل bar docked above the fan ---------- */
-.bg-bidbar { display: flex; justify-content: center; margin: 6px 10px 0; }
-.bg-bidbar-in {
-  width: min(100%, 460px);
+/* ---------- STAGE 6: bid/دبل pills docked UNDER the hand fan ----------
+   ONLY the currently-available actions, as 1-3 WIDE dark pills with equal
+   widths filling the row (e.g. «ثري | بس»). No question header — the
+   dealer's bubble on the felt already asks. The dark panel shell remains
+   only around the round-2 suit picker. */
+.bg-bidbar { display: flex; justify-content: center; margin: 4px 10px 0; }
+.bg-bidbar-in { width: 100%; animation: bg-sheet-up .25s ease; }
+.bg-bidbar-in.panel {
   background: linear-gradient(#33373e, #1e2126);
   border-radius: 16px; padding: 10px;
   box-shadow: 0 4px 14px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .08);
-  animation: bg-sheet-up .25s ease;
 }
 @keyframes bg-sheet-up { from { transform: translateY(30px); opacity: 0; } }
 .bg-bidq {
@@ -341,9 +399,12 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
 .bg-bidbar .bg-suitbtn { background: #f7f2e4; border-color: transparent; }
 .bg-bidrow { display: flex; gap: 8px; }
 .bg-bid {
-  flex: 1; min-height: 52px; border: none; border-radius: 14px;
+  flex: 1 1 0; min-width: 0; min-height: 54px; border: none; border-radius: 14px;
   font: inherit; font-size: 18px; font-weight: 800; cursor: pointer;
   display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: linear-gradient(#3f444d, #22252b); color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 3px 9px rgba(0, 0, 0, .3);
   transition: transform .1s ease, filter .1s ease;
   animation: bg-pop .3s cubic-bezier(.3, 1.6, .5, 1) backwards; /* spring in */
 }
@@ -351,15 +412,9 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
 .bg-bidrow .bg-bid:nth-child(3) { animation-delay: .1s; }
 .bg-bidrow .bg-bid:nth-child(4) { animation-delay: .15s; }
 .bg-bid:active { transform: scale(.96); }
-.bg-bid.sun { background: linear-gradient(#e3bd63, #b98f3e); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
-.bg-bid.hokum { background: linear-gradient(#2f8f5b, #1e6b47); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
 .bg-bid.hokum b { font-size: 22px; }
-.bg-bid.hokum b.redsuit { color: #ffb3a7; }
-.bg-bid.ashkal { background: linear-gradient(#4a7fd4, #2b5aa8); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
-.bg-bid.dbl { background: linear-gradient(#d4574a, #a83a2b); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
+.bg-bid.hokum b.redsuit { color: #ff9d8f; }
 .bg-bid.dbl b { font-size: 20px; }
-.bg-bid.pass { background: #e7e2d6; color: #5a564d; }
-.bg-bid[disabled] { opacity: .4; cursor: default; }
 .bg-suitrow { display: flex; gap: 8px; margin-bottom: 10px; }
 .bg-suitbtn {
   flex: 1; min-height: 64px; border: 1.5px solid var(--line); border-radius: 14px;
@@ -455,30 +510,10 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
    STAGE 3 — turn timers, deal & buy animations
    =========================================================== */
 
-/* avatar wrapper: carries the timer ring + the dealer's question bubble */
+/* avatar wrapper: carries the timer + the dealer's question bubble
+   (STAGE 6: the ring overlay is gone — see .bg-avatar.bg-timer) */
 .bg-avwrap { position: relative; }
 .bg-avatar.bot { font-size: 20px; }
-
-/* shrinking turn-timer ring (duration mirrors TURN_MS = 20s in the JS) */
-.bg-ring { position: absolute; inset: -6px; pointer-events: none; z-index: 3; }
-.bg-ring svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
-.bg-ring circle { fill: none; stroke-width: 3.5; }
-.bg-ring .track { stroke: rgba(0, 0, 0, .3); }
-.bg-ring .left {
-  stroke: var(--gold); stroke-linecap: round;
-  stroke-dasharray: 150.8;                 /* 2π · r24 */
-  animation: bg-ringout 20s linear forwards;
-}
-@keyframes bg-ringout { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 150.8; } }
-
-/* numeric countdown inside the turn-timer ring */
-.bg-ringnum {
-  position: absolute; inset: 0; z-index: 4; pointer-events: none;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 50%; background: rgba(10, 14, 22, .5);
-  color: #ffd977; font-weight: 800; font-size: 17px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
-}
 
 /* «أول؟ / ثاني؟ / دبل؟» — the dealer's question on the current bidder */
 .bg-ask {
@@ -516,13 +551,13 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
    STAGE 4/5 — Kamelna look & feel
    =========================================================== */
 
-/* ----- opponents' card-back fans (by each avatar, live count ≤ 8) ----- */
+/* ----- opponents' card-back fans (live count ≤ 8) — STAGE 6: they peek
+   from BEHIND/ABOVE the avatar on EVERY seat (the top chip sits on the
+   sand now, so nothing clips it any more) ----- */
 .bg-fan {
   position: absolute; left: 50%; bottom: calc(100% - 16px);
   width: 0; height: 40px; pointer-events: none; z-index: 1;
 }
-/* top seat: no room above (felt edge) → mirror the fan below the avatar */
-.bg-pos-t .bg-fan { bottom: auto; top: calc(100% - 16px); transform: scaleY(-1); }
 .bg-fancard {
   position: absolute; left: 50%; bottom: 0;
   width: 27px; height: 39px; margin-left: -13.5px;
@@ -578,18 +613,26 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
 }
 .bg-abtn:active { transform: scale(.96); }
 .bg-abtn.gold { background: linear-gradient(#e3bd63, #b98f3e); color: #3d2c07; }
-.bg-mechip { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+/* STAGE 6: my name PLATE — dark, gold-edged, name + small flame icon,
+   inline with the action bar (this IS the bottom player's identity) */
+.bg-mechip {
+  display: inline-flex; align-items: center; gap: 5px; min-width: 0;
+  background: rgba(12, 15, 22, .6);
+  border: 1px solid rgba(201, 164, 83, .5);
+  border-radius: 12px; padding: 3px 7px;
+}
 .bg-meav {
-  flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%;
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 9px;
   background: linear-gradient(#24365c, #131d33); color: #f2ead6;
-  border: 2px solid var(--gold);
+  border: 2px solid #d8b25c;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 13px;
+  font-weight: 800; font-size: 12px;
 }
 .bg-mename {
-  color: #f2ead6; font-size: 12px; font-weight: 700; max-width: 72px;
+  color: #fff; font-size: 12px; font-weight: 700; max-width: 72px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.bg-meflame { font-size: 12px; flex: 0 0 auto; }
 
 /* ----- «قيدها» score-sheet rows ----- */
 .bg-histrow {
@@ -625,29 +668,45 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
 }
 .bg-emote:active { background: #f3d98c; }
 
-/* ---------- mobile portrait tuning (390px is the primary target) ---------- */
+/* ---------- mobile portrait tuning (390×844 is the primary target:
+   rug ≈ 300px tall, hand cards ≈ 190px) ---------- */
 @media (max-width: 430px) {
-  .bg-hudbtn { min-height: 32px; padding: 4px 9px; font-size: 11px; }
-  .bg-hudrow b { font-size: 14px; }
-  .bg-chip { font-size: 11px; padding: 4px 9px; }
-  .bg-board { min-height: 200px; }
+  .bg-hudbtn { min-height: 42px; min-width: 44px; }
+  .bg-scorepill b { font-size: 13px; }
+  .bg-board { min-height: 280px; }
   .bg-pcard { width: 56px; height: 81px; }
   .bg-avatar { width: 46px; height: 46px; font-size: 15px; }
-  .bg-name { max-width: 78px; font-size: 11px; }
+  .bg-avatar.bg-timer { font-size: 20px; }
+  .bg-name { max-width: 88px; }
   .bg-code { font-size: 24px; letter-spacing: 6px; }
-  .bg-bid { min-height: 48px; font-size: 16px; }
-  /* hand fan: 8 cards must fit 390px with the arc */
-  .bg-hand { min-height: 122px; padding: 14px 6px 4px; }
-  .bg-handslot { margin: 0 -20px; }
-  .bg-hand .bg-pcard { width: 74px; height: 107px; }
+  .bg-bid { min-height: 50px; font-size: 17px; }
+  /* hand fan: 8 HUGE cards fit 390px through heavy overlap */
+  .bg-hand { min-height: 200px; padding: 16px 6px 4px; }
+  .bg-handslot { margin: 0 -50px; }
+  .bg-hand .bg-pcard { width: 130px; height: 188px; }
   .bg-tslot .bg-pcard { width: 68px; height: 99px; }
-  .bg-flipwrap .bg-pcard { width: 70px; height: 102px; }
+  .bg-flipwrap .bg-pcard { width: 80px; height: 116px; }
   .bg-fancard { width: 23px; height: 33px; margin-left: -11.5px; }
   .bg-fan { height: 33px; bottom: calc(100% - 14px); }
-  .bg-pos-t .bg-fan { bottom: auto; top: calc(100% - 14px); }
   .bg-abtn { font-size: 13px; min-height: 42px; }
   .bg-mename { max-width: 56px; }
   .bg-say { max-width: 130px; font-size: 11px; }
+}
+
+/* very narrow phones: shrink the fan a notch so 8 cards still fit */
+@media (max-width: 360px) {
+  .bg-hand { min-height: 178px; }
+  .bg-handslot { margin: 0 -46px; }
+  .bg-hand .bg-pcard { width: 116px; height: 168px; }
+}
+
+/* ---------- shorter portrait phones: keep everything on screen ---------- */
+@media (max-height: 740px) {
+  .bg-board { min-height: 240px; }
+  .bg-board .bg-felt { inset: 74px 8px 32px; }  /* game rug only, not the lobby's */
+  .bg-hand { min-height: 158px; padding-top: 12px; }
+  .bg-handslot { margin: 0 -40px; }
+  .bg-hand .bg-pcard { width: 106px; height: 154px; }
 }
 
 /* ---------- short viewports (landscape phones): allow scrolling ---------- */
