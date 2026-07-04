@@ -909,7 +909,11 @@
         bg_nashra_result: 'نتيجة الشراء:', bg_nashra_rabha: 'رابحة',
         bg_nashra_khsrana: 'خسرانة', bg_nashra_score: 'النتيجة',
         bg_versus: 'ضدّ',
-        bg_swapped: 'تم استبدالك مؤقتًا — اضغط للعودة'
+        bg_swapped: 'تم استبدالك مؤقتًا — اضغط للعودة',
+        // ENGINE — لعب فردي (المحرّك المحلي)
+        bg_solo: 'لعب فردي (ضد الكمبيوتر)',
+        bg_solo_hint: 'يبدأ فورًا — أنت لاعب، وثلاثة روبوتات أقوياء. بدون إنترنت.',
+        bg_solo_you: 'أنت', bg_solo_p1: 'سالم', bg_solo_p2: 'فهد', bg_solo_p3: 'ماجد'
       },
       en: {
         bg_title: 'Baloot Online', bg_sub: 'Private Baloot tables — Kamelna rules',
@@ -965,7 +969,11 @@
         bg_nashra_result: 'Buy result:', bg_nashra_rabha: 'Made it',
         bg_nashra_khsrana: 'Fell short', bg_nashra_score: 'Score',
         bg_versus: 'VS',
-        bg_swapped: 'You were temporarily covered — tap to return'
+        bg_swapped: 'You were temporarily covered — tap to return',
+        // ENGINE — solo (local engine)
+        bg_solo: 'Play solo (vs computer)',
+        bg_solo_hint: 'Starts instantly — you plus three strong bots. No internet.',
+        bg_solo_you: 'You', bg_solo_p1: 'Salem', bg_solo_p2: 'Fahad', bg_solo_p3: 'Majed'
       }
     },
 
@@ -1028,11 +1036,18 @@
         shownUs: null, shownThem: null,       // HUD score count-up
         sfxMult: null, sfxPhase: null,        // sound-cue edge detection
         versusShown: '', versusPrevPhase: null, // STAGE 8: «ضدّ» splash once per game
-        swapToastShown: ''                    // STAGE 8: 60s rejoin-grace toast guard
+        swapToastShown: '',                   // STAGE 8: 60s rejoin-grace toast guard
+        // ENGINE: instant local SOLO — the game runs on js/baloot-engine.js
+        soloMode: false, engine: null, soloTimer: null, soloTimer2: null,
+        soloBusy: false, soloHoldTable: null
       };
 
       session = {
         close: function () {
+          st.soloMode = false; st.engine = null;      // ENGINE: stop the solo driver
+          clearTimeout(st.soloTimer); st.soloTimer = null;
+          clearTimeout(st.soloTimer2); st.soloTimer2 = null;
+          st.soloHoldTable = null; st.soloBusy = false;
           try { if (st.pubUnsub) st.pubUnsub(); } catch (e) {}
           Object.keys(st.privSubs).forEach(function (k) { try { st.privSubs[k](); } catch (e) {} });
           st.privSubs = {};
@@ -1192,6 +1207,15 @@
                     'ما شاء الله عليك', 'خذها وانقلع', 'صبر صبر', 'وين المشاريع؟'];
 
       async function sendEmote(text) {
+        if (st.soloMode) {
+          // ENGINE: solo emotes render locally (no Firestore doc to write).
+          if (EMOTES.indexOf(text) < 0) return;
+          st.sayShow = { seat: 0, text: text, until: Date.now() + 3000 };
+          clearTimeout(st.sayTimer);
+          st.sayTimer = setTimeout(function () { st.sayShow = null; paint(); }, 3050);
+          paint();
+          return;
+        }
         var seat = mySeat();
         if (seat < 0 || EMOTES.indexOf(text) < 0) return;   // seated members, fixed list only
         var now = Date.now();
@@ -1236,8 +1260,20 @@
           ]));
         }
 
+        // ENGINE: instant local SOLO — the whole game runs in the browser on
+        // js/baloot-engine.js (zero Firestore, zero network, zero races). The
+        // most prominent CTA: تthe mode the owner tests.
+        if (window.BalootEngine) {
+          root.appendChild(UI.el('div', { class: 'card' }, [
+            UI.el('button', { class: 'btn btn-green btn-block bg-solo-btn', onclick: startSolo },
+              I18n.t('bg_solo')),
+            UI.el('p', { class: 'muted', style: 'text-align:center;margin:6px 0 0;font-size:12px' },
+              I18n.t('bg_solo_hint'))
+          ]));
+        }
+
         root.appendChild(UI.el('div', { class: 'card' }, [
-          UI.el('button', { class: 'btn btn-green btn-block', onclick: createTable }, I18n.t('bg_create'))
+          UI.el('button', { class: 'btn btn-block', onclick: createTable }, I18n.t('bg_create'))
         ]));
 
         var codeIn = UI.el('input', { class: 'fld', maxlength: '4', placeholder: 'K7RD',
@@ -1551,6 +1587,13 @@
       async function doBid(action, chosenSuit, tick, seat) {
         var actSeat = (seat == null) ? (st.pub && st.pub.turn) : seat;
         st.suitPick = false;
+        // ENGINE: solo mode routes straight through the local engine.
+        if (st.soloMode) {
+          var mv = { type: 'bid', a: action };
+          if (action === 'hokum') mv.suit = chosenSuit || (st.engine && suitOf(st.engine.flip));
+          soloHumanMove(mv);
+          return;
+        }
         if (actSeat == null || actSeat < 0 || !mayWriteFor(actSeat)) return;
         try {
           await runTx(async function (tx) {
@@ -1614,6 +1657,9 @@
          player removes the card from their own priv hand doc.
          ====================================================================== */
       async function playCard(seat, card, tick) {
+        // ENGINE: solo mode plays the card through the local engine (validated
+        // there against legalMoves — an illegal tap is a no-op).
+        if (st.soloMode) { soloHumanMove({ type: 'play', card: card }); return; }
         var key = privKey(seat);
         var hand = (st.hands[key] || []).slice();
         if (!mayWriteFor(seat)) return;                   // STAGE 7 · P0-3
@@ -1659,6 +1705,8 @@
         // STAGE 7 · P0-2/P1-4: explicit seat from the caller — a stale
         // st.pub.doubleTurn capture can no longer act for the wrong seat.
         var actSeat = (seat == null) ? (st.pub && st.pub.doubleTurn) : seat;
+        // ENGINE: solo mode routes the دبل decision through the local engine.
+        if (st.soloMode) { soloHumanMove({ type: 'double', a: action }); return; }
         if (actSeat == null || actSeat < 0 || !mayWriteFor(actSeat)) return;
         try {
           await runTx(async function (tx) {
@@ -1711,6 +1759,8 @@
          playing the K/Q) — it is auto-scored and never cancelled.
          ====================================================================== */
       async function declareProject(seat) {
+        // ENGINE: solo mode declares through the local engine.
+        if (st.soloMode) { return soloHumanMove({ type: 'project' }); }
         var hand = (st.hands[privKey(seat)] || []).slice();
         if (hand.length !== 8) return false;           // must act before my first card
         if (!mayWriteFor(seat)) return false;          // STAGE 7 · P0-3
@@ -2202,6 +2252,15 @@
           (roundEnd → dealing) so the 6s auto-advance and a manual tap
           can never double-deal; hostAutomation performs the actual deal. */
       async function nextRound() {
+        // ENGINE: solo advances the engine to the next deal locally.
+        if (st.soloMode) {
+          if (st.engine && st.engine.phase === 'roundEnd') {
+            clearTimeout(st.soloTimer);
+            st.engine = window.BalootEngine.nextRound(st.engine);
+            soloRefresh(true);
+          }
+          return;
+        }
         if (!isHost()) return;
         try {
           await runTx(async function (tx) {
@@ -2214,6 +2273,8 @@
       }
 
       async function newGame() {
+        // ENGINE: solo restarts a fresh local game.
+        if (st.soloMode) { startSolo(); return; }
         if (!isHost()) return;
         try {
           await runTx(async function (tx) {
@@ -2250,6 +2311,196 @@
           navigator.clipboard.writeText(st.code).then(function () { toast(I18n.t('bg_copied')); })
             .catch(function () {});
         } catch (e) {}
+      }
+
+      /* ======================================================================
+         ENGINE · INSTANT LOCAL SOLO MODE
+         The entire game runs IN THE BROWSER on window.BalootEngine — ZERO
+         Firestore, ZERO network, ZERO races/freezes/timer-desync. The player
+         is seat 0; seats 1-3 are the strong AI. We reuse the ENTIRE stage
+         4-8 renderer by projecting the engine state onto the exact `st.pub`
+         + `st.hands` shape the paint code already reads, then intercepting
+         the user's action handlers (doBid/playCard/doDouble/declareProject/
+         nextRound) at the top when st.soloMode is on. AI acts on a short
+         LOCAL timer (600-1100ms) that we fully control.
+         ====================================================================== */
+      var SOLO_KEYS = ['seat0', 'seat1', 'seat2', 'seat3'];
+
+      /** Project the engine state → (st.pub, st.hands). Seat 0 is the human
+          (uid = myUid so mySeat()/controlsSeat(0)/isHost() all resolve); the
+          rest are bot seats (uid:null, bot:true) so isBotSeat()/privKey()
+          route unchanged. The human's hand lives at myUid, bots at seatN. */
+      function soloProject() {
+        var e = st.engine; if (!e) return;
+        var nm = [I18n.t('bg_solo_you'), I18n.t('bg_solo_p1'),
+                  I18n.t('bg_solo_p2'), I18n.t('bg_solo_p3')];
+        var seats = [
+          { uid: myUid, name: (myName || nm[0]) },
+          { uid: null, name: nm[1] + ' 🤖', bot: true },
+          { uid: null, name: nm[2] + ' 🤖', bot: true },
+          { uid: null, name: nm[3] + ' 🤖', bot: true }
+        ];
+        // the engine state IS a superset of pub — copy the fields the
+        // renderer reads (same names), plus the solo-table framing.
+        st.pub = {
+          code: st.code, hostUid: myUid, practice: false, solo: true,
+          seats: seats, bots: { 1: true, 2: true, 3: true },
+          // during the trick-completion hold, keep the phase at 'playing' so
+          // the finished trick shows (with its sweep) BEFORE the النشرة modal
+          // pops; freeze the turn so no input/timer fires meanwhile.
+          phase: st.soloHoldTable ? 'playing' : e.phase,
+          dealer: e.dealer,
+          turn: st.soloHoldTable ? -1 : e.turn,
+          flip: e.flip, bidRound: e.bidRound, bids: e.bids, pendHokum: e.pendHokum,
+          mode: e.mode, trump: e.trump, buyer: e.buyer, buyRound: e.buyRound,
+          table: st.soloHoldTable || e.table,
+          tricksWon: e.tricksWon, lastTrickWinner: e.lastTrickWinner,
+          roundScores: e.roundScores, totals: e.totals,
+          handCounts: e.handCounts, roundNo: e.roundNo,
+          projects: e.projects, declared: e.declared,
+          mult: e.mult, multBy: e.multBy, doubleTurn: e.doubleTurn, doubleLeft: e.doubleLeft,
+          history: e.history, winner: e.winner
+        };
+        // hands: human at uid, bots at seatN (matches privKey()).
+        st.hands = {};
+        st.hands[myUid] = (e.hands[0] || []).slice();
+        for (var i = 1; i < 4; i++) st.hands['seat' + i] = (e.hands[i] || []).slice();
+      }
+
+      /** Start a fresh solo game (instant deal, no lobby, no table code). */
+      function startSolo() {
+        if (!window.BalootEngine) { toast(I18n.t('bg_err')); return; }
+        session.close();                                  // tear down any online table
+        st.soloMode = true;
+        st.code = 'SOLO';
+        st.ref = null; st.pub = null; st.hands = {};
+        st.soloHoldTable = null; st.soloBusy = false;
+        clearTimeout(st.soloTimer); clearTimeout(st.soloTimer2);
+        st.turnSig = ''; st.turnDeadline = 0; st.projDialog = false;
+        st.lastPhase = null; st.dealAnimKey = ''; st.restAnimKey = '';
+        // seed the versus-splash "previous phase" so «ضدّ» shows on the first
+        // solo deal too (it only fires after a pre-deal phase was seen).
+        st.versusShown = ''; st.versusPrevPhase = 'dealing';
+        st.handRound = -1; st.prevHandLen = 0; st.prevSig = ''; st.prevCount = 0;
+        st.shownUs = null; st.shownThem = null; st.sfxMult = null; st.sfxPhase = null;
+        // fresh RNG seed each game; strong AI; human is seat 0
+        var seed = (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0;
+        st.engine = window.BalootEngine.createGame({ seed: seed, aiLevel: 'strong', dealer: 0, humanSeat: 0 });
+        openStage();
+        soloRefresh(true);
+      }
+
+      /** One "snapshot" of solo: project → run all the same per-snapshot
+          hooks the Firestore stream runs (sound/versus/pacing/paint/anim),
+          then schedule the next AI move. Mirrors openTable's onSnapshot. */
+      function soloRefresh(fromDeal) {
+        if (!st.soloMode || !st.engine) return;
+        soloProject();
+        if (st.pub.turn >= 0) st.lastActing = st.pub.turn;
+        try { soundCues(); } catch (e) {}
+        try { versusSplash(); } catch (e) {}
+        try { paint(); } catch (e) {}
+        try { dealAnimations(); } catch (e) {}
+        soloSchedule();
+      }
+
+      /** Schedule the next automatic step: a bot move, trick resolution pause,
+          or the round-end auto-advance. The HUMAN's turn is inviolable — we
+          never auto-act for seat 0 (no timeout in solo; the player has all
+          the time they want, matching Kamelna's single-player feel). */
+      function soloSchedule() {
+        clearTimeout(st.soloTimer); st.soloTimer = null;
+        var e = st.engine; if (!e) return;
+        // trick just completed in the engine? (engine resolves instantly, so
+        // the pause is purely cosmetic — handled by the sweep in paint.)
+        if (e.phase === 'roundEnd') {
+          // auto-advance to the next deal after the النشرة shows (~5s), like
+          // online's 6s host advance — but locally, no transaction.
+          st.soloTimer = setTimeout(function () {
+            if (!st.soloMode || !st.engine || st.engine.phase !== 'roundEnd') return;
+            st.engine = window.BalootEngine.nextRound(st.engine);
+            soloRefresh(true);
+          }, 4200);
+          return;
+        }
+        if (e.phase === 'gameEnd') return;                // wait for «لعبة جديدة»
+        var actor = (e.phase === 'doubling') ? e.doubleTurn : e.turn;
+        if (actor == null || actor < 0) return;
+        if (actor === 0) return;                          // HUMAN — never auto-act
+        // a bot: pick its move on a snappy local timer (bidding is quicker so
+        // the auction doesn't drag; card play a touch slower to stay readable)
+        var delay = (e.phase === 'bidding')
+          ? 380 + Math.floor(Math.random() * 320)         // 380-700ms
+          : 560 + Math.floor(Math.random() * 380);        // 560-940ms
+        st.soloTimer = setTimeout(function () { soloBotStep(actor); }, delay);
+      }
+
+      /** Apply ONE engine move for `seat`, with the trick-completion pause:
+          the engine resolves a full trick INSTANTLY, so before we let the
+          emptied table paint we HOLD the 4 cards on screen (~1.15s) + sweep
+          toward the winner — exactly the readable cadence the online table
+          gives. Returns true if the move committed. */
+      function soloApply(seat, move) {
+        if (!st.soloMode || !st.engine) return false;
+        var e = st.engine;
+        var beforeTable = (e.table || []).slice();
+        var next;
+        try { next = window.BalootEngine.applyMove(e, seat, move); }
+        catch (err) { return false; }                     // illegal → ignore, repaint
+        // did this play COMPLETE a trick? (table had 3, we added the 4th, and
+        // the engine cleared it). If so, hold the finished trick visible.
+        var completed = (move.type === 'play' && beforeTable.length === 3 &&
+                         (next.table || []).length === 0);
+        st.engine = next;
+        if (completed) {
+          var shownTrick = beforeTable.concat([{ seat: seat, card: move.card }]);
+          var winSeat = (next.lastTrickWinner != null) ? next.lastTrickWinner
+                        : winnerOf(shownTrick, e.mode, e.trump).seat;
+          st.soloHoldTable = shownTrick;                  // paint override
+          soloRefresh(false);                              // shows the full trick
+          clearTimeout(st.soloTimer);
+          // snappy but readable: hold the full trick ~0.8s, sweep, then move on
+          st.soloTimer = setTimeout(function () {
+            try { sweepAnim(winSeat); } catch (e2) {}
+          }, 800);
+          st.soloTimer2 = setTimeout(function () {
+            st.soloHoldTable = null;
+            soloRefresh(false);
+          }, 1150);
+          return true;
+        }
+        st.soloHoldTable = null;
+        soloRefresh(false);
+        return true;
+      }
+
+      /** Apply ONE engine move for a bot seat. Guarded against reentry. */
+      function soloBotStep(actor) {
+        if (!st.soloMode || !st.engine || st.soloBusy) return;
+        if (st.soloHoldTable) return;                     // trick-pause in progress
+        var e = st.engine;
+        var cur = (e.phase === 'doubling') ? e.doubleTurn : e.turn;
+        if (cur !== actor || actor === 0) return;         // state moved on / human
+        st.soloBusy = true;
+        try {
+          var mv = window.BalootEngine.aiMove(e, actor);
+          if (mv) soloApply(actor, mv);
+        } catch (err) { try { console.warn('solo bot step failed', err); } catch (e2) {} }
+        st.soloBusy = false;
+      }
+
+      /** Apply ONE engine move for the HUMAN (seat 0). Returns commit bool. */
+      function soloHumanMove(move) {
+        if (!st.soloMode || !st.engine) return false;
+        if (st.soloHoldTable) return false;               // wait out the trick pause
+        var e = st.engine;
+        var actor = (e.phase === 'doubling') ? e.doubleTurn : e.turn;
+        if (move.type === 'project') {
+          if (e.phase !== 'playing' || e.turn !== 0) return false;
+        } else if (actor !== 0) {
+          return false;                                   // not my turn — ignore
+        }
+        return soloApply(0, move);
       }
 
       /* ======================================================================

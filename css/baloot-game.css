@@ -82,6 +82,15 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
 .bg-lobby-actions { display: flex; gap: 10px; justify-content: center; }
 .bg-danger { color: #b03030 !important; }
 
+/* ENGINE: the prominent «لعب فردي» CTA — the solo mode the owner tests.
+   A taller gold-edged green button so it clearly leads the lobby. */
+.bg-solo-btn {
+  font-size: 17px; font-weight: 800; min-height: 54px;
+  box-shadow: 0 3px 12px rgba(30, 107, 71, .35),
+              inset 0 0 0 2px rgba(201, 164, 83, .55);
+}
+.bg-solo-btn::before { content: '🎮 '; }
+
 /* ---------- STAGE 6: the Kamelna HUD band ----------
    Small DARK TRANSLUCENT icon-over-label chips on both sides, the
    لنا/لهم numeric-pill unit (+ «جلسة CODE» beneath) in the center. */
