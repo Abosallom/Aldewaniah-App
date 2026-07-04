@@ -198,6 +198,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ---------- error log (app "black box"; admin-only read) ----------
+    // Any approved member's device can APPEND an error; only the admin
+    // (and the AI health monitor) can read/clear them. No member reads.
+    match /errors/{id} {
+      allow create: if approved();
+      allow read, delete: if isAdmin();
+      allow update: if false;
+    }
+
     // ---------- gift codes (subscription gifts; STRICTLY admin-only) ----------
     match /giftcodes/{id} {
       allow read, write: if isAdmin();

@@ -72,7 +72,10 @@
         adm_gift_msg_head: 'طِرا لمدة شهر — Tira 1 month code', adm_gift_msg_body: '🎁 هديتك من الديوانية — كود الاشتراك:',
         adm_gift_resend: 'إعادة إرسال برسالة محدّثة', adm_gift_resend_confirm: 'سيتم حذف رسالة الهدية القديمة من محادثة كل عضو وإرسال نفس الكود برسالة جديدة. متابعة؟',
         adm_gift_resent: 'تمت إعادة الإرسال لـ {n} عضو ✓',
-        adm_changelog: 'سجل التحديثات', adm_changelog_show: 'عرض سجل التحديثات منذ أول نسخة', adm_changelog_hide: 'إخفاء السجل'
+        adm_changelog: 'سجل التحديثات', adm_changelog_show: 'عرض سجل التحديثات منذ أول نسخة', adm_changelog_hide: 'إخفاء السجل',
+        adm_health: 'صحة التطبيق (المراقب الذكي)', adm_health_ok: 'كل شيء يعمل بشكل سليم',
+        adm_health_found: 'رُصد {e} خطأ تقني و{b} بلاغ من الأعضاء', adm_health_diag: 'حلّل المشاكل بالذكاء',
+        adm_health_clear: 'مسح سجل الأخطاء', adm_health_clear_c: 'مسح جميع الأخطاء المسجّلة؟'
       },
       en: {
         adm_title: 'Admin panel', adm_sub: 'Manage members and join requests', adm_version: 'App version:',
@@ -119,7 +122,10 @@
         adm_gift_msg_head: 'طِرا لمدة شهر — Tira 1 month code', adm_gift_msg_body: '🎁 Your gift from Aldewaniah — subscription code:',
         adm_gift_resend: 'Resend with updated message', adm_gift_resend_confirm: 'The old gift message will be removed from each member\'s chat and the same code re-sent with the new wording. Continue?',
         adm_gift_resent: 'Re-sent to {n} members ✓',
-        adm_changelog: 'Updates log', adm_changelog_show: 'Show updates since the first version', adm_changelog_hide: 'Hide log'
+        adm_changelog: 'Updates log', adm_changelog_show: 'Show updates since the first version', adm_changelog_hide: 'Hide log',
+        adm_health: 'App Health (AI monitor)', adm_health_ok: 'Everything is running fine',
+        adm_health_found: 'Detected {e} technical errors and {b} member reports', adm_health_diag: 'AI-diagnose issues',
+        adm_health_clear: 'Clear error log', adm_health_clear_c: 'Clear all recorded errors?'
       }
     },
 
@@ -235,6 +241,14 @@
         loadReports(repWrap);
       }
 
+      // ---- App Health (admin only) — the AI monitor: errors + AI diagnosis ----
+      if (isAdmin) {
+        view.appendChild(UI.el('h2', { class: 'section-head' }, I18n.t('adm_health')));
+        const hWrap = UI.el('div');
+        view.appendChild(hWrap);
+        loadHealth(hWrap);
+      }
+
       // ---- Updates log (admin only) — app history since the first version ----
       if (isAdmin) {
         view.appendChild(UI.el('h2', { class: 'section-head' }, I18n.t('adm_changelog')));
@@ -305,6 +319,74 @@
             r.reason ? UI.el('div', { style: 'margin-top:4px;line-height:1.6' }, r.reason) : null
           ]));
         });
+      }
+
+      /* ---- App Health: the AI monitor. Reads the `errors` black-box +
+         member bug reports, shows what's happening, and an AI button
+         diagnoses the issues in plain language and proposes fixes. ---- */
+      async function loadHealth(wrap) {
+        wrap.innerHTML = '<div class="muted" style="text-align:center;padding:10px">…</div>';
+        let errs = [], bugs = [];
+        try {
+          const es = await db.collection('errors').orderBy('at', 'desc').limit(60).get();
+          es.forEach((d) => errs.push(d.data()));
+        } catch (e) {}
+        try {
+          const bs = await db.collection('suggestions').where('type', '==', 'bug').limit(30).get();
+          bs.forEach((d) => bugs.push(d.data()));
+        } catch (e) {}
+        wrap.innerHTML = '';
+
+        // group errors by message
+        const groups = {};
+        errs.forEach((e) => { const k = (e.message || '—').slice(0, 80); (groups[k] = groups[k] || { n: 0, e: e }).n++; });
+        const glist = Object.keys(groups).map((k) => ({ k: k, n: groups[k].n, e: groups[k].e }))
+          .sort((a, b) => b.n - a.n);
+
+        // summary strip
+        const okAll = errs.length === 0 && bugs.length === 0;
+        wrap.appendChild(UI.el('div', { class: 'card', style: 'text-align:center;font-weight:700;color:' + (okAll ? '#2e7d4f' : 'var(--maroon)') },
+          okAll ? '✅ ' + I18n.t('adm_health_ok')
+                : '⚠️ ' + I18n.t('adm_health_found').replace('{e}', errs.length).replace('{b}', bugs.length)));
+
+        // AI diagnose button
+        if (window.AI && AI.available()) {
+          const out = UI.el('div', { class: 'card', style: 'display:none;white-space:pre-line;line-height:1.8' });
+          const btn = UI.el('button', { class: 'btn btn-block', onclick: async () => {
+            btn.disabled = true; btn.textContent = '✨ ' + I18n.t('ai_thinking');
+            const top = glist.slice(0, 12).map((g) => (g.n + '×) ' + g.k + (g.e.page ? ' [' + g.e.page + ']' : ''))).join('\n');
+            const bugTxt = bugs.slice(0, 10).map((b) => '- ' + (b.text || '').slice(0, 120)).join('\n');
+            const prompt = 'أنت مهندس يراقب تطبيق الديوانية. هذه أخطاء تقنية تكررت وبلاغات الأعضاء. '
+              + 'لخّص أهم 3 مشاكل فعلية (تجاهل الضجيج) واقترح لكل واحدة سببًا محتملًا وإصلاحًا مختصرًا، بالعربية ونقاط قصيرة.\n\n'
+              + 'الأخطاء:\n' + (top || 'لا يوجد') + '\n\nبلاغات الأعضاء:\n' + (bugTxt || 'لا يوجد');
+            try { const r = await AI.ask(prompt); out.textContent = r; out.style.display = ''; }
+            catch (e) { out.textContent = I18n.t('ai_none'); out.style.display = ''; }
+            btn.disabled = false; btn.textContent = '🤖 ' + I18n.t('adm_health_diag');
+          } }, '🤖 ' + I18n.t('adm_health_diag'));
+          wrap.appendChild(btn);
+          wrap.appendChild(out);
+        }
+
+        // recent error groups
+        if (glist.length) {
+          const clr = UI.el('button', { class: 'btn btn-ghost', style: 'color:var(--maroon);border-color:var(--maroon);margin-top:8px',
+            onclick: () => UI.confirm(I18n.t('adm_health_clear_c'), async () => {
+              try { const snap = await db.collection('errors').limit(300).get();
+                for (const d of snap.docs) await d.ref.delete(); } catch (e) {}
+              loadHealth(wrap);
+            }) }, '🗑️ ' + I18n.t('adm_health_clear'));
+          wrap.appendChild(clr);
+          glist.forEach((g) => {
+            const when = g.e.at && g.e.at.toDate ? g.e.at.toDate().toLocaleDateString(I18n.lang === 'ar' ? 'ar' : 'en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+            wrap.appendChild(UI.el('div', { class: 'card' }, [
+              UI.el('div', { class: 'flex-between' }, [
+                UI.el('div', { style: 'font-weight:700;color:var(--navy);word-break:break-word' }, g.k),
+                UI.el('span', { class: 'nav-badge', style: 'position:static' }, g.n > 9 ? '9+' : String(g.n))
+              ]),
+              UI.el('div', { class: 'card-meta' }, (g.e.page ? '📄 ' + g.e.page + ' · ' : '') + (g.e.version || '') + (when ? ' · ' + when : ''))
+            ]));
+          });
+        }
       }
 
       /* ---- Updates log: the app's story since v1 (static, newest first) ---- */
