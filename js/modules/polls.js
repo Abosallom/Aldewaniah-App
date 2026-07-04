@@ -21,14 +21,16 @@
         pl_new: 'استطلاع جديد', pl_q: 'السؤال (مثال: وين نتعشّى؟)', pl_opt: 'خيار',
         pl_addopt: '+ إضافة خيار', pl_create: 'نشر الاستطلاع', pl_votes: 'صوت', pl_novotes: 'لا أصوات بعد',
         pl_empty: 'لا توجد استطلاعات — أنشئ واحدًا', pl_close: 'إغلاق', pl_closed: 'مغلق', pl_open: 'إعادة فتح',
-        pl_del: 'حذف هذا الاستطلاع؟', pl_by: 'أنشأه', pl_need: 'اكتب السؤال وخيارين على الأقل'
+        pl_del: 'حذف هذا الاستطلاع؟', pl_by: 'أنشأه', pl_need: 'اكتب السؤال وخيارين على الأقل',
+        pl_ai_opts: 'اقترح خيارات', pl_ai_needq: 'اكتب السؤال أولاً'
       },
       en: {
         pl_title: 'Polls', pl_sub: 'Quick group votes', pl_locked: 'Members only',
         pl_new: 'New poll', pl_q: 'Question (e.g. Where to eat?)', pl_opt: 'Option',
         pl_addopt: '+ Add option', pl_create: 'Post poll', pl_votes: 'votes', pl_novotes: 'No votes yet',
         pl_empty: 'No polls yet — create one', pl_close: 'Close', pl_closed: 'Closed', pl_open: 'Reopen',
-        pl_del: 'Delete this poll?', pl_by: 'by', pl_need: 'Add a question and at least two options'
+        pl_del: 'Delete this poll?', pl_by: 'by', pl_need: 'Add a question and at least two options',
+        pl_ai_opts: 'Suggest options', pl_ai_needq: 'Type the question first'
       }
     },
 
@@ -57,8 +59,36 @@
       addOptInput(); addOptInput();
       const addOptBtn = UI.el('button', { class: 'btn btn-ghost pl-addopt', onclick: () => addOptInput() }, I18n.t('pl_addopt'));
       const createBtn = UI.el('button', { class: 'btn btn-block', onclick: create }, I18n.t('pl_create'));
+
+      /* ---- AI: suggest poll options from the typed question ---- */
+      const aiErr = UI.el('div', { class: 'ai-mini-err' });
+      let aiRow = null;
+      if (window.AI && AI.available()) {
+        const aiBtn = AI.button(
+          () => (q.value || '').trim(),
+          (reply, btn) => {
+            aiErr.textContent = '';
+            if (!(q.value || '').trim()) { aiErr.textContent = I18n.t('pl_ai_needq'); return; }
+            if (reply == null) { aiErr.textContent = I18n.t('ai_none'); return; }
+            const ideas = String(reply).split('\n')
+              .map((s) => s.replace(/^[\s\-\d.،،)\]]+/, '').trim())
+              .filter(Boolean).slice(0, 5);
+            if (!ideas.length) { aiErr.textContent = I18n.t('ai_none'); return; }
+            // fill option inputs, growing up to the max of 5, without overwriting a filled option
+            ideas.forEach((idea) => {
+              let target = [...opts.querySelectorAll('.pl-optin')].find((i) => !(i.value || '').trim());
+              if (!target && opts.children.length < 5) { addOptInput(); target = opts.lastChild; }
+              if (target) target.value = idea;
+            });
+          },
+          I18n.t('pl_ai_opts'),
+          { system: 'أنت تساعد مجموعة أصدقاء (ديوانية) على إنشاء تصويت. أعطِ خيارات قصيرة جدًا، كل خيار في سطر، بدون ترقيم.' }
+        );
+        aiRow = UI.el('div', { class: 'ai-mini-row' }, [aiBtn, aiErr]);
+      }
+
       view.appendChild(UI.el('div', { class: 'card pl-form' }, [
-        UI.el('div', { class: 'sp-title2' }, I18n.t('pl_new')), q, opts, addOptBtn, createBtn
+        UI.el('div', { class: 'sp-title2' }, I18n.t('pl_new')), q, opts, addOptBtn, aiRow, createBtn
       ]));
 
       const listWrap = UI.el('div', { class: 'pl-list' });

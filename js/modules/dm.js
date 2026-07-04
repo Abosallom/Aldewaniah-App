@@ -29,7 +29,8 @@
       dm_reported: 'تم الإبلاغ، شكرًا لك ✅', dm_report_fail: 'تعذّر الإبلاغ، حاول لاحقًا',
       dm_as_admin: 'إرسال كإدارة', dm_as_admin_on: 'كإدارة ✓',
       dm_send_as_q: 'إرسال الرسالة بصفة…', dm_send_admin: 'الإدارة (رسالة رسمية)', dm_send_member: '{name} (عضو)',
-      dm_copy: 'انسخ', dm_copied: 'نُسخ'
+      dm_copy: 'انسخ', dm_copied: 'نُسخ',
+      dm_ai_reply: 'اقتراح رد', dm_ai_norecv: 'لا توجد رسالة للرد عليها'
     },
     en: {
       dm_title: 'Private messages', dm_new: '✉️ New message', dm_pick: 'Pick a member',
@@ -40,7 +41,8 @@
       dm_reported: 'Reported, thank you ✅', dm_report_fail: 'Could not report, try later',
       dm_as_admin: 'Send as Admin', dm_as_admin_on: 'As Admin ✓',
       dm_send_as_q: 'Send this message as…', dm_send_admin: 'Admin (official message)', dm_send_member: '{name} (member)',
-      dm_copy: 'Copy', dm_copied: 'Copied'
+      dm_copy: 'Copy', dm_copied: 'Copied',
+      dm_ai_reply: 'Suggest reply', dm_ai_norecv: 'No message to reply to'
     }
   });
 
@@ -209,7 +211,7 @@
     const d = db();
     const tRef = d.collection('dms').doc(tid);
     const signedUrls = {};
-    let atBottom = true, renderedKeys = [], otherName = '—', officialThread = false;
+    let atBottom = true, renderedKeys = [], otherName = '—', officialThread = false, lastRecvText = '';
 
     const screen = UI.el('div', { class: 'chat-screen' });
     view.appendChild(screen);
@@ -253,7 +255,25 @@
     const input = UI.el('input', { class: 'chat-input', type: 'text', placeholder: I18n.t('dm_ph'), maxlength: '500', enterkeyhint: 'send' });
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); sendText(); } });
     const sendBtn = UI.el('button', { class: 'btn btn-green chat-send', onclick: sendText }, I18n.t('dm_send'));
-    screen.appendChild(UI.el('div', { class: 'chat-bar' }, [photoBtn, photoFile, input, sendBtn]));
+
+    /* small ✨ that drafts ONE quick reply to the last received message
+       and fills the input (never auto-sends). Members only. */
+    let aiReplyBtn = null;
+    if (window.AI && AI.available()) {
+      aiReplyBtn = UI.el('button', { class: 'chat-photo ai-mini-icon', type: 'button', title: I18n.t('dm_ai_reply'),
+        onclick: async () => {
+          if (!lastRecvText) { input.placeholder = I18n.t('dm_ai_norecv'); return; }
+          const orig = aiReplyBtn.textContent; aiReplyBtn.disabled = true; aiReplyBtn.textContent = '…';
+          try {
+            const r = await AI.ask('اقترح ردًا واحدًا قصيرًا ومهذبًا على هذه الرسالة:\n' + lastRecvText,
+              { system: 'أنت تقترح ردًا واحدًا قصيرًا جدًا ومهذبًا بنفس لغة الرسالة، بدون مقدمات ولا علامات اقتباس.' });
+            if (r) { input.value = String(r).trim().replace(/^["'«»]+|["'«»]+$/g, '').slice(0, 500); input.focus(); }
+            else input.placeholder = I18n.t('ai_none');
+          } catch (e) { input.placeholder = I18n.t('ai_none'); }
+          aiReplyBtn.disabled = false; aiReplyBtn.textContent = orig;
+        } }, '✨');
+    }
+    screen.appendChild(UI.el('div', { class: 'chat-bar' }, [photoBtn, photoFile, aiReplyBtn, input, sendBtn]));
 
     list.innerHTML = '<div class="muted" style="text-align:center;padding:14px">…</div>';
 
@@ -339,6 +359,8 @@
     try {
       unsubThread = tRef.collection('msgs').orderBy('at', 'desc').limit(100).onSnapshot(async (snap) => {
         const docs = []; snap.forEach((x) => docs.push({ id: x.id, m: x.data() })); docs.reverse();
+        // remember the newest message received FROM the other member (for AI quick-reply)
+        for (let i = docs.length - 1; i >= 0; i--) { const mm = docs[i].m; if (mm.uid !== me && mm.text) { lastRecvText = mm.text; break; } }
         await signKeys(docs.map((x) => x.m.imageKey).filter(Boolean));
         const keys = docs.map((x) => x.id);
         let prefix = renderedKeys.length > 0 && renderedKeys.length < keys.length;

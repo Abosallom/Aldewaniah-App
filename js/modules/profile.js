@@ -27,7 +27,7 @@
         pr_no_info: 'لم يضِف هذا العضو معلومات بعد', pr_close: 'إغلاق',
         pr_edit_one: 'تعديل', pr_delete: 'حذف', pr_del_confirm: 'حذف ملف هذا العضو؟',
         pr_report: 'إبلاغ', pr_reported: 'تم الإبلاغ، شكرًا لك ✅', pr_report_fail: 'تعذّر الإبلاغ، حاول لاحقًا',
-        pr_msg: 'مراسلة'
+        pr_msg: 'مراسلة', pr_ai_bio: 'اكتب نبذة'
       },
       en: {
         pr_title: 'Members', pr_sub: 'Meet the Dewaniah members', pr_mine: 'My profile',
@@ -38,7 +38,7 @@
         pr_no_info: "This member hasn't added any info yet", pr_close: 'Close',
         pr_edit_one: 'Edit', pr_delete: 'Delete', pr_del_confirm: "Delete this member's profile?",
         pr_report: 'Report', pr_reported: 'Reported, thank you ✅', pr_report_fail: 'Could not report, try later',
-        pr_msg: 'Message'
+        pr_msg: 'Message', pr_ai_bio: 'Write a bio'
       }
     },
 
@@ -173,12 +173,39 @@
         const hobbies = UI.el('input', { class: 'fld', value: cur.hobbies || '', maxlength: '80' });
         const bio = UI.el('textarea', { class: 'fld', maxlength: '300' }); bio.value = cur.bio || '';
 
+        /* ---- AI: draft a short friendly bio from name/hobbies ---- */
+        const bioErr = UI.el('div', { class: 'ai-mini-err' });
+        let bioAiRow = null;
+        if (window.AI && AI.available()) {
+          const bioBtn = AI.button(
+            () => {
+              const nm = (name.value || '').trim();
+              const hb = (hobbies.value || '').trim();
+              const sy = (saying.value || '').trim();
+              return 'اكتب نبذة قصيرة ودّية (جملتان كحد أقصى) لعضو ديوانية.'
+                + (nm ? ' الاسم: ' + nm + '.' : '')
+                + (hb ? ' الهوايات: ' + hb + '.' : '')
+                + (sy ? ' مقولته: ' + sy + '.' : '');
+            },
+            (reply, btn) => {
+              bioErr.textContent = '';
+              if (reply == null) { bioErr.textContent = I18n.t('ai_none'); return; }
+              const clean = String(reply).trim();
+              if (clean) bio.value = clean.slice(0, 300);
+              else bioErr.textContent = I18n.t('ai_none');
+            },
+            I18n.t('pr_ai_bio'),
+            { system: 'أنت تكتب نبذة تعريفية قصيرة ودّية، جملتان كحد أقصى، بنفس اللغة، دون مبالغة.' }
+          );
+          bioAiRow = UI.el('div', { class: 'ai-mini-row', style: 'margin-top:6px' }, [bioBtn, bioErr]);
+        }
+
         const fieldsWrap = UI.el('div', null, [
           UI.el('div', { class: 'prof-photo-row' }, [preview, photoBtn, file]),
           UI.el('div', { class: 'field' }, [UI.el('label', null, I18n.t('pr_name')), name]),
           UI.el('div', { class: 'field' }, [UI.el('label', null, I18n.t('pr_saying')), saying]),
           UI.el('div', { class: 'field' }, [UI.el('label', null, I18n.t('pr_hobbies')), hobbies]),
-          UI.el('div', { class: 'field' }, [UI.el('label', null, I18n.t('pr_bio')), bio])
+          UI.el('div', { class: 'field' }, [UI.el('label', null, I18n.t('pr_bio')), bio, bioAiRow])
         ]);
         const err = UI.el('p', { class: 'auth-err' });
         const saveBtn = UI.el('button', { class: 'btn', onclick: save }, I18n.t('pr_save'));

@@ -22,7 +22,7 @@
         fb_ph_bug: 'صف المشكلة: ماذا كنت تفعل؟ ماذا حدث؟ في أي صفحة؟',
         fb_send: 'إرسال للمشرف', fb_sent: 'وصلت رسالتك للمشرف، شكرًا لك ✅',
         fb_err: 'تعذّر الإرسال، حاول مرة أخرى', fb_locked: 'هذا القسم للأعضاء فقط',
-        fb_empty: 'اكتب رسالتك أولاً'
+        fb_empty: 'اكتب رسالتك أولاً', fb_ai_improve: 'حسّن الصياغة'
       },
       en: {
         fb_title: 'Suggestion or bug report', fb_sub: 'Goes straight to the admin',
@@ -31,7 +31,7 @@
         fb_ph_bug: 'Describe the problem: what were you doing? what happened? which page?',
         fb_send: 'Send to admin', fb_sent: 'Delivered to the admin, thank you ✅',
         fb_err: 'Could not send, try again', fb_locked: 'Members only',
-        fb_empty: 'Write your message first'
+        fb_empty: 'Write your message first', fb_ai_improve: 'Improve wording'
       }
     },
 
@@ -76,9 +76,27 @@
         send.disabled = false;
       } }, I18n.t('fb_send'));
 
+      /* ---- AI: rewrite the current text more clearly ---- */
+      let aiRow = null;
+      if (window.AI && AI.available()) {
+        const aiBtn = AI.button(
+          () => (ta.value || '').trim(),
+          (reply, btn) => {
+            if (!(ta.value || '').trim()) { msg.textContent = I18n.t('fb_empty'); return; }
+            if (reply == null) { msg.textContent = I18n.t('ai_none'); return; }
+            const clean = String(reply).trim();
+            if (clean) { ta.value = clean.slice(0, 600); msg.textContent = ''; }
+            else msg.textContent = I18n.t('ai_none');
+          },
+          I18n.t('fb_ai_improve'),
+          { system: 'أعد صياغة النص التالي بشكل واضح ومهذب باختصار، بنفس اللغة، دون إضافة معلومات.' }
+        );
+        aiRow = UI.el('div', { class: 'ai-mini-row', style: 'margin-top:8px' }, [aiBtn]);
+      }
+
       view.appendChild(UI.el('div', { class: 'card' }, [
         UI.el('div', { class: 'chat-seg', style: 'margin-bottom:10px' }, [sB, bB]),
-        ta, send, msg
+        ta, aiRow, send, msg
       ]));
     }
   });

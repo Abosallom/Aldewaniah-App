@@ -149,6 +149,49 @@
     if (window.I18n && I18n.onChange) I18n.onChange(ensureFab);
   }
 
+  /* ---- Reusable AI helper for OTHER modules ----
+     window.AI.ask(prompt, {system}) → Promise<string reply>
+     window.AI.available() → bool (member + signed in)
+     window.AI.button(getPrompt, onReply, label) → a ✨ button node
+     Lets any feature embed a one-tap AI action (suggest poll options,
+     draft an event, summarize chat, etc.) using the same worker. */
+  async function ask(prompt, opts) {
+    opts = opts || {};
+    const msgs = [];
+    if (opts.system) msgs.push({ role: 'system', content: opts.system });
+    msgs.push({ role: 'user', content: String(prompt || '') });
+    const tk = await firebase.auth().currentUser.getIdToken();
+    const res = await fetch(AI_WORKER + '/chat', {
+      method: 'POST', headers: { Authorization: 'Bearer ' + tk, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: msgs })
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j.reply) throw new Error(j.error || 'ai');
+    return j.reply;
+  }
+  function aiButton(getPrompt, onReply, label, opts) {
+    const b = UI.el('button', { class: 'btn btn-ghost ai-mini', onclick: async () => {
+      if (!isMember()) return;
+      const orig = b.textContent; b.disabled = true; b.textContent = '✨ ' + I18n.t('ai_thinking');
+      try { const r = await ask(getPrompt(), opts); onReply(r, b); }
+      catch (e) { onReply(null, b); }
+      b.disabled = false; b.textContent = orig;
+    } }, '✨ ' + (label || I18n.t('ai_help')));
+    return b;
+  }
+
+  I18n.extend({
+    ar: { ai_help: 'مساعدة ذكية', ai_suggest_ideas: 'اقترح أفكارًا', ai_improve: 'حسّن الصياغة',
+      ai_none: 'لا يوجد رد، حاول مجددًا' },
+    en: { ai_help: 'AI help', ai_suggest_ideas: 'Suggest ideas', ai_improve: 'Improve wording',
+      ai_none: 'No reply, try again' }
+  });
+
+  window.AI = {
+    ask: ask,
+    available: function () { return isMember() && !!(window.firebase && firebase.auth && firebase.auth().currentUser); },
+    button: aiButton
+  };
   window.AIAssistant = { refresh: ensureFab };
   if (document.readyState !== 'loading') init();
   else document.addEventListener('DOMContentLoaded', init);

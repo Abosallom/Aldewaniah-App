@@ -31,13 +31,13 @@
         cal_title: 'التقويم', cal_sub: 'مناسبات ومواعيد الديوانية', cal_locked: 'هذا القسم للأعضاء فقط',
         cal_new: 'إضافة مناسبة', cal_name: 'العنوان (مثال: عشاء الديوانية)', cal_note: 'تفاصيل (اختياري)',
         cal_add: 'إضافة', cal_empty: 'لا توجد مناسبات قادمة', cal_today: 'اليوم', cal_del: 'حذف هذه المناسبة؟',
-        cal_by: 'أضافها'
+        cal_by: 'أضافها', cal_ai: 'اقترح مناسبة'
       },
       en: {
         cal_title: 'Calendar', cal_sub: 'Shared events & dates', cal_locked: 'Members only',
         cal_new: 'Add event', cal_name: 'Title (e.g. Dewaniah dinner)', cal_note: 'Details (optional)',
         cal_add: 'Add', cal_empty: 'No upcoming events', cal_today: 'Today', cal_del: 'Delete this event?',
-        cal_by: 'by'
+        cal_by: 'by', cal_ai: 'Suggest an event'
       }
     },
 
@@ -59,9 +59,31 @@
       const time = UI.el('input', { class: 'fld', type: 'time' });
       const note = UI.el('input', { class: 'fld', type: 'text', placeholder: I18n.t('cal_note'), maxlength: '120' });
       const addBtn = UI.el('button', { class: 'btn btn-block', onclick: add }, I18n.t('cal_add'));
+
+      /* ---- AI: suggest an event idea (title + one-line note) ---- */
+      const aiErr = UI.el('div', { class: 'ai-mini-err' });
+      let aiRow = null;
+      if (window.AI && AI.available()) {
+        const aiBtn = AI.button(
+          () => 'اقترح فكرة مناسبة أو لقاء لمجموعة أصدقاء. أعطِ العنوان في السطر الأول، وملاحظة قصيرة في السطر الثاني.',
+          (reply, btn) => {
+            aiErr.textContent = '';
+            if (reply == null) { aiErr.textContent = I18n.t('ai_none'); return; }
+            const lines = String(reply).split('\n')
+              .map((s) => s.replace(/^[\s\-*•\d.،)\]:]+/, '').trim()).filter(Boolean);
+            if (!lines.length) { aiErr.textContent = I18n.t('ai_none'); return; }
+            if (!(title.value || '').trim()) title.value = (lines[0] || '').slice(0, 70);
+            if (!(note.value || '').trim() && lines[1]) note.value = lines[1].slice(0, 120);
+          },
+          I18n.t('cal_ai'),
+          { system: 'أنت تساعد مجموعة أصدقاء (ديوانية) على اقتراح مناسبة أو لقاء. أعطِ فكرة واحدة قصيرة جدًا: عنوان في سطر ثم ملاحظة في سطر، بدون ترقيم.' }
+        );
+        aiRow = UI.el('div', { class: 'ai-mini-row' }, [aiBtn, aiErr]);
+      }
+
       view.appendChild(UI.el('div', { class: 'card cal-form' }, [
         UI.el('div', { class: 'sp-title2' }, I18n.t('cal_new')),
-        title, UI.el('div', { class: 'cal-row2' }, [date, time]), note, addBtn
+        title, UI.el('div', { class: 'cal-row2' }, [date, time]), note, aiRow, addBtn
       ]));
 
       const listWrap = UI.el('div', { class: 'cal-list' });

@@ -879,6 +879,7 @@
         bg_suit_S: 'سبيت', bg_suit_H: 'هاص', bg_suit_D: 'ديمن', bg_suit_C: 'كلفس',
         bg_spectator: 'تشاهد الطاولة (المقاعد ممتلئة)', bg_full: 'المقاعد ممتلئة',
         bg_ashkal: 'أشكل',
+        bg_coach: 'المدرب', bg_coach_bid: 'المدرب يقترح:', bg_coach_play: 'المدرب يقترح لعب:',
         bg_project: 'مشروع', bg_projects: 'المشاريع',
         bg_proj_cancelled: 'ملغي', bg_tap_close: 'اضغط للمتابعة',
         bg_proj_sira: 'سرا', bg_proj_50: 'خمسين', bg_proj_100: 'مية',
@@ -939,6 +940,7 @@
         bg_suit_S: 'Spades', bg_suit_H: 'Hearts', bg_suit_D: 'Diamonds', bg_suit_C: 'Clubs',
         bg_spectator: 'Watching (seats are full)', bg_full: 'Seats are full',
         bg_ashkal: 'Ashkal',
+        bg_coach: 'Coach', bg_coach_bid: 'Coach suggests:', bg_coach_play: 'Coach suggests playing:',
         bg_project: 'Project', bg_projects: 'Projects',
         bg_proj_cancelled: 'Cancelled', bg_tap_close: 'Tap to continue',
         bg_proj_sira: 'Sira', bg_proj_50: 'Fifty', bg_proj_100: 'Hundred',
@@ -1194,6 +1196,7 @@
          royal courts. isRed/SUIT_CHAR stay for text labels elsewhere. */
       function cardEl(card, cls) {
         var el = UI.el('div', { class: 'bg-pcard' + (cls ? ' ' + cls : '') });
+        el.setAttribute('data-card', card);            // for the AI coach highlight
         el.style.backgroundImage = cardFaceURI(card);
         return el;
       }
@@ -3138,6 +3141,39 @@
       /* Kamelna's dark bar under the hand: «قيدها» (score sheet) ·
          «المشاريع» (this round's projects) · «تعابير» (emote picker) +
          the local player's name chip. Spectators get no emote button. */
+      /* AI COACH — ask the engine's own AI what it would do on my turn,
+         then flash a hint (a toast + highlight the suggested card). */
+      function aiHint() {
+        try {
+          if (!(st.soloMode && st.engine && window.BalootEngine)) return;
+          var me = mySeat();
+          if (me < 0 || st.engine.turn !== me) return;
+          var mv = BalootEngine.aiMove(st.engine, me);
+          if (!mv) return;
+          var txt = '';
+          if (st.engine.phase === 'bidding') {
+            var lbl = { sun: I18n.t('bg_sun'), hokum: I18n.t('bg_hokum'), ashkal: I18n.t('bg_ashkal'), pass: I18n.t('bg_pass') };
+            txt = I18n.t('bg_coach_bid') + ' ' + (lbl[mv.bid || mv.type] || (mv.bid || '—'));
+          } else if (mv.card) {
+            txt = I18n.t('bg_coach_play') + ' ' + cardLabel(mv.card);
+            // glow the suggested card in the fan
+            try {
+              var el = document.querySelector('.bg-hand .bg-pcard[data-card="' + mv.card + '"]');
+              if (el) { el.classList.add('bg-hint'); setTimeout(function () { el.classList.remove('bg-hint'); }, 2200); }
+            } catch (e) {}
+          }
+          swapToast(txt);   // reuse the existing transient toast
+        } catch (e) {}
+      }
+      function cardLabel(c) {
+        // c like "10H" / "AS" → "10♥" / "A♠"
+        try {
+          var s = c.slice(-1), r = c.slice(0, -1);
+          var sym = { S: '♠', H: '♥', D: '♦', C: '♣' }[s] || s;
+          return r + sym;
+        } catch (e) { return c; }
+      }
+
       function actionBar(p) {
         var me = mySeat();
         var kids = [
@@ -3149,6 +3185,14 @@
         if (me >= 0) {
           kids.push(UI.el('button', { class: 'bg-abtn gold', onclick: function () { st.modal = 'emotes'; paint(); } },
             I18n.t('bg_emotes')));
+        }
+        // AI COACH — suggest the player's best move via the engine's own AI.
+        // Solo only (needs the live engine state + it's my genuine turn).
+        if (st.soloMode && st.engine && window.BalootEngine && me >= 0
+            && st.engine.turn === me
+            && (st.engine.phase === 'bidding' || st.engine.phase === 'playing')) {
+          kids.push(UI.el('button', { class: 'bg-abtn bg-coach', onclick: function () { aiHint(); } },
+            '🤖 ' + I18n.t('bg_coach')));
         }
         // STAGE 6: mode/دبل mini chips ride the plate row (Kamelna keeps
         // «حكم ♦ / قهوة» next to the local player's plate, not in the HUD)

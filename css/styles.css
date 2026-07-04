@@ -1105,3 +1105,8 @@ input, textarea, .chat-text, .gift-code-txt, .dm-code-txt{
 @media (prefers-reduced-motion: reduce){
   .pop-in, .nav-item.active svg, .modal-backdrop{ animation:none !important; }
 }
+/* ---- inline AI helper buttons in member forms ---- */
+.ai-mini{ font-size:.85rem; padding:7px 12px; }
+.ai-mini-row{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:8px 0; }
+.ai-mini-err{ font-size:.82rem; color:var(--maroon,#7a2230); }
+.ai-mini-icon{ font-size:1.1rem; line-height:1; }

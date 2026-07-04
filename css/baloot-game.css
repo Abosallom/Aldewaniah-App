@@ -893,3 +893,9 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
   touch-action: manipulation;
 }
 .bg-stage { overscroll-behavior: none; }
+
+/* AI coach button + suggested-card glow */
+.bg-abtn.bg-coach{ background:linear-gradient(160deg,#2b6f5a,#1f5344); color:#fff; }
+.bg-pcard.bg-hint{ box-shadow:0 0 0 3px #C2A050, 0 0 18px 4px rgba(194,160,80,.7);
+  animation:bgHintPulse .6s ease-in-out 3; z-index:5; }
+@keyframes bgHintPulse{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-10px); } }
