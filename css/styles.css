@@ -1051,3 +1051,16 @@ html{ scroll-behavior:smooth; }
 .dm-ask-title{ text-align:center; font-weight:800; color:var(--navy); padding:10px 0 4px; }
 .chat-sheet-it.dm-ask-admin{ background:linear-gradient(160deg,var(--maroon),#5a252c); color:#fff;
   border-color:var(--gold); font-weight:800; }
+
+/* one-tap copy chip for codes inside chat/DM bubbles */
+.dm-code-chip{ display:flex; width:100%; align-items:center; justify-content:space-between; gap:8px;
+  margin:6px 0; background:rgba(255,255,255,.92); border:1.5px dashed var(--gold); border-radius:10px;
+  padding:10px 12px; cursor:pointer; font-family:inherit; min-height:46px;
+  transition:background .15s, transform .1s; }
+.dm-code-chip:active{ transform:scale(.98); }
+.dm-code-chip.copied{ background:#e8f6ec; border-color:#2e7d4f; }
+.dm-code-txt{ font-family:ui-monospace,Menlo,Consolas,monospace; direction:ltr; unicode-bidi:embed;
+  font-weight:800; font-size:clamp(.78rem,3.2vw,.98rem); letter-spacing:.8px; color:var(--navy);
+  word-break:break-all; text-align:left; }
+.dm-code-hint{ flex:0 0 auto; font-size:.7rem; font-weight:800; color:var(--ink-soft); white-space:nowrap; }
+.dm-code-chip.copied .dm-code-hint{ color:#2e7d4f; }

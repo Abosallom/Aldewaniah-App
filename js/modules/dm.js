@@ -28,7 +28,8 @@
       dm_report: 'إبلاغ', dm_block: 'حظر هذا العضو', dm_cancel: 'إلغاء',
       dm_reported: 'تم الإبلاغ، شكرًا لك ✅', dm_report_fail: 'تعذّر الإبلاغ، حاول لاحقًا',
       dm_as_admin: 'إرسال كإدارة', dm_as_admin_on: 'كإدارة ✓',
-      dm_send_as_q: 'إرسال الرسالة بصفة…', dm_send_admin: 'الإدارة (رسالة رسمية)', dm_send_member: '{name} (عضو)'
+      dm_send_as_q: 'إرسال الرسالة بصفة…', dm_send_admin: 'الإدارة (رسالة رسمية)', dm_send_member: '{name} (عضو)',
+      dm_copy: 'انسخ', dm_copied: 'نُسخ'
     },
     en: {
       dm_title: 'Private messages', dm_new: '✉️ New message', dm_pick: 'Pick a member',
@@ -38,7 +39,8 @@
       dm_report: 'Report', dm_block: 'Block this member', dm_cancel: 'Cancel',
       dm_reported: 'Reported, thank you ✅', dm_report_fail: 'Could not report, try later',
       dm_as_admin: 'Send as Admin', dm_as_admin_on: 'As Admin ✓',
-      dm_send_as_q: 'Send this message as…', dm_send_admin: 'Admin (official message)', dm_send_member: '{name} (member)'
+      dm_send_as_q: 'Send this message as…', dm_send_admin: 'Admin (official message)', dm_send_member: '{name} (member)',
+      dm_copy: 'Copy', dm_copied: 'Copied'
     }
   });
 
@@ -280,6 +282,40 @@
       } catch (e) {}
     }
 
+    /* Render message text, turning long code-like tokens (e.g. gift/
+       subscription codes: 10-24 uppercase letters+digits) into big
+       ONE-TAP COPY chips — copying from a text bubble on a phone is
+       painful otherwise. Everything is text nodes (XSS-safe). */
+    function textWithCopyChips(text) {
+      const box = UI.el('div', { class: 'chat-text' });
+      const re = /[A-Z0-9]{10,24}/g;
+      let last = 0, match;
+      while ((match = re.exec(text)) !== null) {
+        if (match.index > last) box.appendChild(document.createTextNode(text.slice(last, match.index)));
+        const code = match[0];
+        const chip = UI.el('button', { class: 'dm-code-chip', type: 'button' }, [
+          UI.el('span', { class: 'dm-code-txt' }, code),
+          UI.el('span', { class: 'dm-code-hint' }, '📋 ' + I18n.t('dm_copy'))
+        ]);
+        chip.onclick = (ev) => {
+          ev.stopPropagation();
+          const ok = () => {
+            chip.classList.add('copied');
+            chip.lastChild.textContent = '✓ ' + I18n.t('dm_copied');
+            setTimeout(() => { chip.classList.remove('copied'); chip.lastChild.textContent = '📋 ' + I18n.t('dm_copy'); }, 1600);
+          };
+          try { navigator.clipboard.writeText(code).then(ok).catch(() => {
+            const ta = document.createElement('textarea'); ta.value = code; document.body.appendChild(ta);
+            ta.select(); try { document.execCommand('copy'); ok(); } catch (e) {} ta.remove();
+          }); } catch (e) {}
+        };
+        box.appendChild(chip);
+        last = match.index + code.length;
+      }
+      if (last < text.length) box.appendChild(document.createTextNode(text.slice(last)));
+      return box;
+    }
+
     function rowEl(m, prev, animate) {
       const mine = m.uid === me;
       const official = m.admin === true;                 // rules-verified admin stamp
@@ -293,7 +329,7 @@
           document.body.appendChild(bd);
         }, onload: () => { if (atBottom) list.scrollTop = list.scrollHeight; } }));
       }
-      if (m.text) kids.push(UI.el('div', { class: 'chat-text' }, m.text));
+      if (m.text) kids.push(textWithCopyChips(m.text));
       kids.push(UI.el('div', { class: 'chat-time' },
         m.at && m.at.toDate ? m.at.toDate().toLocaleTimeString(I18n.lang === 'ar' ? 'ar' : 'en-GB', { hour: '2-digit', minute: '2-digit' }) : ''));
       const bubble = UI.el('div', { class: 'chat-bubble' + (official ? ' official' : '') }, kids);
