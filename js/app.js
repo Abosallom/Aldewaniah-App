@@ -61,6 +61,16 @@
         // scroll position hides the new page's upper controls.
         try { window.scrollTo(0, 0); document.documentElement.scrollTop = 0; document.body.scrollTop = 0; } catch (e) {}
         mod.render(view);
+        // Dynamic entrance: stagger the page's top-level blocks (springy
+        // rise+fade, 45ms apart) so every screen feels alive, not static.
+        try {
+          if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            Array.prototype.slice.call(view.children, 0, 14).forEach((el, i) => {
+              el.style.animationDelay = (i * 45) + 'ms';
+              el.classList.add('pop-in');
+            });
+          }
+        } catch (e) {}
         this._paintNav();
       };
       // Cross-fade: gently fade the current page out, then fade the new one in.

@@ -268,15 +268,17 @@
         } catch (e) { wrap.innerHTML = '<div class="auth-err">' + (e.message || 'Error') + '</div>'; return; }
         wrap.innerHTML = '';
         if (!rows.length) { wrap.appendChild(UI.el('p', { class: 'muted', style: 'text-align:center' }, I18n.t('adm_suggest_none'))); return; }
+        rows.sort((a, b) => (a.type === 'bug' ? -1 : 0) - (b.type === 'bug' ? -1 : 0)); // bugs first
         rows.forEach((s) => {
           const when = s.at && s.at.toDate ? s.at.toDate().toLocaleDateString(I18n.lang === 'ar' ? 'ar' : 'en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
           wrap.appendChild(UI.el('div', { class: 'card' }, [
             UI.el('div', { class: 'flex-between' }, [
-              UI.el('div', { class: 'card-meta' }, (s.name || '—') + (when ? ' · ' + when : '')),
+              UI.el('div', { class: 'card-meta' },
+                (s.type === 'bug' ? '🐞 ' : '💡 ') + (s.name || '—') + (when ? ' · ' + when : '') + (s.page ? ' · ' + s.page : '')),
               UI.el('button', { style: 'border:none;background:none;color:var(--maroon);cursor:pointer;font-size:1.2rem',
                 onclick: () => UI.confirm(I18n.t('adm_suggest_del'), async () => { await db.collection('suggestions').doc(s.id).delete(); loadSuggestions(wrap); }) }, '×')
             ]),
-            UI.el('div', { style: 'margin-top:4px;line-height:1.6' }, s.text || '')
+            UI.el('div', { style: 'margin-top:4px;line-height:1.6' + (s.type === 'bug' ? ';border-inline-start:3px solid var(--maroon);padding-inline-start:8px' : '') }, s.text || '')
           ]));
         });
       }

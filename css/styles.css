@@ -1080,3 +1080,28 @@ body{ -webkit-font-smoothing:antialiased; }
   touch-action:manipulation; }
 input, textarea, .chat-text, .gift-code-txt, .dm-code-txt{
   -webkit-user-select:text; user-select:text; }
+
+/* ===== Dynamic movement revamp (app-wide) ===== */
+@keyframes popIn{
+  0%{ opacity:0; transform:translateY(16px) scale(.97); }
+  60%{ opacity:1; transform:translateY(-2px) scale(1.005); }
+  100%{ opacity:1; transform:translateY(0) scale(1); } }
+.pop-in{ animation:popIn .42s cubic-bezier(.22,.9,.28,1.15) both; }
+/* springy press physics everywhere */
+.btn, .nav-item, .sec-card, .dm-row, .card, .gift-code, .dm-code-chip, .chat-seg-btn{
+  transition:transform .16s cubic-bezier(.34,1.56,.64,1), box-shadow .22s ease, background .18s ease; }
+.btn:active, .sec-card:active, .dm-row:active, .gift-code:active, .chat-seg-btn:active{ transform:scale(.96); }
+.btn:hover, .sec-card:hover{ transform:translateY(-2px); box-shadow:0 8px 22px rgba(26,39,68,.16); }
+.nav-item{ position:relative; }
+.nav-item:active{ transform:scale(.88); }
+.nav-item.active svg{ animation:navBounce .38s cubic-bezier(.34,1.56,.64,1); }
+@keyframes navBounce{ 0%{ transform:scale(.7); } 60%{ transform:scale(1.18); } 100%{ transform:scale(1); } }
+/* header brand micro-life */
+.brand-logo{ transition:transform .3s cubic-bezier(.34,1.56,.64,1); }
+.brand:active .brand-logo{ transform:rotate(-12deg) scale(1.08); }
+/* modal spring already exists; deepen backdrop fade */
+.modal-backdrop{ animation:bdIn .22s ease both; }
+@keyframes bdIn{ from{ opacity:0; } to{ opacity:1; } }
+@media (prefers-reduced-motion: reduce){
+  .pop-in, .nav-item.active svg, .modal-backdrop{ animation:none !important; }
+}
