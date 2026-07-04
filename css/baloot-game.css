@@ -45,18 +45,49 @@
 .bg-lobby-actions { display: flex; gap: 10px; justify-content: center; }
 .bg-danger { color: #b03030 !important; }
 
-/* ---------- the felt table ---------- */
+/* ---------- the table: a sadu Bedouin rug (STAGE 4, pure CSS) ----------
+   Maroon wool base + three woven bands. Each band is a pair of conic-
+   gradient triangle strips (down-pointing over up-pointing, offset half a
+   tile) so the two colours interlock into the classic sadu zig-zag,
+   flanked by thin beige/teal weft lines. ::after draws the framed border. */
 .bg-felt {
   position: relative;
   height: clamp(300px, 46vh, 440px);
-  border-radius: 22px;
+  border-radius: 14px;
   background:
-    radial-gradient(circle at 50% 32%, #1e6b47 0%, #16583a 55%, #0f4630 100%);
+    /* faint horizontal weave texture over everything */
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, .05) 0 1px, transparent 1px 3px),
+    /* band 1 (upper) — teal/navy zig-zag */
+    linear-gradient(#d9c79a, #d9c79a) 0 9% / 100% 3px no-repeat,
+    conic-gradient(from 120deg at 50% 0, #22434f 0 120deg, transparent 120deg) 0 14% / 34px 15px repeat-x,
+    conic-gradient(from -60deg at 50% 100%, #3e7a72 0 120deg, transparent 120deg) 17px 14% / 34px 15px repeat-x,
+    linear-gradient(#22434f, #22434f) 0 19% / 100% 3px no-repeat,
+    /* band 2 (center, widest) — beige/navy zig-zag */
+    linear-gradient(#d9c79a, #d9c79a) 0 44% / 100% 3px no-repeat,
+    conic-gradient(from 120deg at 50% 0, #d9c79a 0 120deg, transparent 120deg) 0 50% / 38px 18px repeat-x,
+    conic-gradient(from -60deg at 50% 100%, #22434f 0 120deg, transparent 120deg) 19px 50% / 38px 18px repeat-x,
+    linear-gradient(#d9c79a, #d9c79a) 0 56% / 100% 3px no-repeat,
+    /* band 3 (lower) — teal/navy zig-zag mirrored */
+    linear-gradient(#22434f, #22434f) 0 81% / 100% 3px no-repeat,
+    conic-gradient(from 120deg at 50% 0, #3e7a72 0 120deg, transparent 120deg) 0 86% / 34px 15px repeat-x,
+    conic-gradient(from -60deg at 50% 100%, #22434f 0 120deg, transparent 120deg) 17px 86% / 34px 15px repeat-x,
+    linear-gradient(#d9c79a, #d9c79a) 0 91% / 100% 3px no-repeat,
+    /* maroon wool base with tonal variation */
+    linear-gradient(180deg, #7c3036, #6b262d 45%, #782e34 70%, #5f2228);
   box-shadow:
-    inset 0 0 70px rgba(0, 0, 0, .38),
-    inset 0 0 0 6px rgba(0, 0, 0, .18),
-    0 6px 18px rgba(0, 0, 0, .22);
+    inset 0 0 70px rgba(0, 0, 0, .42),
+    0 8px 22px rgba(0, 0, 0, .28);
   overflow: hidden;
+}
+/* the rug's framed border: dark line · tan band · dark line (under seats) */
+.bg-felt::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  pointer-events: none; z-index: 1;
+  box-shadow:
+    inset 0 0 0 3px #4a3220,
+    inset 0 0 0 10px #c9a76b,
+    inset 0 0 0 12px #8a6844,
+    inset 0 0 0 14px rgba(58, 42, 26, .55);
 }
 .bg-felt-lobby { height: clamp(260px, 38vh, 340px); }
 .bg-lobby-mid {
@@ -79,11 +110,12 @@
 
 .bg-avatar {
   width: 46px; height: 46px; border-radius: 50%;
-  background: #10382a; color: #f2ead6;
+  background: linear-gradient(#24365c, #131d33); color: #f2ead6;
   display: flex; align-items: center; justify-content: center;
   font-weight: 800; font-size: 16px;
-  border: 2px solid rgba(255, 255, 255, .28);
+  border: 2px solid rgba(255, 255, 255, .35);
   transition: box-shadow .2s, border-color .2s;
+  position: relative; z-index: 2; /* STAGE 4: above the card-back fan */
 }
 .bg-avatar.empty {
   background: rgba(255, 255, 255, .1); color: #fff; font-size: 24px;
@@ -109,10 +141,7 @@
   background: var(--gold); border-radius: 999px; padding: 1px 8px;
 }
 .bg-tag.dealer { background: #e9e2d0; }
-.bg-count {
-  font-size: 11px; color: rgba(255, 255, 255, .85); font-weight: 700;
-  background: rgba(0, 0, 0, .25); border-radius: 999px; padding: 1px 8px;
-}
+/* (.bg-count removed in STAGE 4 — replaced by the card-back fan) */
 .bg-bidlbl {
   font-size: 11px; font-weight: 800; color: #ffe9b0;
   background: rgba(0, 0, 0, .35); border-radius: 999px; padding: 2px 9px;
@@ -172,6 +201,13 @@
 /* ---------- center trick area ---------- */
 .bg-center { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
 .bg-tcard { position: absolute; left: 50%; top: 50%; }
+/* STAGE 4: Kamelna shows BIG ornate cards in the middle (~1.35×) */
+.bg-pcard.bg-tcard { width: 78px; height: 114px; border-radius: 11px; }
+.bg-tcard .bg-pc-pip { font-size: 42px; }
+.bg-tcard .bg-pc-corner { font-size: 15px; }
+.bg-tcard .bg-pc-corner i { font-size: 13px; }
+.bg-flipwrap .bg-pcard { width: 80px; height: 117px; border-radius: 11px; }
+.bg-flipwrap .bg-pc-pip { font-size: 44px; }
 .bg-t-b { transform: translate(-50%, -8%); }
 .bg-t-t { transform: translate(-50%, -92%); }
 .bg-t-l { transform: translate(-128%, -50%) rotate(-6deg); }
@@ -217,10 +253,16 @@
   background: var(--card); border-radius: 14px; box-shadow: var(--shadow);
   padding: 8px 10px;
 }
-.bg-score { font-size: 14px; }
-.bg-score b { color: var(--navy); }
-.bg-score b.them { color: var(--maroon); }
-.bg-score i { font-style: normal; color: var(--ink-soft); }
+/* STAGE 4: Kamelna-style لنا/لهم score pills */
+.bg-scorepill {
+  display: inline-flex; align-items: center; gap: 6px;
+  border-radius: 999px; padding: 3px 11px; color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 1px 3px rgba(0, 0, 0, .18);
+}
+.bg-scorepill small { font-size: 10px; font-weight: 800; opacity: .85; }
+.bg-scorepill b { font-size: 15px; line-height: 1; }
+.bg-scorepill.us { background: linear-gradient(#2c4070, var(--navy)); }
+.bg-scorepill.them { background: linear-gradient(#8a3b44, var(--maroon)); }
 .bg-topgrow { flex: 1; }
 .bg-chip {
   display: inline-flex; align-items: center; gap: 4px;
@@ -230,26 +272,27 @@
 .bg-chip-sun { background: linear-gradient(#f3d98c, #e0b95a); color: #5c430e; }
 .bg-chip-hokum { background: linear-gradient(#3f9c68, #1e6b47); color: #fff; }
 .bg-chip-hokum.redsuit { text-shadow: 0 0 2px #fff; }
-.bg-chip-code { letter-spacing: 2px; border: 1.5px dashed var(--gold); background: none; }
+/* STAGE 4: «جلسة 1234» chip — Arabic word + code, so lighter letter-spacing */
+.bg-chip-code { letter-spacing: 1px; border: 1.5px dashed var(--gold); background: none; }
 
-/* ---------- bid bottom sheet (Kamelna style) ---------- */
-.bg-sheet {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
-  display: flex; justify-content: center; pointer-events: none;
-  padding-bottom: calc(var(--nav-h) + 8px);
-}
-.bg-sheet-body {
-  pointer-events: auto;
-  width: min(96vw, 460px);
-  background: var(--card); border-radius: 20px;
-  box-shadow: 0 -4px 32px rgba(0, 0, 0, .3), 0 0 0 1px rgba(0, 0, 0, .05);
-  padding: 14px;
+/* ---------- STAGE 4: INLINE bid/دبل bar (Kamelna style) ----------
+   In-flow dark bar docked between the felt and the hand — it no longer
+   covers the hand the way the old fixed bottom-sheet did. */
+.bg-bidbar { display: flex; justify-content: center; margin: 6px 0 2px; }
+.bg-bidbar-in {
+  width: min(100%, 460px);
+  background: linear-gradient(#33373e, #1e2126);
+  border-radius: 16px; padding: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .08);
   animation: bg-sheet-up .25s ease;
 }
 @keyframes bg-sheet-up { from { transform: translateY(30px); opacity: 0; } }
-.bg-sheet-flip { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: 10px; }
-.bg-sheet .bg-fliplbl { color: #6b4d12; background: #f6ecd2; }
-.bg-sheet-title { text-align: center; font-weight: 800; margin-bottom: 10px; }
+.bg-bidq {
+  text-align: center; font-weight: 800; font-size: 13px;
+  color: #ffe9b0; margin-bottom: 8px;
+}
+.bg-bidbar .bg-suitbtn { background: #f7f2e4; border-color: transparent; }
+.bg-bidbar .btn-ghost { color: #f2ead6; }
 .bg-bidrow { display: flex; gap: 8px; }
 .bg-bid {
   flex: 1; min-height: 52px; border: none; border-radius: 14px;
@@ -283,6 +326,7 @@
 }
 .bg-modal {
   width: min(94vw, 420px);
+  max-height: 82vh; overflow-y: auto; /* STAGE 4: long قيدها sheets scroll */
   background: var(--card); border-radius: 20px;
   box-shadow: 0 12px 44px rgba(0, 0, 0, .35);
   padding: 18px; animation: bg-sheet-up .25s ease;
@@ -427,6 +471,126 @@
   transition: left .34s ease, top .34s ease;
 }
 
+/* ===========================================================
+   STAGE 4 — Kamelna look & feel
+   =========================================================== */
+
+/* ----- opponents' card-back fans (by each avatar, live count ≤ 8) ----- */
+.bg-fan {
+  position: absolute; left: 50%; bottom: calc(100% - 16px);
+  width: 0; height: 38px; pointer-events: none; z-index: 1;
+}
+/* top seat: no room above (felt edge) → mirror the fan below the avatar */
+.bg-pos-t .bg-fan { bottom: auto; top: calc(100% - 16px); transform: scaleY(-1); }
+.bg-fancard {
+  position: absolute; left: 50%; bottom: 0;
+  width: 26px; height: 38px; margin-left: -13px;
+  border-radius: 4px; border: 2px solid #f4efe2;
+  transform-origin: 50% 92%; /* JS adds rotate(…deg) inline per card */
+  background:
+    url("../assets/icon-192.png") center / 14px 14px no-repeat,
+    linear-gradient(160deg, #24365c, #131d33);
+  box-shadow: inset 0 0 0 1px var(--gold), 0 1px 3px rgba(0, 0, 0, .4);
+}
+
+/* ----- numeric countdown inside the existing turn-timer ring ----- */
+.bg-ringnum {
+  position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: rgba(10, 14, 22, .5);
+  color: #ffd977; font-weight: 800; font-size: 17px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+}
+
+/* ----- تعابير speech bubbles (transient, 3s, fixed phrase list) ----- */
+.bg-say {
+  position: absolute; bottom: calc(100% + 4px); left: 50%;
+  transform: translateX(-50%); z-index: 9;
+  width: max-content; max-width: 150px;
+  background: #fff; color: #1c2b22; font-size: 12px; font-weight: 800;
+  border-radius: 12px; padding: 6px 10px; text-align: center;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, .35);
+  animation: bg-sayin .22s ease;
+}
+@keyframes bg-sayin { from { opacity: 0; } }
+.bg-say::after {
+  content: ''; position: absolute; bottom: -4px; left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 8px; height: 8px; background: #fff;
+}
+/* top seat: bubble drops below the avatar (felt clips above) */
+.bg-pos-t .bg-say { bottom: auto; top: calc(100% + 6px); }
+.bg-pos-t .bg-say::after { bottom: auto; top: -4px; }
+/* side seats: hug the felt edge instead of centering (no overflow) */
+.bg-pos-l .bg-say { left: 0; transform: none; }
+.bg-pos-l .bg-say::after { left: 16px; transform: rotate(45deg); }
+.bg-pos-r .bg-say { left: auto; right: 0; transform: none; }
+.bg-pos-r .bg-say::after { left: auto; right: 16px; transform: rotate(45deg); }
+
+/* ----- bottom action bar: قيدها · المشاريع · تعابير + my chip ----- */
+.bg-actionbar {
+  display: flex; align-items: center; gap: 8px;
+  background: linear-gradient(#33373e, #1e2126);
+  border-radius: 16px; padding: 8px 10px;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, .25), inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+.bg-abtn {
+  flex: 1; min-height: 44px; min-width: 0;
+  border: none; border-radius: 12px; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 800; color: #f2ead6;
+  background: linear-gradient(#4d525b, #34383f);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 2px 4px rgba(0, 0, 0, .25);
+  transition: transform .1s ease;
+}
+.bg-abtn:active { transform: scale(.96); }
+.bg-abtn.gold { background: linear-gradient(#e3bd63, #b98f3e); color: #3d2c07; }
+.bg-mechip { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.bg-meav {
+  flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%;
+  background: linear-gradient(#24365c, #131d33); color: #f2ead6;
+  border: 2px solid var(--gold);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 13px;
+}
+.bg-mename {
+  color: #f2ead6; font-size: 12px; font-weight: 700; max-width: 72px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ----- «قيدها» score-sheet rows ----- */
+.bg-histrow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; font-size: 13px;
+  border-bottom: 1px solid var(--line);
+}
+.bg-histrow .h1 {
+  flex: 1; min-width: 0; text-align: start;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.bg-histrow .h1 small { color: var(--ink-soft); font-size: 11px; }
+.bg-histrow .pts { flex: 0 0 52px; text-align: center; font-weight: 800; }
+.bg-histrow .pts.us { color: var(--navy); }
+.bg-histrow .pts.them { color: var(--maroon); }
+.bg-histrow.head {
+  background: var(--navy); color: #fff; font-weight: 800;
+  border-bottom: none; border-radius: 10px 10px 0 0;
+}
+.bg-histrow.head .pts { color: #fff; font-size: 12px; }
+.bg-histrow.total {
+  background: #f6ecd2; font-weight: 800;
+  border-bottom: none; border-radius: 0 0 10px 10px;
+}
+
+/* ----- «تعابير» picker grid ----- */
+.bg-emotegrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bg-emote {
+  min-height: 46px; padding: 6px 8px; cursor: pointer;
+  border: 1px solid #e5d5a8; border-radius: 12px;
+  background: #faf6ec; color: #5c430e;
+  font: inherit; font-size: 13px; font-weight: 800;
+}
+.bg-emote:active { background: #f3d98c; }
+
 /* ---------- mobile portrait tuning (thumb-size targets) ---------- */
 @media (max-width: 430px) {
   .bg-felt { height: clamp(280px, 42vh, 380px); }
@@ -438,5 +602,16 @@
   .bg-code { font-size: 24px; letter-spacing: 6px; }
   .bg-bid { min-height: 48px; font-size: 16px; }
   .bg-topbar { font-size: 12px; }
-  .bg-score { font-size: 13px; }
+  /* STAGE 4 sizes at 390px: nothing may overflow */
+  .bg-pcard.bg-tcard { width: 66px; height: 97px; }
+  .bg-tcard .bg-pc-pip { font-size: 34px; }
+  .bg-flipwrap .bg-pcard { width: 68px; height: 100px; }
+  .bg-flipwrap .bg-pc-pip { font-size: 36px; }
+  .bg-fancard { width: 22px; height: 32px; margin-left: -11px; background-size: 12px 12px, 100%; }
+  .bg-fan { height: 32px; bottom: calc(100% - 14px); }
+  .bg-pos-t .bg-fan { bottom: auto; top: calc(100% - 14px); }
+  .bg-scorepill b { font-size: 14px; }
+  .bg-abtn { font-size: 13px; }
+  .bg-mename { max-width: 56px; }
+  .bg-say { max-width: 130px; font-size: 11px; }
 }

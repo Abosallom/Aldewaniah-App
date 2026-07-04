@@ -566,13 +566,20 @@
         bg_proj_cancelled: 'ملغي', bg_tap_close: 'اضغط للمتابعة',
         bg_proj_sira: 'سرا', bg_proj_50: 'خمسين', bg_proj_100: 'مية',
         bg_proj_400: 'أربعمية', bg_proj_baloot: 'بلوت',
-        bg_double: 'دبل', bg_triple: 'تربل', bg_kawra: 'كورة', bg_qahwa: 'قهوة',
+        bg_double: 'دبل', bg_triple: 'ثري', bg_kawra: 'أربع', bg_qahwa: 'قهوة',
         bg_double_q: 'الدبل — ترفع الرهان؟',
         bg_coffee: 'قهوة! هذه الجولة تحسم اللعبة كاملة',
         // STAGE 3
-        bg_ask1: 'أول؟', bg_ask2: 'ثاني؟', bg_ask_dbl: 'دبل؟',
+        bg_ask1: 'أول؟', bg_ask2: 'ثاني؟', bg_ask_dbl: 'الدبل؟',
         bg_bought: 'شريت!', bg_timeout_pass: 'انتهى الوقت ⏱',
-        bg_bot_seat: 'روبوت'
+        bg_bot_seat: 'روبوت',
+        // STAGE 4 — شكل «كملنا»
+        bg_session: 'جلسة', bg_qaydha: 'قيدها', bg_emotes: 'تعابير',
+        bg_close: 'إغلاق', bg_hist_empty: 'ما انقيدت جولات بعد',
+        bg_no_proj_yet: 'ما فيه مشاريع معلنة',
+        bg_declared_proj: 'أعلن مشروع',
+        bg_hidden_until2: 'تنكشف المشاريع مع بداية اللعبة الثانية',
+        bg_round_col: 'الجولة'
       },
       en: {
         bg_title: 'Baloot Online', bg_sub: 'Private Baloot tables — Kamelna rules',
@@ -602,13 +609,20 @@
         bg_proj_cancelled: 'Cancelled', bg_tap_close: 'Tap to continue',
         bg_proj_sira: 'Sira', bg_proj_50: 'Fifty', bg_proj_100: 'Hundred',
         bg_proj_400: 'Four hundred', bg_proj_baloot: 'Baloot',
-        bg_double: 'Double', bg_triple: 'Triple', bg_kawra: 'Kawra', bg_qahwa: 'Qahwa',
+        bg_double: 'Double', bg_triple: 'Three (×3)', bg_kawra: 'Four (×4)', bg_qahwa: 'Qahwa',
         bg_double_q: 'Doubling — raise the stakes?',
         bg_coffee: 'Qahwa! This deal decides the whole game',
         // STAGE 3
         bg_ask1: 'Awwal?', bg_ask2: 'Thani?', bg_ask_dbl: 'Double?',
         bg_bought: 'Bought!', bg_timeout_pass: 'Time is up ⏱',
-        bg_bot_seat: 'Bot'
+        bg_bot_seat: 'Bot',
+        // STAGE 4 — Kamelna look & feel
+        bg_session: 'Session', bg_qaydha: 'Score it', bg_emotes: 'Emotes',
+        bg_close: 'Close', bg_hist_empty: 'No rounds recorded yet',
+        bg_no_proj_yet: 'No projects declared',
+        bg_declared_proj: 'declared a project',
+        bg_hidden_until2: 'Projects are revealed on trick 2',
+        bg_round_col: 'Round'
       }
     },
 
@@ -654,7 +668,11 @@
         turnTimer: null, backupTimer: null,   // human timeout / host backup
         botTimer: null, botTries: 0,          // bot action scheduler
         dealAnimKey: '', restAnimKey: '', lastPhase: null, dealOv: null, // deal animation
-        autoNextKey: '', autoNextTimer: null, autoNextInt: null // roundEnd auto-advance
+        autoNextKey: '', autoNextTimer: null, autoNextInt: null, // roundEnd auto-advance
+        // STAGE 4: Kamelna look & feel
+        modal: null,                          // 'scores' | 'projects' | 'emotes'
+        saySig: '', sayShow: null, sayTimer: null, // تعابير speech bubbles
+        lastEmoteAt: 0, ringInt: null         // emote throttle + timer countdown
       };
 
       session = {
@@ -669,6 +687,7 @@
           clearTimeout(st.turnTimer); clearTimeout(st.backupTimer);
           clearTimeout(st.botTimer);
           clearTimeout(st.autoNextTimer); clearInterval(st.autoNextInt);
+          clearTimeout(st.sayTimer); clearInterval(st.ringInt); // STAGE 4
           if (st.dealOv) { try { st.dealOv.remove(); } catch (e) {} st.dealOv = null; }
         }
       };
@@ -740,6 +759,41 @@
           UI.el('span', { class: 'bg-pc-pip' }, SUIT_CHAR[s]),
           UI.el('span', { class: 'bg-pc-corner flip' }, [UI.el('b', null, r), UI.el('i', null, SUIT_CHAR[s])])
         ]);
+      }
+
+      /* ================= STAGE 4 · تعابير (emotes) =================
+         A FIXED phrase list only — no free text ever reaches Firestore
+         or the DOM (rendered as text nodes, validated on read AND write).
+         The canonical list is Arabic (Kamelna vocabulary, like بس/حكم),
+         shared by every client so last-write-wins validation matches. */
+      var EMOTES = ['ابشر بابعوض', 'الله يعينك', 'عطنا ونشوف', 'ياساتر!',
+                    'ما شاء الله عليك', 'خذها وانقلع', 'صبر صبر', 'وين المشاريع؟'];
+
+      async function sendEmote(text) {
+        var seat = mySeat();
+        if (seat < 0 || EMOTES.indexOf(text) < 0) return;   // seated members, fixed list only
+        var now = Date.now();
+        if (now - (st.lastEmoteAt || 0) < 2500) return;     // gentle local throttle
+        st.lastEmoteAt = now;
+        try {
+          // plain last-write-wins field — no transaction needed
+          await st.ref.update({ say: { seat: seat, text: text, ts: now }, updatedAt: ts() });
+        } catch (e) {}
+      }
+
+      /** Show a 3s speech bubble over the speaker's seat whenever a NEW
+          say lands. Guards: fixed-list check, stale-on-rejoin check. */
+      function maybeSay() {
+        var p = st.pub;
+        if (!p || !p.say || p.say.seat == null) return;     // old tables: no field
+        var sig = p.say.seat + '|' + p.say.text + '|' + (p.say.ts || 0);
+        if (st.saySig === sig) return;
+        st.saySig = sig;
+        if (Math.abs(Date.now() - (p.say.ts || 0)) > 15000) return; // stale echo on rejoin
+        if (EMOTES.indexOf(p.say.text) < 0) return;         // render fixed phrases ONLY
+        st.sayShow = { seat: p.say.seat, text: p.say.text, until: Date.now() + 3000 };
+        clearTimeout(st.sayTimer);
+        st.sayTimer = setTimeout(function () { st.sayShow = null; paint(); }, 3050);
       }
 
       /* ======================================================================
@@ -836,6 +890,7 @@
             hostAutomation();
             scheduleCollect();
             pacing();          // STAGE 3: bots + turn timers + auto-advance
+            maybeSay();        // STAGE 4: تعابير speech bubbles
             paint();
             dealAnimations();  // STAGE 3: needs the freshly painted felt
           } catch (e) { /* defensive: never let a paint error kill the stream */ }
@@ -1239,6 +1294,18 @@
               }
               var totals = { t0: prev.t0 + rs.pts.t0, t1: prev.t1 + rs.pts.t1 };
               upd.roundScores = rs; upd.totals = totals; upd.turn = -1;
+              // STAGE 4: append this deal's line to the «قيدها» score sheet.
+              // Old in-flight tables simply start their history here.
+              var hist = (p.history || []).slice();
+              hist.push({
+                m: p.mode, tr: p.trump || null, b: p.buyer,
+                mult: (p.mult === 'coffee') ? 'coffee' : (p.mult || 1),
+                bnt: rs.bnt,
+                pj: { t0: (rs.projPts.t0 || 0) + (rs.balootPts.t0 || 0),
+                      t1: (rs.projPts.t1 || 0) + (rs.balootPts.t1 || 0) },
+                pts: rs.pts, kb: rs.kaboot || null, kh: !!rs.khosran
+              });
+              upd.history = hist.slice(-60);   // plenty for a 152 game, tiny doc
               // game over at 152+ (both over → higher wins; exact tie → keep playing)
               var over = Math.max(totals.t0, totals.t1) >= 152 && totals.t0 !== totals.t1;
               upd.phase = over ? 'gameEnd' : 'roundEnd';
@@ -1536,7 +1603,7 @@
             var p = snap.data();
             if (!p || p.phase !== 'gameEnd') throw new Error('phase');
             tx.update(st.ref, {
-              totals: { t0: 0, t1: 0 }, phase: 'dealing',
+              totals: { t0: 0, t1: 0 }, phase: 'dealing', history: [], // STAGE 4: fresh قيدها
               dealer: ((p.dealer || 0) + 1) % 4, updatedAt: ts()
             });
           });
@@ -1640,6 +1707,7 @@
 
       /* ---------------- in-game paint ---------------- */
       function paintGame(p) {
+        clearInterval(st.ringInt);                     // STAGE 4: countdown rebuilt below
         root.innerHTML = '';
         root.appendChild(topBar(p));
 
@@ -1648,14 +1716,21 @@
         felt.appendChild(centerArea(p));
         root.appendChild(felt);
 
-        root.appendChild(handArea(p));
-
+        // STAGE 4: Kamelna-style INLINE bid/دبل bar docked above the hand
+        // (replaces the old covering bottom-sheet — same logic & guards)
         if (p.phase === 'bidding' && p.turn >= 0 && controlsSeat(p.turn)) root.appendChild(bidSheet(p));
         if (p.phase === 'doubling' && p.doubleTurn != null && controlsSeat(p.doubleTurn)) {
           root.appendChild(doubleSheet(p));            // STAGE 2: دبل chain
         }
+
+        root.appendChild(handArea(p));
+        root.appendChild(actionBar(p));                // STAGE 4: قيدها/المشاريع/تعابير
+
         var reveal = projectOverlay(p);                // STAGE 2: trick-2 showdown
         if (reveal) root.appendChild(reveal);
+        if (st.modal === 'scores') root.appendChild(scoreSheetModal(p));       // STAGE 4
+        else if (st.modal === 'projects') root.appendChild(projectsModal(p));  // STAGE 4
+        else if (st.modal === 'emotes') root.appendChild(emoteModal(p));       // STAGE 4
         if (p.phase === 'roundEnd') root.appendChild(roundEndModal(p));
         if (p.phase === 'gameEnd') root.appendChild(gameEndModal(p));
       }
@@ -1676,22 +1751,43 @@
         if (p.mult === 'coffee') multChip = UI.el('span', { class: 'bg-chip bg-chip-mult' }, '☕ ' + I18n.t('bg_qahwa'));
         else if (p.mult >= 2) multChip = UI.el('span', { class: 'bg-chip bg-chip-mult' }, '×' + p.mult);
 
+        // STAGE 4: Kamelna top bar — لنا/لهم pills + «جلسة <code>» chip
         return UI.el('div', { class: 'bg-topbar' }, [
-          UI.el('span', { class: 'bg-score' }, [
-            UI.el('b', null, I18n.t('bg_us') + ' ' + us),
-            UI.el('i', null, ' · '),
-            UI.el('b', { class: 'them' }, I18n.t('bg_them') + ' ' + them)
+          UI.el('span', { class: 'bg-scorepill us' }, [
+            UI.el('small', null, I18n.t('bg_us')), UI.el('b', null, String(us))
+          ]),
+          UI.el('span', { class: 'bg-scorepill them' }, [
+            UI.el('small', null, I18n.t('bg_them')), UI.el('b', null, String(them))
           ]),
           modeChip,
           multChip,
-          UI.el('button', { class: 'bg-chip bg-chip-code', onclick: copyCode }, st.code),
-          UI.el('span', { class: 'bg-beta' }, I18n.t('bg_beta')),
+          UI.el('button', { class: 'bg-chip bg-chip-code', onclick: copyCode },
+            I18n.t('bg_session') + ' ' + st.code),
           UI.el('span', { class: 'bg-topgrow' }),
           isHost() ? UI.el('button', { class: 'bg-chip bg-danger', onclick: function () {
             UI.confirm(I18n.t('bg_end_confirm'), endTable);
           } }, I18n.t('bg_end_table')) : null,
           UI.el('button', { class: 'bg-chip', onclick: exitView }, I18n.t('bg_exit'))
         ]);
+      }
+
+      /* STAGE 4: tight fan of mini card backs (max 8) shown by each seat —
+         pure CSS card backs (navy + gold frame + the app's dallah emblem). */
+      function fanEl(n) {
+        n = Math.min(8, Math.max(1, n | 0));
+        var f = UI.el('div', { class: 'bg-fan' });
+        var spread = 12, start = -((n - 1) * spread) / 2;
+        for (var k = 0; k < n; k++) {
+          var c = UI.el('div', { class: 'bg-fancard' });
+          c.style.transform = 'rotate(' + (start + k * spread) + 'deg)';
+          f.appendChild(c);
+        }
+        return f;
+      }
+
+      /** Seconds left on the current turn (for the ring's countdown number). */
+      function ringSecs() {
+        return Math.max(0, Math.ceil((TURN_MS - (Date.now() - (st.turnStartAt || Date.now()))) / 1000));
       }
 
       function seatChip(p, i) {
@@ -1704,7 +1800,15 @@
         // STAGE 3: avatar wrapper carries the shrinking turn-timer ring
         var av = UI.el('div', { class: 'bg-avatar' + (isBotSeat(i) ? ' bot' : '') },
           isBotSeat(i) ? '🤖' : UI.initials(name));
-        var avKids = [av];
+        var avKids = [];
+        // STAGE 4: fanned card backs by every other seat (Kamelna look) —
+        // driven live by handCounts, capped at 8.
+        if (i !== viewSeat() && p.handCounts && p.handCounts[i] > 0 &&
+            (p.phase === 'bidding' || p.phase === 'dealRest' ||
+             p.phase === 'doubling' || p.phase === 'playing')) {
+          avKids.push(fanEl(p.handCounts[i]));
+        }
+        avKids.push(av);
         if (isTurn && !isBotSeat(i) &&
             (p.phase === 'bidding' || p.phase === 'playing' || p.phase === 'doubling')) {
           var elapsed = Math.max(0, (Date.now() - (st.turnStartAt || Date.now())) / 1000);
@@ -1714,6 +1818,19 @@
             '<circle class="left" cx="27" cy="27" r="24" style="animation-delay:-' +
             elapsed.toFixed(2) + 's"/></svg>';
           avKids.push(ring);
+          // STAGE 4: remaining-seconds NUMBER inside the ring (Kamelna timer)
+          var num = UI.el('div', { class: 'bg-ringnum' }, String(ringSecs()));
+          avKids.push(num);
+          clearInterval(st.ringInt);
+          st.ringInt = setInterval(function () {
+            var s = ringSecs();
+            num.textContent = String(s);
+            if (s <= 0) clearInterval(st.ringInt);
+          }, 500);
+        }
+        // STAGE 4: تعابير speech bubble (fixed-list text, rendered as a text node)
+        if (st.sayShow && st.sayShow.seat === i && Date.now() < st.sayShow.until) {
+          avKids.push(UI.el('div', { class: 'bg-say' }, st.sayShow.text));
         }
         // STAGE 3: the dealer's question rides on the current bidder's seat
         if (p.phase === 'bidding' && p.turn === i) {
@@ -1729,9 +1846,7 @@
         ];
         if (partner) kids.push(UI.el('div', { class: 'bg-tag' }, I18n.t('bg_partner')));
         if (p.dealer === i) kids.push(UI.el('div', { class: 'bg-tag dealer' }, I18n.t('bg_dealer')));
-        if (p.phase === 'playing' && i !== viewSeat() && p.handCounts) {
-          kids.push(UI.el('div', { class: 'bg-count' }, '🂠 ' + (p.handCounts[i] || 0)));
-        }
+        // (STAGE 4: the old «🂠 n» count chip is replaced by the card-back fan)
         if (p.phase === 'bidding') {
           var b = lastBid(p, i);
           if (b) kids.push(UI.el('div', { class: 'bg-bidlbl' }, b));
@@ -1848,17 +1963,18 @@
         return wrap;
       }
 
-      /* Kamelna-style bottom sheet: صن / حكم / بس (+ suit picker in round 2). */
+      /* STAGE 4: Kamelna-style INLINE bid bar (docked above the hand):
+         صن / حكم / أشكل / بس (+ suit picker in round 2). Same doBid logic. */
       function bidSheet(p) {
         var act = p.turn;
         var r = p.bidRound || 1;
         var key = act + '|' + r + '|' + (p.roundNo || 0);
         if (st.suitPickKey !== key) { st.suitPick = false; st.suitPickKey = key; }
 
-        var body = UI.el('div', { class: 'bg-sheet-body' });
+        var body = UI.el('div', { class: 'bg-bidbar-in' });
 
         if (st.suitPick) {
-          body.appendChild(UI.el('div', { class: 'bg-sheet-title' }, I18n.t('bg_pick_suit')));
+          body.appendChild(UI.el('div', { class: 'bg-bidq' }, I18n.t('bg_pick_suit')));
           var row = UI.el('div', { class: 'bg-suitrow' });
           SUITS.filter(function (s) { return s !== suitOf(p.flip); }).forEach(function (s) {
             row.appendChild(UI.el('button', {
@@ -1871,8 +1987,8 @@
             I18n.t('bg_back')));
         } else {
           // STAGE 3: no flip card here — the مشترى stays visible on the felt.
-          // The sheet only carries the dealer's question + the answers.
-          body.appendChild(UI.el('div', { class: 'bg-sheet-title' },
+          // The bar only carries the dealer's question + the answers.
+          body.appendChild(UI.el('div', { class: 'bg-bidq' },
             I18n.t(r === 1 ? 'bg_ask1' : 'bg_ask2')));
           var hokumTaken = !!p.pendHokum;
           var hokumBtn = UI.el('button', { class: 'bg-bid hokum', onclick: function () {
@@ -1895,7 +2011,7 @@
           rowKids.push(UI.el('button', { class: 'bg-bid pass', onclick: function () { doBid('pass'); } }, I18n.t('bg_pass')));
           body.appendChild(UI.el('div', { class: 'bg-bidrow' }, rowKids));
         }
-        return UI.el('div', { class: 'bg-sheet' }, [body]);
+        return UI.el('div', { class: 'bg-bidbar' }, [body]);
       }
 
       /* STAGE 2: display name of a project type. */
@@ -1904,13 +2020,13 @@
                         fourhundred: 'bg_proj_400', baloot: 'bg_proj_baloot' }[type] || 'bg_project');
       }
 
-      /* STAGE 2 bottom sheet for the دبل chain — same look as bidding.
-         Only the NEXT step of the chain is offered: دبل → تربل → كورة → قهوة. */
+      /* STAGE 2/4 inline bar for the دبل chain — Kamelna wording:
+         دبل(×2) → ثري(×3) → أربع(×4) → قهوة. Engine keys unchanged. */
       function doubleSheet(p) {
         var cur = (typeof p.mult === 'number') ? p.mult : 1;
         var nextKey = { 1: 'bg_double', 2: 'bg_triple', 3: 'bg_kawra', 4: 'bg_qahwa' }[cur] || 'bg_double';
-        var body = UI.el('div', { class: 'bg-sheet-body' });
-        body.appendChild(UI.el('div', { class: 'bg-sheet-title' }, I18n.t('bg_double_q')));
+        var body = UI.el('div', { class: 'bg-bidbar-in' });
+        body.appendChild(UI.el('div', { class: 'bg-bidq' }, I18n.t('bg_ask_dbl')));
         body.appendChild(UI.el('div', { class: 'bg-bidrow' }, [
           UI.el('button', { class: 'bg-bid dbl', onclick: function () { doDouble('raise'); } }, [
             UI.el('span', null, I18n.t(nextKey)),
@@ -1918,7 +2034,135 @@
           ]),
           UI.el('button', { class: 'bg-bid pass', onclick: function () { doDouble('pass'); } }, I18n.t('bg_pass'))
         ]));
-        return UI.el('div', { class: 'bg-sheet' }, [body]);
+        return UI.el('div', { class: 'bg-bidbar' }, [body]);
+      }
+
+      /* ================= STAGE 4 · bottom action bar + modals ================= */
+      /* Kamelna's dark bar under the hand: «قيدها» (score sheet) ·
+         «المشاريع» (this round's projects) · «تعابير» (emote picker) +
+         the local player's name chip. Spectators get no emote button. */
+      function actionBar(p) {
+        var me = mySeat();
+        var kids = [
+          UI.el('button', { class: 'bg-abtn', onclick: function () { st.modal = 'scores'; paint(); } },
+            I18n.t('bg_qaydha')),
+          UI.el('button', { class: 'bg-abtn', onclick: function () { st.modal = 'projects'; paint(); } },
+            I18n.t('bg_projects'))
+        ];
+        if (me >= 0) {
+          kids.push(UI.el('button', { class: 'bg-abtn gold', onclick: function () { st.modal = 'emotes'; paint(); } },
+            I18n.t('bg_emotes')));
+        }
+        kids.push(UI.el('span', { class: 'bg-mechip' }, [
+          UI.el('span', { class: 'bg-meav' }, UI.initials(me >= 0 ? seatName(me) : (myName || '؟'))),
+          UI.el('span', { class: 'bg-mename' }, me >= 0 ? seatName(me) : (myName || ''))
+        ]));
+        return UI.el('div', { class: 'bg-actionbar' }, kids);
+      }
+
+      function closeModal() { st.modal = null; paint(); }
+      function modalShell(title, bodyKids) {
+        var inner = UI.el('div', { class: 'bg-modal', onclick: function (e) { e.stopPropagation(); } },
+          [UI.el('h3', null, title)].concat(bodyKids).concat([
+            UI.el('button', { class: 'btn btn-ghost btn-block', style: 'margin-top:10px', onclick: closeModal },
+              I18n.t('bg_close'))
+          ]));
+        return UI.el('div', { class: 'bg-modalbd', onclick: closeModal }, [inner]);
+      }
+
+      /* «قيدها» — the score sheet: one line per finished deal (بنط,
+         مشاريع, دبل multiplier, نقاط per team) + the running النشرة. */
+      function scoreSheetModal(p) {
+        var hist = p.history || [];   // guarded: old tables have no history yet
+        var usK = myTeamKey(), thK = themTeamKey();
+        var kids = [];
+        if (!hist.length) {
+          kids.push(UI.el('p', { class: 'muted', style: 'text-align:center' }, I18n.t('bg_hist_empty')));
+        } else {
+          kids.push(UI.el('div', { class: 'bg-histrow head' }, [
+            UI.el('div', { class: 'h1' }, I18n.t('bg_round_col')),
+            UI.el('span', { class: 'pts' }, I18n.t('bg_us')),
+            UI.el('span', { class: 'pts' }, I18n.t('bg_them'))
+          ]));
+          hist.forEach(function (h, idx) {
+            var modeTxt = h.m === 'sun' ? I18n.t('bg_sun')
+                        : h.m === 'ashkal' ? I18n.t('bg_ashkal')
+                        : (I18n.t('bg_hokum') + ' ' + (h.tr ? SUIT_CHAR[h.tr] : ''));
+            var multTxt = h.mult === 'coffee' ? ' · ☕' : ((h.mult || 1) >= 2 ? ' · ×' + h.mult : '');
+            var sub = I18n.t('bg_abnat') + ' ' +
+              ((h.bnt && h.bnt[usK]) || 0) + '/' + ((h.bnt && h.bnt[thK]) || 0);
+            if (h.pj && ((h.pj.t0 || 0) + (h.pj.t1 || 0)) > 0) {
+              sub += ' · ' + I18n.t('bg_projects') + ' ' + (h.pj[usK] || 0) + '/' + (h.pj[thK] || 0);
+            }
+            if (h.kb) sub += ' · ' + I18n.t('bg_kaboot');
+            if (h.kh) sub += ' · ' + I18n.t('bg_khosran').split('!')[0];
+            kids.push(UI.el('div', { class: 'bg-histrow' }, [
+              UI.el('div', { class: 'h1' }, [
+                UI.el('b', null, (idx + 1) + ' · ' + modeTxt + multTxt),
+                UI.el('small', null, sub)
+              ]),
+              UI.el('span', { class: 'pts us' }, '+' + ((h.pts && h.pts[usK]) || 0)),
+              UI.el('span', { class: 'pts them' }, '+' + ((h.pts && h.pts[thK]) || 0))
+            ]));
+          });
+          kids.push(UI.el('div', { class: 'bg-histrow total' }, [
+            UI.el('div', { class: 'h1' }, [UI.el('b', null, I18n.t('bg_totals'))]),
+            UI.el('span', { class: 'pts us' }, String((p.totals && p.totals[usK]) || 0)),
+            UI.el('span', { class: 'pts them' }, String((p.totals && p.totals[thK]) || 0))
+          ]));
+        }
+        return modalShell(I18n.t('bg_qaydha'), kids);
+      }
+
+      /* «المشاريع» — this round's declarations. Before the trick-2 reveal
+         only WHO declared is public (cards stay hidden — same rule as the
+         showdown overlay); from trick 2 on, the full resolved list shows. */
+      function projectsModal(p) {
+        var kids = [];
+        var tw = p.tricksWon || {};
+        var collected = ((tw.t0 || []).length) + ((tw.t1 || []).length);
+        var declaredSeats = Object.keys(p.declared || {});
+        if (!declaredSeats.length) {
+          kids.push(UI.el('p', { class: 'muted', style: 'text-align:center' }, I18n.t('bg_no_proj_yet')));
+        } else if (p.phase === 'playing' && collected < 4) {
+          declaredSeats.forEach(function (sKey) {
+            kids.push(UI.el('div', { class: 'bg-histrow' }, [
+              UI.el('div', { class: 'h1' }, [
+                UI.el('b', null, seatName(+sKey) + ' — ' + I18n.t('bg_declared_proj'))
+              ])
+            ]));
+          });
+          kids.push(UI.el('p', { class: 'bg-projhint' }, I18n.t('bg_hidden_until2')));
+        } else {
+          var pr = resolveProjects(p.projects, p.mode);
+          if (!pr.items.length) {
+            kids.push(UI.el('p', { class: 'muted', style: 'text-align:center' }, I18n.t('bg_no_proj_yet')));
+          }
+          pr.items.forEach(function (it) {
+            var mini = UI.el('div', { class: 'bg-projcards' });
+            (it.cards || []).forEach(function (c) { mini.appendChild(cardEl(c, 'mini')); });
+            kids.push(UI.el('div', { class: 'bg-projrow' + (it.cancelled ? ' cancelled' : '') }, [
+              UI.el('div', { class: 'bg-projwho' }, [
+                UI.el('b', null, seatName(it.seat)),
+                UI.el('span', null, projLabel(it.type) + ' · ' +
+                  (it.cancelled ? I18n.t('bg_proj_cancelled') : '+' + projectValue(it.type, p.mode)))
+              ]),
+              mini
+            ]));
+          });
+        }
+        return modalShell(I18n.t('bg_projects'), kids);
+      }
+
+      /* «تعابير» — the 8 preset Kamelna-style phrases, nothing else. */
+      function emoteModal() {
+        var grid = UI.el('div', { class: 'bg-emotegrid' });
+        EMOTES.forEach(function (t) {
+          grid.appendChild(UI.el('button', { class: 'bg-emote', onclick: function () {
+            sendEmote(t); closeModal();
+          } }, t));
+        });
+        return modalShell(I18n.t('bg_emotes'), [grid]);
       }
 
       /* STAGE 2: trick-2 showdown overlay — as soon as the first card of

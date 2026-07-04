@@ -62,7 +62,8 @@
         adm_gift_del: 'حذف هذا الكود؟', adm_gift_working: 'جارٍ التوزيع…',
         adm_gift_msg_head: 'طِرا لمدة شهر — Tira 1 month code', adm_gift_msg_body: '🎁 هديتك من الديوانية — كود الاشتراك:',
         adm_gift_resend: 'إعادة إرسال برسالة محدّثة', adm_gift_resend_confirm: 'سيتم حذف رسالة الهدية القديمة من محادثة كل عضو وإرسال نفس الكود برسالة جديدة. متابعة؟',
-        adm_gift_resent: 'تمت إعادة الإرسال لـ {n} عضو ✓'
+        adm_gift_resent: 'تمت إعادة الإرسال لـ {n} عضو ✓',
+        adm_changelog: 'سجل التحديثات', adm_changelog_show: 'عرض سجل التحديثات منذ أول نسخة', adm_changelog_hide: 'إخفاء السجل'
       },
       en: {
         adm_title: 'Admin panel', adm_sub: 'Manage members and join requests', adm_version: 'App version:',
@@ -99,7 +100,8 @@
         adm_gift_del: 'Delete this code?', adm_gift_working: 'Distributing…',
         adm_gift_msg_head: 'طِرا لمدة شهر — Tira 1 month code', adm_gift_msg_body: '🎁 Your gift from Aldewaniah — subscription code:',
         adm_gift_resend: 'Resend with updated message', adm_gift_resend_confirm: 'The old gift message will be removed from each member\'s chat and the same code re-sent with the new wording. Continue?',
-        adm_gift_resent: 'Re-sent to {n} members ✓'
+        adm_gift_resent: 'Re-sent to {n} members ✓',
+        adm_changelog: 'Updates log', adm_changelog_show: 'Show updates since the first version', adm_changelog_hide: 'Hide log'
       }
     },
 
@@ -215,6 +217,14 @@
         loadReports(repWrap);
       }
 
+      // ---- Updates log (admin only) — app history since the first version ----
+      if (isAdmin) {
+        view.appendChild(UI.el('h2', { class: 'section-head' }, I18n.t('adm_changelog')));
+        const clWrap = UI.el('div');
+        view.appendChild(clWrap);
+        loadChangelog(clWrap);
+      }
+
       // ---- Gift codes (admin only) — subscriptions gifted to members ----
       if (isAdmin) {
         view.appendChild(UI.el('h2', { class: 'section-head' }, I18n.t('adm_gift')));
@@ -275,6 +285,52 @@
             r.reason ? UI.el('div', { style: 'margin-top:4px;line-height:1.6' }, r.reason) : null
           ]));
         });
+      }
+
+      /* ---- Updates log: the app's story since v1 (static, newest first) ---- */
+      function loadChangelog(wrap) {
+        const LOG = [
+          ['v79', '2026-07-04', 'بلوت أونلاين بشكل «كملنا» الكامل: طاولة سدو، مراوح ورق الخصوم، أزرار الشراء أسفل الشاشة، قيدها والمشاريع والتعابير، مؤقت رقمي + سجل التحديثات هذا', 'Baloot in full Kamelna look: sadu rug, opponents\' card fans, inline bid bar, score sheet, projects, emotes, numeric timer + this updates log'],
+          ['v78', '2026-07-04', 'رسائل الإدارة: اختيار «كإدارة أو كعضو» عند كل إرسال', 'Admin DMs: choose "as Admin or as member" on every send'],
+          ['v77', '2026-07-04', 'إصلاح: كل صفحة تفتح من أعلاها', 'Fix: every page opens from its top'],
+          ['v76', '2026-07-04', 'أكواد الهدايا: إعادة إرسال بنص محدّث بضغطة واحدة', 'Gift codes: one-tap resend with updated wording'],
+          ['v74', '2026-07-03', 'بلوت: روبوتات تكمل الطاولة، توزيع متحرك 3+2، المشترى وسط الطاولة، مؤقت 20 ثانية', 'Baloot: bots fill seats, animated 3+2 deal, flip card center-table, 20s timers'],
+          ['v72', '2026-07-03', 'أكواد الهدايا في الإدارة: استيراد وتوزيع برسائل خاصة رسمية', 'Admin gift codes: import + official-DM distribution'],
+          ['v71', '2026-07-03', 'بلوت: المشاريع (سرا/خمسين/مية/أربعمية/بلوت) والدبل والقهوة وأشكل', 'Baloot: projects, doubling chain & Ashkal'],
+          ['v69', '2026-07-03', 'بلوت أونلاين (المرحلة الأولى) + تجهيز إشعارات الجوال', 'Baloot Online stage 1 + push notifications groundwork'],
+          ['v67', '2026-07-03', 'الرسائل الخاصة بين الأعضاء (ورسائل الإدارة بشكل مميز) + تقوية الخصوصية والأمان', 'Private member DMs (distinct admin style) + privacy/security hardening'],
+          ['v65', '2026-06-27', 'حذف الحساب داخل التطبيق، سياسة الخصوصية والشروط، الإبلاغ والحظر', 'In-app account deletion, privacy policy & terms, report/block'],
+          ['v63', '2026-06-27', 'تسجيل الحضور بالموقع الجغرافي (نطاق يحدده المشرف)', 'Geofenced check-in (admin-set radius)'],
+          ['v54', '2026-06-27', 'الدردشة: رسائل صوتية وفيديو بالضغط المطوّل + لوحة الوسائط', 'Chat: hold-to-record voice/video notes + media panel'],
+          ['v52', '2026-06-26', 'قطّة (تقسيم المصاريف)، التقويم المشترك، التصويت', 'Expense splitting, shared calendar, polls'],
+          ['v47', '2026-06-26', 'وضع الصيانة/الإيقاف المؤقت مع مواقيت الصلاة والقبلة', 'Maintenance mode with prayer times & Qibla'],
+          ['v46', '2026-06-26', 'الدخول بالبريد الإلكتروني (إضافة لرقم الجوال)', 'Email login (in addition to phone)'],
+          ['v45', '2026-06-26', 'المساعد الذكي للأعضاء + اقتراحات للمشرف', 'AI assistant for members + suggestions to admin'],
+          ['v33', '2026-06-26', 'الدردشة الجماعية والملفات الشخصية ودليل الأعضاء', 'Group chat, profiles & member directory'],
+          ['v22', '2026-06-25', 'الأوقات: مواقيت الصلاة وبوصلة القبلة والتقويم الهجري', 'Times: prayers, Qibla compass, Hijri calendar'],
+          ['v20', '2026-06-25', 'الأقسام: حاسبة بلوت، البازر، الروليت، حاسبة تركس', 'Sections: Baloot calculator, buzzer, roulette, Trix calculator'],
+          ['v10', '2026-06-24', 'المعرض بتخزين خاص وآمن', 'Gallery on private secure storage'],
+          ['v4', '2026-06-24', 'إدارة الأعضاء وطلبات الانضمام والأدوار', 'Member management, join requests & roles'],
+          ['v1', '2026-06-23', 'الانطلاقة 🎉: الرئيسية والبطولات ودخول الأعضاء برقم الجوال', 'Launch 🎉: home, tournaments & phone-OTP member login']
+        ];
+        const isAr = I18n.lang === 'ar';
+        const list = UI.el('div', { style: 'display:none' });
+        LOG.forEach((e) => {
+          list.appendChild(UI.el('div', { class: 'card', style: 'padding:10px 14px' }, [
+            UI.el('div', { class: 'flex-between' }, [
+              UI.el('span', { style: 'font-weight:800;color:var(--navy)' }, e[0]),
+              UI.el('span', { class: 'card-meta', style: 'margin:0' }, e[1])
+            ]),
+            UI.el('div', { style: 'margin-top:2px;line-height:1.7' }, isAr ? e[2] : e[3])
+          ]));
+        });
+        const btn = UI.el('button', { class: 'btn btn-ghost btn-block', onclick: () => {
+          const open = list.style.display !== 'none';
+          list.style.display = open ? 'none' : '';
+          btn.textContent = open ? '📜 ' + I18n.t('adm_changelog_show') : '📜 ' + I18n.t('adm_changelog_hide');
+        } }, '📜 ' + I18n.t('adm_changelog_show'));
+        wrap.appendChild(btn);
+        wrap.appendChild(list);
       }
 
       /* ---- Gift codes: import, DM-distribute to members, manage leftovers.
