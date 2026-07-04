@@ -57,6 +57,9 @@
         view.innerHTML = '';
         view.className = 'view fade-in';
         void view.offsetWidth; // replay the entrance animation
+        // Always open a page from its TOP — otherwise the previous page's
+        // scroll position hides the new page's upper controls.
+        try { window.scrollTo(0, 0); document.documentElement.scrollTop = 0; document.body.scrollTop = 0; } catch (e) {}
         mod.render(view);
         this._paintNav();
       };
