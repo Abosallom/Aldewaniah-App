@@ -63,6 +63,8 @@
         adm_gift_wd_one: 'سحب الكود', adm_gift_wd_reason: 'سبب السحب', adm_gift_wd_reason_ph: 'مثال: أُرسل بالخطأ، أو الكود مخصص لعضو آخر…',
         adm_gift_wd_note: 'سيُحذف الكود من محادثة العضو، وإذا كتبت سببًا سيصله إشعار رسمي به. اتركه فارغًا للسحب بدون إشعار.',
         adm_gift_wd_go: 'سحب', adm_gift_wd_last: 'آخر سحب: من {name} — السبب: {reason}',
+        adm_gift_msg_title: 'نص رسالة الهدية', adm_gift_msg_hint: 'هذا النص يُرسل للعضو فوق الكود. عدّله كما تريد ثم احفظ.',
+        adm_gift_msg_save: 'حفظ النص', adm_gift_msg_saved: 'تم الحفظ',
         adm_gift_give_nouid: 'العضو {name} لم يفتح التطبيق بعد، لا يمكن مراسلته. اطلب منه فتح التطبيق مرة ثم أعد المحاولة.',
         adm_gift_available: 'متاح', adm_gift_assigned: 'أُرسل إلى',
         adm_gift_give: 'إعطاء لعضو', adm_gift_pick: 'اختر العضو', adm_gift_copy: 'نسخ', adm_gift_copied: 'نُسخ ✓',
@@ -108,6 +110,8 @@
         adm_gift_wd_one: 'Withdraw code', adm_gift_wd_reason: 'Withdrawal reason', adm_gift_wd_reason_ph: 'e.g. sent by mistake, or reserved for another member…',
         adm_gift_wd_note: 'The code message is removed from the member\'s chat; if you write a reason they get an official notice with it. Leave empty to withdraw silently.',
         adm_gift_wd_go: 'Withdraw', adm_gift_wd_last: 'Last withdrawal: from {name} — reason: {reason}',
+        adm_gift_msg_title: 'Gift message text', adm_gift_msg_hint: 'Sent to the member above their code. Edit freely, then save.',
+        adm_gift_msg_save: 'Save text', adm_gift_msg_saved: 'Saved',
         adm_gift_give_nouid: '{name} hasn\'t opened the app yet, can\'t message them. Ask them to open it once, then try again.',
         adm_gift_available: 'Available', adm_gift_assigned: 'Sent to',
         adm_gift_give: 'Give to member', adm_gift_pick: 'Pick the member', adm_gift_copy: 'Copy', adm_gift_copied: 'Copied ✓',
@@ -354,11 +358,12 @@
          demo account) ONE code in an official private message. Leftover
          codes stay here so the admin can give them to new joiners. ---- */
       const REVIEWER_PHONE = '+966555555555';
+      // The gift message is EDITABLE by the admin (stored in giftcodes/_template).
+      const GIFT_DEFAULT_MSG = 'اشتراك طِرا لمدة شهر مقدمة من تطبيق طِرا بقيادة إبراهيم الحامد\n'
+        + 'A month subscription for Tira App, powered by Ebrahim Alhamed';
+      let giftTemplate = GIFT_DEFAULT_MSG;
       function giftMsgText(code) {
-        // Exact gift wording chosen by Aziz (2026-07-04), bilingual:
-        return 'اشتراك طِرا لمدة شهر مقدمة من تطبيق طِرا بقيادة إبراهيم الحامد\n'
-             + 'A month subscription for Tira App, powered by Ebrahim Alhamed\n\n'
-             + '🎁 كود الاشتراك / Your code:\n' + code;
+        return giftTemplate + '\n\n🎁 كود الاشتراك / Your code:\n' + code;
       }
       // Send an official admin DM (same data model as js/modules/dm.js)
       async function sendGiftDM(toUid, toName, text) {
@@ -444,10 +449,32 @@
           // NOTE: do NOT orderBy here — Firestore omits any doc missing the
           // ordered field, which made codes "disappear". Fetch all, sort in JS.
           const snap = await db.collection('giftcodes').get();
-          snap.forEach((d) => rows.push(Object.assign({ id: d.id }, d.data())));
+          snap.forEach((d) => {
+            if (d.id === '_template') { giftTemplate = (d.data() || {}).text || GIFT_DEFAULT_MSG; return; }
+            rows.push(Object.assign({ id: d.id }, d.data()));
+          });
           rows.sort((a, b) => ((a.at && a.at.seconds) || 0) - ((b.at && b.at.seconds) || 0));
         } catch (e) { wrap.innerHTML = '<div class="auth-err">' + (e.message || 'Error') + '</div>'; return; }
         wrap.innerHTML = '';
+
+        /* editable gift message (what members receive above their code) */
+        const msgTa = UI.el('textarea', { class: 'fld', rows: '3' }); msgTa.value = giftTemplate;
+        const msgSaved = UI.el('span', { class: 'muted', style: 'font-size:.8rem;margin-inline-start:8px' });
+        const msgSave = UI.el('button', { class: 'btn', onclick: async () => {
+          const t = (msgTa.value || '').trim() || GIFT_DEFAULT_MSG;
+          try {
+            await db.collection('giftcodes').doc('_template').set({ text: t,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+            giftTemplate = t;
+            msgSaved.textContent = '✓ ' + I18n.t('adm_gift_msg_saved');
+            setTimeout(() => { msgSaved.textContent = ''; }, 2000);
+          } catch (e) { msgSaved.textContent = e.message || 'Error'; }
+        } }, I18n.t('adm_gift_msg_save'));
+        wrap.appendChild(UI.el('div', { class: 'card' }, [
+          UI.el('div', { class: 'card-title', style: 'margin:0 0 6px' }, I18n.t('adm_gift_msg_title')),
+          UI.el('div', { class: 'muted', style: 'font-size:.8rem;margin-bottom:6px' }, I18n.t('adm_gift_msg_hint')),
+          msgTa, UI.el('div', { style: 'margin-top:8px' }, [msgSave, msgSaved])
+        ]));
 
         /* import box */
         const ta = UI.el('textarea', { class: 'fld', rows: '3', placeholder: I18n.t('adm_gift_import_ph'),

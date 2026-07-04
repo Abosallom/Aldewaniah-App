@@ -293,7 +293,12 @@
           continue;
         }
         // run ended → cut it into projects, top first
+        var guard = 0; // STAGE 7 · P0-1: hard loop guard (a hand has ≤ 8 cards)
         while (run.length >= 3) {
+          if (++guard > 8) {
+            try { console.warn('baloot: findSequences loop guard tripped', run.slice()); } catch (e2) {}
+            break;
+          }
           var take = run.length >= 5 ? 5 : run.length;   // 5, 4 or 3
           var part = run.splice(run.length - take, take);
           found.push({
@@ -593,7 +598,11 @@
     return f;
   }
 
-  /** One complete card face as an SVG string. */
+  /** One complete card face as an SVG string.
+      STAGE 7 · P2-8 (owner's request, Kamelna reference): the corner index
+      is now rank + suit STACKED at the TOP of the card, ≈1.5× bigger and
+      high-contrast, drawn in BOTH top corners (top-left + top-right) so a
+      heavily fanned hand always shows a full readable index column. */
   function cardSVG(rank, suit) {
     var ink = SUIT_INK[suit];
     var s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 290">';
@@ -603,15 +612,15 @@
       '<radialGradient id="sG" cx="0.36" cy="0.3" r="1">' +
         '<stop offset="0" stop-color="' + ink[0] + '"/><stop offset="1" stop-color="' + ink[1] + '"/></radialGradient>' +
       '<g id="p" fill="url(#sG)">' + SUIT_PATH[suit] + '</g>' +
-      '<g id="ix"><text x="25" y="43" text-anchor="middle" font-family="Georgia,serif" font-size="' +
-        (rank === '10' ? 29 : 34) + '" font-weight="700" fill="url(#sG)">' + rank + '</text>' +
-        '<use href="#p" transform="translate(25 63) scale(0.32)"/></g>' +
+      '<g id="ix"><text x="30" y="52" text-anchor="middle" font-family="Georgia,serif" font-size="' +
+        (rank === '10' ? 40 : 48) + '" font-weight="800" fill="url(#sG)">' + rank + '</text>' +
+        '<use href="#p" transform="translate(30 84) scale(0.52)"/></g>' +
       '</defs>';
     // warm white body + thin double gold inner frame
     s += '<rect x="1" y="1" width="198" height="288" rx="17" fill="url(#bgG)" stroke="#d9cdb2" stroke-width="1.5"/>' +
          '<rect x="8" y="8" width="184" height="274" rx="12" fill="none" stroke="' + ART.gold + '" stroke-width="1.6" opacity="0.9"/>' +
          '<rect x="12" y="12" width="176" height="266" rx="9" fill="none" stroke="' + ART.gold + '" stroke-width="0.6" opacity="0.5"/>' +
-         '<use href="#ix"/><use href="#ix" transform="rotate(180 100 145)"/>';
+         '<use href="#ix"/><use href="#ix" transform="translate(140 0)"/>';
     if (PIP_XY[rank]) {
       PIP_XY[rank].forEach(function (xy) {
         s += '<use href="#p" transform="translate(' + xy[0] + ' ' + xy[1] + ') scale(0.52)' +
@@ -619,18 +628,20 @@
       });
     } else if (rank === 'A') {
       s += '<g stroke="' + ART.gold + '" fill="none">' +
-           '<circle cx="100" cy="145" r="64" stroke-width="1.4" stroke-dasharray="3 5"/>' +
-           '<circle cx="100" cy="145" r="72" stroke-width="0.8" opacity="0.55"/></g>';
+           '<circle cx="100" cy="145" r="62" stroke-width="1.4" stroke-dasharray="3 5"/>' +
+           '<circle cx="100" cy="145" r="68" stroke-width="0.8" opacity="0.55"/></g>';
       for (var i = 0; i < 12; i++) {
         s += '<path d="M100 66 C104 72 104 78 100 83 C96 78 96 72 100 66 Z" fill="' + ART.gold +
              '" opacity="0.9" transform="rotate(' + (i * 30) + ' 100 145)"/>';
       }
       s += '<use href="#p" transform="translate(100 145) scale(1.7)"/>';
     } else {
-      s += '<rect x="32" y="38" width="136" height="214" rx="10" fill="#fbf5e6" stroke="' + ART.gold + '" stroke-width="1.4"/>' +
-           '<line x1="38" y1="145" x2="162" y2="145" stroke="' + ART.gold + '" stroke-width="0.8" opacity="0.6"/>' +
+      // STAGE 7: court frame inset to x=48 so the big top indices own the
+      // corner columns (figures span x 58–142, so nothing is clipped)
+      s += '<rect x="48" y="40" width="104" height="210" rx="10" fill="#fbf5e6" stroke="' + ART.gold + '" stroke-width="1.4"/>' +
+           '<line x1="54" y1="145" x2="146" y2="145" stroke="' + ART.gold + '" stroke-width="0.8" opacity="0.6"/>' +
            '<g id="ct">' + courtFigure(rank) +
-             '<use href="#p" transform="translate(51 59) scale(0.28)"/></g>' +
+             '<use href="#p" transform="translate(58 57) scale(0.24)"/></g>' +
            '<use href="#ct" transform="rotate(180 100 145)"/>';
     }
     return s + '</svg>';
@@ -808,12 +819,20 @@
     requestAnimationFrame(step);
   }
 
+  /** STAGE 7 · P0-1: resume decision — pure so the node test can prove it.
+      A missing table OR a finished one must NEVER remount the stage:
+      the stored code is cleared and the player lands in the lobby. */
+  function resumeAction(exists, phase) {
+    return (!exists || phase === 'gameEnd') ? 'lobby' : 'open';
+  }
+
   // exposed for the /tmp node smoke test (harmless in the browser)
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { newDeck: newDeck, shuffle: shuffle, legalMoves: legalMoves,
       winnerOf: winnerOf, scoreRound: scoreRound, findProjects: findProjects,
       botBidChoice: botBidChoice, botPlayChoice: botPlayChoice, suitOf: suitOf,
-      cardSVG: cardSVG, cardBackSVG: cardBackSVG };
+      cardSVG: cardSVG, cardBackSVG: cardBackSVG, resumeAction: resumeAction,
+      cheapest: cheapest };
   }
 
   /* ======================================================================
@@ -855,7 +874,7 @@
         bg_round_end: 'نتيجة الجولة', bg_abnat: 'الأبناط', bg_points: 'النقاط',
         bg_khosran: 'خسران! فريق المشتري ما غطّى الشراء', bg_kaboot: 'كبوت!',
         bg_buyer: 'المشتري', bg_next_round: 'الجولة التالية', bg_wait_host: 'بانتظار المضيف…',
-        bg_we_won: 'لنا فزنا 🎉', bg_they_won: 'فزتم 👏', bg_new_game: 'لعبة جديدة',
+        bg_we_won: 'لنا فزنا 🎉', bg_they_won: 'فازوا 👏 حظ أوفر', bg_new_game: 'لعبة جديدة',
         bg_totals: 'النشرة', bg_mode: 'النمط', bg_last_trick: 'آخر أكلة',
         bg_suit_S: 'سبيت', bg_suit_H: 'هاص', bg_suit_D: 'ديمن', bg_suit_C: 'كلفس',
         bg_spectator: 'تشاهد الطاولة (المقاعد ممتلئة)', bg_full: 'المقاعد ممتلئة',
@@ -881,7 +900,9 @@
         // STAGE 5 — الإخراج الكامل
         bg_sound: 'الصوت',
         // STAGE 6 — نِسَب كملنا (layout proportions + HUD)
-        bg_share: 'مشاركة', bg_end: 'إنهاء'
+        bg_share: 'مشاركة', bg_end: 'إنهاء',
+        // STAGE 7 — إصلاحات جولة الاختبار
+        bg_confirm: 'تأكيد', bg_proj_declared: 'تم إعلان المشروع ✅'
       },
       en: {
         bg_title: 'Baloot Online', bg_sub: 'Private Baloot tables — Kamelna rules',
@@ -928,7 +949,9 @@
         // STAGE 5 — full-screen game feel
         bg_sound: 'Sound',
         // STAGE 6 — Kamelna layout proportions + HUD
-        bg_share: 'Share', bg_end: 'End'
+        bg_share: 'Share', bg_end: 'End',
+        // STAGE 7 — playtest fixes
+        bg_confirm: 'Confirm', bg_proj_declared: 'Project declared ✅'
       }
     },
 
@@ -971,8 +994,12 @@
         projShownRound: 0, projTimerRound: 0, projTimer: null, // trick-2 reveal overlay
         // STAGE 3: pacing engine
         turnSig: '', turnStartAt: 0,          // current turn signature + local start time
-        turnTimer: null, backupTimer: null,   // human timeout / host backup
+        turnDeadline: 0,                      // STAGE 7 · P0-2: server-anchored deadline for THIS turn
+        turnTimer: null, backupTimer: null,   // human timeout (backup kept only for teardown)
         botTimer: null, botTries: 0,          // bot action scheduler
+        watchInt: null,                       // STAGE 7 · P0-1: host watchdog (un-hangs bots/automation)
+        botKickSig: '', botKicks: 0,          // watchdog loop guard (max re-kicks per signature)
+        projDialog: false,                    // STAGE 7 · P1-5: مشروع confirm dialog open → pause my auto-play
         dealAnimKey: '', restAnimKey: '', lastPhase: null, dealOv: null, // deal animation
         autoNextKey: '', autoNextTimer: null, autoNextInt: null, // roundEnd auto-advance
         // STAGE 4: Kamelna look & feel
@@ -999,6 +1026,7 @@
           clearTimeout(st.projTimer);
           clearTimeout(st.turnTimer); clearTimeout(st.backupTimer);
           clearTimeout(st.botTimer);
+          clearInterval(st.watchInt); st.watchInt = null; // STAGE 7 watchdog
           clearTimeout(st.autoNextTimer); clearInterval(st.autoNextInt);
           clearTimeout(st.sayTimer); clearInterval(st.ringInt); // STAGE 4
           if (st.dealOv) { try { st.dealOv.remove(); } catch (e) {} st.dealOv = null; }
@@ -1041,6 +1069,26 @@
           setTimeout(function () { try { t.remove(); } catch (e) {} }, 1900);
         } catch (e) {}
       }
+
+      /** STAGE 7 · P2-9: in-stage confirm dialog. window.confirm (UI.confirm)
+          is suppressed by automation and can BLOCK the main thread in the
+          iOS wrapper, so the game ships its own non-blocking modal. It is
+          appended to st.ov (not the repainted stage body) so snapshot
+          repaints can't dismiss it. */
+      function bgConfirm(msg, onYes) {
+        var host = st.ov || root;
+        var bd = UI.el('div', { class: 'bg-modalbd' });
+        function shut() { try { bd.remove(); } catch (e) {} }
+        bd.onclick = shut;
+        bd.appendChild(UI.el('div', { class: 'bg-modal', onclick: function (e) { e.stopPropagation(); } }, [
+          UI.el('h3', null, msg),
+          UI.el('button', { class: 'btn btn-green btn-block', style: 'margin-top:10px',
+            onclick: function () { shut(); onYes(); } }, I18n.t('bg_confirm')),
+          UI.el('button', { class: 'btn btn-ghost btn-block', style: 'margin-top:8px', onclick: shut },
+            I18n.t('bg_back'))
+        ]));
+        host.appendChild(bd);
+      }
       function isHost() { return !!(st.pub && st.pub.hostUid === myUid); }
       function mySeat() {
         var seats = (st.pub && st.pub.seats) || [];
@@ -1051,10 +1099,12 @@
       }
       /** STAGE 3: a bot seat = a seat created with bot:true, OR a legacy
           practice-mode "virtual" seat (old tables upgrade gracefully —
-          their virtual guests simply become bot-driven). */
+          their virtual guests simply become bot-driven).
+          STAGE 7 · P0-2: a seat carrying ANY uid is a HUMAN, full stop —
+          the bot driver and timers must never touch it. */
       function isBotSeat(i) {
         var s = st.pub && st.pub.seats && st.pub.seats[i];
-        return !!(s && (s.bot || s.virtual));
+        return !!(s && !s.uid && (s.bot || s.virtual));
       }
       function hasBots() {
         var p = st.pub; if (!p || !p.seats) return false;
@@ -1150,8 +1200,8 @@
         try { saved = localStorage.getItem(LSKEY); } catch (e) {}
         if (saved) {
           root.appendChild(UI.el('div', { class: 'card' }, [
-            UI.el('button', { class: 'btn btn-green btn-block', onclick: function () { openTable(saved); } },
-              I18n.t('bg_resume') + ' · ' + saved)
+            UI.el('button', { class: 'btn btn-green btn-block', onclick: function () { resumeTable(saved); } },
+              I18n.t('bg_resume') + ' · ⁦' + saved + '⁩')  // STAGE 7: code stays LTR
           ]));
         }
 
@@ -1191,7 +1241,7 @@
             roundScores: null, totals: { t0: 0, t1: 0 },
             handCounts: [0, 0, 0, 0], roundNo: 0,
             // STAGE 2: projects keyed by team, the دبل chain, declaration flags
-            projects: {}, declared: {}, mult: 1, doubleTurn: null, doubleLeft: []
+            projects: {}, declared: {}, mult: 1, multBy: null, doubleTurn: null, doubleLeft: []
           });
           try { localStorage.setItem(LSKEY, code); } catch (e) {}
           openTable(code);
@@ -1215,6 +1265,9 @@
         st.code = code;
         st.ref = db.collection('balootTables').doc(code);
         st.pub = null; st.hands = {}; st.privSubs = {}; st.guard = '';
+        st.turnSig = ''; st.turnDeadline = 0; st.projDialog = false;   // STAGE 7
+        st.botKickSig = ''; st.botKicks = 0;
+        st.watchInt = setInterval(watchdog, 4000);      // STAGE 7 · P0-1: host anti-hang watchdog
         // STAGE 5: the whole table (lobby AND game) lives in the
         // full-screen stage; the section page keeps only a resume card.
         openStage();
@@ -1223,7 +1276,7 @@
         root.innerHTML = '';
         root.appendChild(UI.el('div', { class: 'card' }, [
           UI.el('button', { class: 'btn btn-green btn-block', onclick: function () { openTable(code); } },
-            I18n.t('bg_resume') + ' · ' + code)
+            I18n.t('bg_resume') + ' · ⁦' + code + '⁩')     // STAGE 7: code stays LTR
         ]));
 
         st.pubUnsub = st.ref.onSnapshot(function (doc) {
@@ -1352,7 +1405,7 @@
           roundScores: null, handCounts: [5, 5, 5, 5],
           roundNo: (p.roundNo || 0) + 1, updatedAt: ts(),
           // STAGE 2: fresh round → no projects, no دبل, nobody declared
-          projects: {}, declared: {}, mult: 1, doubleTurn: null, doubleLeft: []
+          projects: {}, declared: {}, mult: 1, multBy: null, doubleTurn: null, doubleLeft: []
         });
         await batch.commit();
       }
@@ -1401,19 +1454,50 @@
       }
 
       /* ======================================================================
+         STAGE 7 · P0-3: one shared transaction runner — a single retry with
+         backoff on optimistic-concurrency conflicts (failed-precondition /
+         aborted), everything else propagates to the caller's catch. Stale
+         turn/phase checks inside the transactions now NO-OP silently
+         instead of throwing (the snapshot repaints anyway).
+         ====================================================================== */
+      async function runTx(fn) {
+        try {
+          return await db.runTransaction(fn);
+        } catch (e) {
+          var code = String((e && e.code) || '');
+          var msg = String((e && e.message) || '');
+          if (code === 'failed-precondition' || code === 'aborted' ||
+              msg.indexOf('failed-precondition') >= 0 || msg.indexOf('aborted') >= 0) {
+            await new Promise(function (res) { setTimeout(res, 260 + Math.floor(Math.random() * 400)); });
+            return await db.runTransaction(fn);           // one retry, then give up
+          }
+          throw e;
+        }
+      }
+      /** STAGE 7 · P0-3: single-writer discipline — this client may write a
+          move ONLY for its own seat, or (host only) for a bot seat. */
+      function mayWriteFor(seat) {
+        return controlsSeat(seat) || (isHost() && isBotSeat(seat));
+      }
+
+      /* ======================================================================
          BIDDING — transactional so only the seat whose turn it is can act.
          Round 1: حكم = flip suit · صن ends the auction instantly.
          Round 2: حكم = any other suit. 8 passes → ورق (redeal, dealer+1).
+         STAGE 7 · P0-2: the acting seat is passed EXPLICITLY by the caller
+         (never re-read from st.pub at call time) so a stale capture can
+         never bid for somebody else's — least of all the human's — turn.
          ====================================================================== */
-      async function doBid(action, chosenSuit, tick) {
-        var actSeat = st.pub && st.pub.turn;
+      async function doBid(action, chosenSuit, tick, seat) {
+        var actSeat = (seat == null) ? (st.pub && st.pub.turn) : seat;
         st.suitPick = false;
+        if (actSeat == null || actSeat < 0 || !mayWriteFor(actSeat)) return;
         try {
-          await db.runTransaction(async function (tx) {
+          await runTx(async function (tx) {
             var snap = await tx.get(st.ref);
             var p = snap.data();
-            if (!p || p.phase !== 'bidding' || p.turn !== actSeat) throw new Error('turn');
-            if (tick && p.botTick === tick) throw new Error('tick'); // STAGE 3: two-tab guard
+            if (!p || p.phase !== 'bidding' || p.turn !== actSeat) return; // stale → no-op
+            if (tick && p.botTick === tick) return;       // STAGE 3: two-tab guard
             var r = p.bidRound || 1;
             var bids = (p.bids || []).slice();
             var upd = { updatedAt: ts() };
@@ -1472,16 +1556,19 @@
       async function playCard(seat, card, tick) {
         var key = privKey(seat);
         var hand = (st.hands[key] || []).slice();
+        if (!mayWriteFor(seat)) return;                   // STAGE 7 · P0-3
+        var applied = false;                              // did the tx actually commit a move?
         try {
-          await db.runTransaction(async function (tx) {
+          await runTx(async function (tx) {
+            applied = false;                              // reset on tx retry
             var snap = await tx.get(st.ref);
             var p = snap.data();
-            if (!p || p.phase !== 'playing' || p.turn !== seat) throw new Error('turn');
-            if (tick && p.botTick === tick) throw new Error('tick'); // STAGE 3: two-tab guard
+            if (!p || p.phase !== 'playing' || p.turn !== seat) return;  // stale → no-op
+            if (tick && p.botTick === tick) return;       // STAGE 3: two-tab guard
             var table = (p.table || []).slice();
-            if (table.length >= 4) throw new Error('full');
+            if (table.length >= 4) return;
             var legal = legalMoves(hand, table, p.mode, p.trump, seat);
-            if (legal.indexOf(card) < 0) throw new Error('illegal');
+            if (legal.indexOf(card) < 0) return;          // stale hand → let the watchdog re-pick
             table.push({ seat: seat, card: card });
             var hc = (p.handCounts || [8, 8, 8, 8]).slice();
             hc[seat] = Math.max(0, hc[seat] - 1);
@@ -1491,8 +1578,10 @@
               updatedAt: ts()
             };
             if (tick) upd.botTick = tick;
+            applied = true;
             tx.update(st.ref, upd);
           });
+          if (!applied) return;                           // no move happened → hand untouched
           // optimistic local update + authoritative priv-doc update
           st.hands[key] = hand.filter(function (c) { return c !== card; });
           await st.ref.collection('priv').doc(key).update({ cards: FV.arrayRemove(card) });
@@ -1506,20 +1595,24 @@
          call قهوة — this one deal decides the whole game. بس passes; when
          both seats of the asking team pass, the chain stops and play begins.
          ====================================================================== */
-      async function doDouble(action, tick) {
-        var actSeat = st.pub && st.pub.doubleTurn;
+      async function doDouble(action, tick, seat) {
+        // STAGE 7 · P0-2/P1-4: explicit seat from the caller — a stale
+        // st.pub.doubleTurn capture can no longer act for the wrong seat.
+        var actSeat = (seat == null) ? (st.pub && st.pub.doubleTurn) : seat;
+        if (actSeat == null || actSeat < 0 || !mayWriteFor(actSeat)) return;
         try {
-          await db.runTransaction(async function (tx) {
+          await runTx(async function (tx) {
             var snap = await tx.get(st.ref);
             var p = snap.data();
-            if (!p || p.phase !== 'doubling' || p.doubleTurn !== actSeat) throw new Error('turn');
-            if (tick && p.botTick === tick) throw new Error('tick'); // STAGE 3: two-tab guard
+            if (!p || p.phase !== 'doubling' || p.doubleTurn !== actSeat) return; // stale → no-op
+            if (tick && p.botTick === tick) return;       // STAGE 3: two-tab guard
             var upd = { updatedAt: ts() };
             if (tick) upd.botTick = tick;
             if (action === 'raise') {
               var cur = p.mult || 1;
               var next = cur >= 4 ? 'coffee' : cur + 1;   // 1→2→3→4→قهوة
               upd.mult = next;
+              upd.multBy = actSeat;                       // STAGE 7 · P1-4: who called it (seat pill)
               if (next === 'coffee') {
                 // nothing can top قهوة → straight to the cards
                 upd.phase = 'playing'; upd.turn = (p.dealer + 1) % 4;
@@ -1559,17 +1652,20 @@
          ====================================================================== */
       async function declareProject(seat) {
         var hand = (st.hands[privKey(seat)] || []).slice();
-        if (hand.length !== 8) return;                 // must act before my first card
+        if (hand.length !== 8) return false;           // must act before my first card
+        if (!mayWriteFor(seat)) return false;          // STAGE 7 · P0-3
         var found = findProjects(hand, st.pub && st.pub.mode, st.pub && st.pub.trump);
-        if (!found.length) return;
+        if (!found.length) return false;
+        var ok = false;                                // STAGE 7 · P1-5: real feedback for the dialog
         try {
-          await db.runTransaction(async function (tx) {
+          await runTx(async function (tx) {
+            ok = false;                                // reset on tx retry
             var snap = await tx.get(st.ref);
             var p = snap.data();
-            if (!p || p.phase !== 'playing') throw new Error('phase');
+            if (!p || p.phase !== 'playing') return;
             var tw = p.tricksWon || {};
-            if (((tw.t0 || []).length + (tw.t1 || []).length) > 0) throw new Error('late'); // trick 1 only
-            if (p.declared && p.declared[seat]) throw new Error('dup');
+            if (((tw.t0 || []).length + (tw.t1 || []).length) > 0) return; // trick 1 only
+            if (p.declared && p.declared[seat]) return;
             var ord = (seat - ((p.dealer + 1) % 4) + 4) % 4; // play-order position (tie-break)
             var teamKey = String(seat % 2);
             var projects = {
@@ -1582,9 +1678,11 @@
             });
             var declared = Object.assign({}, p.declared || {});
             declared[seat] = true;
+            ok = true;
             tx.update(st.ref, { projects: projects, declared: declared, updatedAt: ts() });
           });
-        } catch (e) { /* too late / double tap — snapshot repaints */ }
+        } catch (e) { ok = false; /* too late / double tap — snapshot repaints */ }
+        return ok;
       }
 
       /* ======================================================================
@@ -1601,16 +1699,16 @@
           st.collectSig = sig;
           clearTimeout(st.collectTimer); clearTimeout(st.sweepTimer);
 
-          // sweep animation toward the winner (everyone sees it locally)
+          // STAGE 7 · P2-7: hold the complete trick ~1.2s so everyone can
+          // READ it, then sweep toward the winner (locally on every client)
           var win = winnerOf(p.table, p.mode, p.trump);
           st.sweepTimer = setTimeout(function () {
             try { sweepAnim(win.seat); } catch (e) {}
-          }, 550);
+          }, 1200);
 
-          var delay = -1;
-          if (controlsSeat(p.table[3].seat)) delay = 800;
-          else if (isHost()) delay = isBotSeat(p.table[3].seat) ? 850 : 1500; // host drives bot tricks
-          else if (mySeat() >= 0) delay = 2200;
+          // STAGE 7 · P0-3: single-writer — the HOST alone collects tricks;
+          // a seated non-host only steps in as a LATE safety net (host gone)
+          var delay = isHost() ? 2100 : (mySeat() >= 0 ? 8000 : -1);
           if (delay > 0) st.collectTimer = setTimeout(function () { collectTrick(sig); }, delay);
         } else {
           st.collectSig = null;
@@ -1620,13 +1718,13 @@
 
       async function collectTrick(expectSig) {
         try {
-          await db.runTransaction(async function (tx) {
+          await runTx(async function (tx) {
             var snap = await tx.get(st.ref);
             var p = snap.data();
-            if (!p || p.phase !== 'playing') throw new Error('phase');
+            if (!p || p.phase !== 'playing') return;      // stale → no-op (P0-3)
             var table = p.table || [];
-            if (table.length !== 4) throw new Error('len');
-            if (table.map(function (t) { return t.card; }).join(',') !== expectSig) throw new Error('sig');
+            if (table.length !== 4) return;
+            if (table.map(function (t) { return t.card; }).join(',') !== expectSig) return;
 
             var win = winnerOf(table, p.mode, p.trump);
             var team = win.seat % 2;
@@ -1717,24 +1815,39 @@
         return -1;
       }
 
+      /** STAGE 7 · P0-2: millis of a Firestore server timestamp (0 when the
+          local echo hasn't resolved it yet). */
+      function serverMs(v) {
+        try { return (v && typeof v.toMillis === 'function') ? v.toMillis() : 0; } catch (e) { return 0; }
+      }
+
       function pacing() {
         var p = st.pub; if (!p) return;
         var sig = turnSigOf(p);
         if (sig !== st.turnSig) {
           st.turnSig = sig; st.turnStartAt = Date.now(); st.botTries = 0;
+          // STAGE 7 · P0-2: the deadline for THIS turn is anchored to the
+          // SERVER write that created it (doc.updatedAt), but never earlier
+          // than a full visible countdown on this client (resume/rejoin).
+          var sv = serverMs(p.updatedAt);
+          st.turnDeadline = Math.max(sv ? sv + TURN_MS : 0, st.turnStartAt + TURN_MS);
           clearTimeout(st.turnTimer); clearTimeout(st.backupTimer); clearTimeout(st.botTimer);
           var act = actorOf(p);
           // STAGE 5: gentle chime the moment a turn becomes MINE
           if (act >= 0 && controlsSeat(act) && (p.table || []).length < 4) Sfx.chime();
           if (act >= 0 && (p.table || []).length < 4) {
             if (isBotSeat(act)) {
+              // STAGE 7 · P2-7: readable bot cadence — 900–1200ms per move
               if (isHost()) {
-                st.botTimer = setTimeout(function () { botAct(sig); }, 700 + Math.floor(Math.random() * 500));
+                st.botTimer = setTimeout(function () { botAct(sig); }, 900 + Math.floor(Math.random() * 300));
               }
             } else if (controlsSeat(act)) {
-              st.turnTimer = setTimeout(function () { autoAct(sig, act); }, TURN_MS);
-            } else if (isHost() && p.phase !== 'playing') {
-              st.backupTimer = setTimeout(function () { autoAct(sig, act); }, TURN_MS + 3000);
+              // STAGE 7 · P0-2/P0-3: ONLY my own client times out my own
+              // seat, and never before the full visible countdown. The old
+              // host "backup" that auto-passed OTHER HUMANS is gone — the
+              // host now enforces timeouts for bots only.
+              st.turnTimer = setTimeout(function () { autoAct(sig, act); },
+                Math.max(250, st.turnDeadline - Date.now() + 150));
             }
           }
         }
@@ -1762,23 +1875,34 @@
 
       /** One bot action (host client only). Re-validates the turn signature,
           skips if another host tab already ticked this exact state, retries
-          briefly if the bot's hand hasn't streamed in yet. */
+          briefly if the bot's hand hasn't streamed in yet.
+          STAGE 7 · P0-2: a bot is ONLY a seat with uid == null — a seat that
+          carries any uid is a human and the driver hard-refuses to act.
+          STAGE 7 · P0-1: bounded retries + console.warn instead of a silent
+          give-up; the watchdog below re-kicks a stuck signature. */
       async function botAct(sig) {
         var p = st.pub;
         if (!p || !isHost() || turnSigOf(p) !== sig) return;
         if (p.botTick === sig) return;                    // second tab already moved
         var act = actorOf(p);
         if (act < 0 || !isBotSeat(act)) return;
+        var so = p.seats && p.seats[act];
+        if (!so || so.uid) return;                        // uid'd seat = HUMAN, never bot-driven
+        if (st.botTries > 40) {                           // loop guard
+          if (st.botTries === 41) { st.botTries++; try { console.warn('baloot: bot driver guard tripped for', sig); } catch (e2) {} }
+          return;
+        }
         try {
-          if (p.phase === 'doubling') { await doDouble('pass', sig); return; }  // bots never دبل
+          if (p.phase === 'doubling') { await doDouble('pass', sig, act); return; }  // bots never دبل
           var hand = st.hands[privKey(act)] || [];
           if (!hand.length) {                             // priv doc still loading
-            if (st.botTries++ < 10) st.botTimer = setTimeout(function () { botAct(sig); }, 450);
+            st.botTries++;
+            st.botTimer = setTimeout(function () { botAct(sig); }, 450);
             return;
           }
           if (p.phase === 'bidding') {
             var ch = botBidChoice(hand, p);
-            await doBid(ch.a, ch.suit || null, sig);
+            await doBid(ch.a, ch.suit || null, sig, act);
           } else if (p.phase === 'playing') {
             // declare projects automatically before the bot's first card
             var tw = p.tricksWon || {};
@@ -1790,19 +1914,70 @@
             var card = botPlayChoice(hand, p.table || [], p.mode, p.trump, act, p.buyer);
             await playCard(act, card, sig);
           }
-        } catch (e) { /* transaction turn-check lost a race — snapshot rules */ }
+        } catch (e) {
+          // lost a race / transient error → bounded retry (never a dead table)
+          st.botTries++;
+          st.botTimer = setTimeout(function () { botAct(sig); }, 700);
+        }
       }
 
-      /** Turn-timer expiry: بس on bids/doubles, lowest legal card on plays. */
+      /** STAGE 7 · P0-1: host watchdog — every 4s it un-sticks anything the
+          normal event flow dropped (a bot whose move never landed, a full
+          trick nobody collected, a deal/redeal transition whose write
+          failed). All re-kicks are bounded so it can never loop forever. */
+      function watchdog() {
+        try {
+          var p = st.pub;
+          if (!p || !isHost()) return;
+          var idle = Date.now() - (st.turnStartAt || 0);
+          if ((p.phase === 'dealing' || p.phase === 'redeal' || p.phase === 'dealRest') && idle > 8000) {
+            st.guard = ''; st.turnStartAt = Date.now();   // re-arm host automation once
+            hostAutomation();
+            return;
+          }
+          if (p.phase === 'playing' && (p.table || []).length === 4 && idle > 5000) {
+            collectTrick(p.table.map(function (t) { return t.card; }).join(','));
+            return;
+          }
+          var act = actorOf(p);
+          if (act >= 0 && isBotSeat(act) && idle > 4000) {
+            if (st.botKickSig !== st.turnSig) { st.botKickSig = st.turnSig; st.botKicks = 0; }
+            st.botKicks++;
+            if (st.botKicks > 20) {                       // loop guard
+              if (st.botKicks === 21) { try { console.warn('baloot: watchdog stopped re-kicking', st.turnSig); } catch (e2) {} }
+              return;
+            }
+            st.botTries = 0;
+            botAct(turnSigOf(p));
+          }
+        } catch (e) {}
+      }
+
+      /** Turn-timer expiry: بس on bids/doubles, lowest legal card on plays.
+          STAGE 7 · P0-2/P0-3: fires ONLY for my own seat, never before the
+          full visible countdown, and re-checks the actor + deadline. */
       async function autoAct(sig, seat) {
         var p = st.pub;
         if (!p || turnSigOf(p) !== sig) return;
         if (p.botTick === sig) return;
+        if (actorOf(p) !== seat) return;                  // stale capture → never act
+        if (!controlsSeat(seat)) return;                  // I may only time out MYSELF
+        var left = (st.turnDeadline || 0) - Date.now();
+        if (left > 200) {                                 // fired early (clock/reschedule) → wait it out
+          clearTimeout(st.turnTimer);
+          st.turnTimer = setTimeout(function () { autoAct(sig, seat); }, left + 150);
+          return;
+        }
+        if (st.projDialog) {                              // P1-5: مشروع dialog open → pause auto-play
+          clearTimeout(st.turnTimer);
+          st.turnTimer = setTimeout(function () { autoAct(sig, seat); }, 2000);
+          return;
+        }
         try {
-          if (controlsSeat(seat)) toast(I18n.t('bg_timeout_pass')); // it was MY turn
-          if (p.phase === 'bidding') await doBid('pass', null, sig);
-          else if (p.phase === 'doubling') await doDouble('pass', sig);
-          else if (p.phase === 'playing' && controlsSeat(seat)) {
+          toast(I18n.t('bg_timeout_pass'));               // it was MY turn
+          if (p.phase === 'bidding') await doBid('pass', null, sig, seat);
+          else if (p.phase === 'doubling') await doDouble('pass', sig, seat);
+          else if (p.phase === 'playing') {
             var hand = st.hands[privKey(seat)] || [];
             if (!hand.length) return;
             var legal = legalMoves(hand, p.table || [], p.mode, p.trump, seat);
@@ -1899,7 +2074,7 @@
          ====================================================================== */
       async function sit(i) {
         try {
-          await db.runTransaction(async function (tx) {
+          await runTx(async function (tx) {
             var snap = await tx.get(st.ref);
             var p = snap.data();
             if (!p || p.phase !== 'lobby') throw new Error('phase');
@@ -1965,7 +2140,7 @@
       async function nextRound() {
         if (!isHost()) return;
         try {
-          await db.runTransaction(async function (tx) {
+          await runTx(async function (tx) {
             var snap = await tx.get(st.ref);
             var p = snap.data();
             if (!p || p.phase !== 'roundEnd') throw new Error('phase');
@@ -1977,7 +2152,7 @@
       async function newGame() {
         if (!isHost()) return;
         try {
-          await db.runTransaction(async function (tx) {
+          await runTx(async function (tx) {
             var snap = await tx.get(st.ref);
             var p = snap.data();
             if (!p || p.phase !== 'gameEnd') throw new Error('phase');
@@ -2086,7 +2261,7 @@
         var row = UI.el('div', { class: 'bg-lobby-actions' }, [
           UI.el('button', { class: 'btn btn-ghost', onclick: leaveSeat }, I18n.t('bg_leave_seat')),
           isHost() ? UI.el('button', { class: 'btn btn-ghost bg-danger', onclick: function () {
-            UI.confirm(I18n.t('bg_end_confirm'), endTable);
+            bgConfirm(I18n.t('bg_end_confirm'), endTable);
           } }, I18n.t('bg_end_table')) : null
         ]);
         m.appendChild(row);
@@ -2128,9 +2303,24 @@
         if (p.phase === 'doubling' && p.doubleTurn != null && controlsSeat(p.doubleTurn)) {
           m.appendChild(doubleSheet(p));               // STAGE 2: دبل chain
         }
+        // STAGE 7 · P1-5: «مشروع» docked at the bid-bar level (left side),
+        // any time during trick 1 while I still hold all 8 cards
+        if (st.projDialog && p.phase !== 'playing') st.projDialog = false;
+        if (canDeclare(p)) {
+          m.appendChild(UI.el('div', { class: 'bg-projdock' }, [
+            UI.el('button', { class: 'bg-projpill', onclick: function (e) {
+              e.stopPropagation();
+              st.projDialog = true; paint();
+            } }, I18n.t('bg_project'))
+          ]));
+        }
 
         m.appendChild(actionBar(p));                   // STAGE 4: قيدها/المشاريع/تعابير
 
+        if (st.projDialog) {                           // STAGE 7 · P1-5: confirm dialog
+          var dlg = canDeclare(p) ? projDeclareDialog(p, mySeat()) : null;
+          if (dlg) m.appendChild(dlg); else st.projDialog = false;
+        }
         var reveal = projectOverlay(p);                // STAGE 2: trick-2 showdown
         if (reveal) m.appendChild(reveal);
         if (st.modal === 'scores') m.appendChild(scoreSheetModal(p));       // STAGE 4
@@ -2171,13 +2361,15 @@
               UI.el('span', { class: 'bg-scorepill' }, [UI.el('small', null, I18n.t('bg_us')), usB]),
               UI.el('span', { class: 'bg-scorepill' }, [UI.el('small', null, I18n.t('bg_them')), themB])
             ]),
-            UI.el('span', { class: 'bg-hudsess' }, I18n.t('bg_session') + ' ' + st.code)
+            // STAGE 7 · P2-9: the code itself renders LTR inside the RTL label
+            UI.el('span', { class: 'bg-hudsess' },
+              [I18n.t('bg_session') + ' ', UI.el('b', { class: 'bg-codeltr' }, st.code)])
           ]),
           UI.el('span', { class: 'bg-hudgrow' }),
           hudBtn(Sfx.enabled() ? '🔊' : '🔇', I18n.t('bg_sound'), '', function () { Sfx.toggle(); paint(); }),
           hudBtn('✕', I18n.t('bg_exit'), '', exitView),
           isHost() ? hudBtn('⏻', I18n.t('bg_end'), 'danger', function () {
-            UI.confirm(I18n.t('bg_end_confirm'), endTable);
+            bgConfirm(I18n.t('bg_end_confirm'), endTable);
           }) : null
         ]);
       }
@@ -2211,9 +2403,12 @@
         return f;
       }
 
-      /** Seconds left on the current turn (for the ring's countdown number). */
+      /** Seconds left on the current turn (for the ring's countdown number).
+          STAGE 7 · P0-2: reads the same deadline the timeout fires on, so
+          the visible countdown and the auto-play can never disagree. */
       function ringSecs() {
-        return Math.max(0, Math.ceil((TURN_MS - (Date.now() - (st.turnStartAt || Date.now()))) / 1000));
+        var end = st.turnDeadline || ((st.turnStartAt || Date.now()) + TURN_MS);
+        return Math.max(0, Math.ceil((end - Date.now()) / 1000));
       }
 
       function seatChip(p, i) {
@@ -2283,6 +2478,14 @@
                    : p.mode === 'ashkal' ? I18n.t('bg_ashkal')
                    : I18n.t('bg_hokum') + ' ' + SUIT_CHAR[p.trump];
           kids.push(UI.el('div', { class: 'bg-bidlbl' }, call));
+        }
+        // STAGE 7 · P1-4: the دبل caller's dark pill (دبل/ثري/أربع/قهوة ×N)
+        if ((p.phase === 'doubling' || p.phase === 'playing') && p.multBy === i &&
+            (p.mult === 'coffee' || (p.mult || 1) >= 2)) {
+          var mlbl = (p.mult === 'coffee') ? ('☕ ' + I18n.t('bg_qahwa'))
+                   : (I18n.t({ 2: 'bg_double', 3: 'bg_triple', 4: 'bg_kawra' }[p.mult] || 'bg_double') +
+                      ' ×' + p.mult);
+          kids.push(UI.el('div', { class: 'bg-bidlbl dbl' }, mlbl));
         }
         // STAGE 2: «مشروع» chip — everyone sees WHO declared, not WHAT
         if (p.phase === 'playing' && p.declared && p.declared[i]) {
@@ -2360,6 +2563,14 @@
           c.appendChild(UI.el('div', { class: 'bg-turnhint soft' },
             controlsSeat(p.turn) ? I18n.t('bg_your_turn') : I18n.t('bg_turn_of') + ' ' + seatName(p.turn)));
         }
+        // STAGE 7 · P2-7: small won-tricks pile chip per team (🂠 ×N)
+        if (p.phase === 'playing') {
+          var twp = p.tricksWon || {};
+          var usN = Math.floor(((twp[myTeamKey()] || []).length) / 4);
+          var themN = Math.floor(((twp[themTeamKey()] || []).length) / 4);
+          if (usN > 0) c.appendChild(UI.el('div', { class: 'bg-pile us' }, '🂠 ×' + usN));
+          if (themN > 0) c.appendChild(UI.el('div', { class: 'bg-pile them' }, '🂠 ×' + themN));
+        }
         return c;
       }
 
@@ -2426,19 +2637,9 @@
         var hand = sortHand(st.hands[privKey(act)] || [], p.mode, p.trump);
         var canAct = p.phase === 'playing' && p.turn === act && controlsSeat(act);
         var legal = canAct ? legalMoves(hand, p.table || [], p.mode, p.trump, act) : [];
-        // STAGE 2: «مشروع» pill — trick 1 only, on my turn, BEFORE I play my
-        // card (hand still holds all 8), and only if there really is a project.
-        if (canAct && hand.length === 8 && !((p.declared || {})[act])) {
-          var tw1 = p.tricksWon || {};
-          var isTrick1 = !((tw1.t0 || []).length) && !((tw1.t1 || []).length);
-          if (isTrick1 && findProjects(hand, p.mode, p.trump).length) {
-            var pill = UI.el('button', { class: 'bg-projpill', onclick: function () {
-              pill.setAttribute('disabled', 'true');
-              declareProject(act);
-            } }, I18n.t('bg_project'));
-            wrap.appendChild(pill);
-          }
-        }
+        // STAGE 7 · P1-5: the «مشروع» pill moved OFF the hand — it now docks
+        // at the bid-bar level (see projDock in paintGame) so a tap can
+        // never fall through to the card underneath.
         // STAGE 5: big ARCHED fan (Kamelna proportions) — each card sits in
         // a slot that owns the arc rotation (the card itself stays free for
         // the lift/flip animations). New deals flip-reveal with a stagger.
@@ -2490,7 +2691,7 @@
           SUITS.filter(function (s) { return s !== suitOf(p.flip); }).forEach(function (s) {
             row.appendChild(UI.el('button', {
               class: 'bg-suitbtn' + (s === 'H' || s === 'D' ? ' redsuit' : ''),
-              onclick: function () { doBid('hokum', s); }
+              onclick: function () { doBid('hokum', s, null, act); }   // STAGE 7: explicit seat
             }, [UI.el('b', null, SUIT_CHAR[s]), UI.el('span', null, I18n.t('bg_suit_' + s))]));
           });
           body.appendChild(row);
@@ -2504,22 +2705,22 @@
           // instead of dimming (Kamelna shows only what you can say).
           var hokumTaken = !!p.pendHokum;
           var rowKids = [
-            UI.el('button', { class: 'bg-bid sun', onclick: function () { doBid('sun'); } }, I18n.t('bg_sun'))
+            UI.el('button', { class: 'bg-bid sun', onclick: function () { doBid('sun', null, null, act); } }, I18n.t('bg_sun'))
           ];
           if (r === 2) { // STAGE 2: أشكل — round 2 only, like صن but the flip is mine
-            rowKids.push(UI.el('button', { class: 'bg-bid ashkal', onclick: function () { doBid('ashkal'); } },
+            rowKids.push(UI.el('button', { class: 'bg-bid ashkal', onclick: function () { doBid('ashkal', null, null, act); } },
               I18n.t('bg_ashkal')));
           }
           if (!hokumTaken) {
             rowKids.push(UI.el('button', { class: 'bg-bid hokum', onclick: function () {
-              if (r === 1) doBid('hokum', null);
+              if (r === 1) doBid('hokum', null, null, act);
               else { st.suitPick = true; paint(); }
             } }, [
               UI.el('span', null, I18n.t('bg_hokum')),
               r === 1 ? UI.el('b', { class: (suitOf(p.flip) === 'H' || suitOf(p.flip) === 'D') ? 'redsuit' : '' }, SUIT_CHAR[suitOf(p.flip)]) : UI.el('b', null, '?')
             ]));
           }
-          rowKids.push(UI.el('button', { class: 'bg-bid pass', onclick: function () { doBid('pass'); } }, I18n.t('bg_pass')));
+          rowKids.push(UI.el('button', { class: 'bg-bid pass', onclick: function () { doBid('pass', null, null, act); } }, I18n.t('bg_pass')));
           body.appendChild(UI.el('div', { class: 'bg-bidrow' }, rowKids));
         }
         return UI.el('div', { class: 'bg-bidbar' }, [body]);
@@ -2531,20 +2732,73 @@
                         fourhundred: 'bg_proj_400', baloot: 'bg_proj_baloot' }[type] || 'bg_project');
       }
 
+      /* STAGE 7 · P1-5: may I still declare? Trick 1, all 8 cards in hand,
+         not yet declared, and there actually IS a project to declare. */
+      function canDeclare(p) {
+        var me = mySeat();
+        if (me < 0 || p.phase !== 'playing') return false;
+        if ((p.declared || {})[me]) return false;
+        var hand = st.hands[privKey(me)] || [];
+        if (hand.length !== 8) return false;
+        var tw = p.tricksWon || {};
+        if (((tw.t0 || []).length + (tw.t1 || []).length) > 0) return false;
+        return findProjects(hand, p.mode, p.trump).length > 0;
+      }
+
+      /* STAGE 7 · P1-5: the declaration CONFIRM dialog — shows exactly what
+         will be declared; while it is open, autoAct pauses my timeout. */
+      function projDeclareDialog(p, seat) {
+        var hand = (st.hands[privKey(seat)] || []).slice();
+        var found = findProjects(hand, p.mode, p.trump);
+        if (!found.length) return null;
+        var rows = found.map(function (it) {
+          var mini = UI.el('div', { class: 'bg-projcards' });
+          (it.cards || []).forEach(function (c) { mini.appendChild(cardEl(c, 'mini')); });
+          return UI.el('div', { class: 'bg-projrow' }, [
+            UI.el('div', { class: 'bg-projwho' }, [
+              UI.el('b', null, projLabel(it.type)),
+              UI.el('span', null, '+' + projectValue(it.type, p.mode))
+            ]),
+            mini
+          ]);
+        });
+        function closeDlg(e) { if (e) e.stopPropagation(); st.projDialog = false; paint(); }
+        var inner = UI.el('div', { class: 'bg-modal', onclick: function (e) { e.stopPropagation(); } },
+          [UI.el('h3', null, I18n.t('bg_project'))].concat(rows).concat([
+            UI.el('button', { class: 'btn btn-green btn-block', style: 'margin-top:10px',
+              onclick: function (e) {
+                e.stopPropagation();
+                st.projDialog = false;
+                declareProject(seat).then(function (ok) {
+                  if (ok) { toast(I18n.t('bg_proj_declared')); }
+                });
+                paint();
+              } }, I18n.t('bg_confirm')),
+            UI.el('button', { class: 'btn btn-ghost btn-block', style: 'margin-top:8px',
+              onclick: closeDlg }, I18n.t('bg_back'))
+          ]));
+        return UI.el('div', { class: 'bg-modalbd', onclick: closeDlg }, [inner]);
+      }
+
       /* STAGE 2/4 inline bar for the دبل chain — Kamelna wording:
          دبل(×2) → ثري(×3) → أربع(×4) → قهوة. Engine keys unchanged. */
       function doubleSheet(p) {
         var cur = (typeof p.mult === 'number') ? p.mult : 1;
+        var act = p.doubleTurn;                        // STAGE 7 · P1-4: seat captured at render
         var nextKey = { 1: 'bg_double', 2: 'bg_triple', 3: 'bg_kawra', 4: 'bg_qahwa' }[cur] || 'bg_double';
         // STAGE 6: no question header (the دبل؟ bubble on the felt asks) —
         // just the 2 wide dark pills, e.g. «ثري | بس»
         var body = UI.el('div', { class: 'bg-bidbar-in' });
         body.appendChild(UI.el('div', { class: 'bg-bidrow' }, [
-          UI.el('button', { class: 'bg-bid dbl', onclick: function () { doDouble('raise'); } }, [
+          UI.el('button', { class: 'bg-bid dbl', onclick: function () {
+            Sfx.drum();                                // STAGE 7 · P1-4: immediate local feedback
+            st.sfxMult = (cur >= 4) ? 9 : cur + 1;     // don't double-drum on the echo
+            doDouble('raise', null, act);
+          } }, [
             UI.el('span', null, I18n.t(nextKey)),
             UI.el('b', null, cur >= 4 ? '☕' : '×' + (cur + 1))
           ]),
-          UI.el('button', { class: 'bg-bid pass', onclick: function () { doDouble('pass'); } }, I18n.t('bg_pass'))
+          UI.el('button', { class: 'bg-bid pass', onclick: function () { doDouble('pass', null, act); } }, I18n.t('bg_pass'))
         ]));
         return UI.el('div', { class: 'bg-bidbar' }, [body]);
       }
@@ -2814,16 +3068,30 @@
               I18n.t('bg_them') + ' ' + ((p.totals && p.totals[themTeamKey()]) || 0)),
             isHost() ? UI.el('button', { class: 'btn btn-green btn-block', onclick: newGame }, I18n.t('bg_new_game')) : null,
             isHost() ? UI.el('button', { class: 'btn btn-ghost btn-block', style: 'margin-top:8px', onclick: function () {
-              UI.confirm(I18n.t('bg_end_confirm'), endTable);
+              bgConfirm(I18n.t('bg_end_confirm'), endTable);
             } }, I18n.t('bg_end_table')) : UI.el('button', { class: 'btn btn-ghost btn-block', onclick: exitView }, I18n.t('bg_exit'))
           ])
         ]);
       }
 
-      /* ---------------- entry: rejoin or fresh lobby ---------------- */
+      /* ---------------- entry: rejoin or fresh lobby ----------------
+         STAGE 7 · P0-1: a saved code is verified with ONE read before the
+         stage mounts. A finished (gameEnd) or deleted table clears the
+         stored code and lands in the lobby — never a frozen resume. */
+      async function resumeTable(code) {
+        var snap = null;
+        try { snap = await db.collection('balootTables').doc(code).get(); } catch (e) {}
+        var d = (snap && snap.exists) ? snap.data() : null;
+        if (resumeAction(!!d, d && d.phase) === 'lobby') {
+          try { localStorage.removeItem(LSKEY); } catch (e) {}
+          lobby(d ? I18n.t('bg_table_ended') : null);
+          return;
+        }
+        openTable(code);
+      }
       var saved = null;
       try { saved = localStorage.getItem(LSKEY); } catch (e) {}
-      if (saved) openTable(saved); else lobby();
+      if (saved) resumeTable(saved); else lobby();
     }
   });
 })();

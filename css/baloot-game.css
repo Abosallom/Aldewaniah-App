@@ -125,6 +125,9 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
 .bg-scorepill b.us { background: #ffe9b0; }
 .bg-scorepill b.them { background: #ffcfc4; }
 .bg-hudsess { font-size: 9px; font-weight: 700; color: rgba(255, 255, 255, .72); letter-spacing: 1.5px; }
+/* STAGE 7 · P2-9: the 4-letter code always renders LTR inside RTL labels */
+.bg-codeltr { direction: ltr; unicode-bidi: isolate; font-weight: 800; letter-spacing: 2px; }
+.bg-code { direction: ltr; unicode-bidi: isolate; }
 
 /* mode / دبل chips — STAGE 6: they ride the bottom plate row (.mini) */
 .bg-chip {
@@ -277,9 +280,19 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
   box-shadow: 0 2px 6px rgba(0, 0, 0, .3); white-space: nowrap;
   animation: bg-pop .32s cubic-bezier(.3, 1.6, .5, 1); /* STAGE 5: spring pop */
 }
-/* side callers: the pill hangs beside the chip, toward the rug */
-.bg-pos-l .bg-bidlbl { position: absolute; left: calc(100% + 6px); top: 38%; }
-.bg-pos-r .bg-bidlbl { position: absolute; right: calc(100% + 6px); top: 38%; }
+/* side callers: the pill hangs beside the chip, toward the rug.
+   STAGE 7 · P2-9: clamped so it can never poke outside the viewport. */
+.bg-pos-l .bg-bidlbl {
+  position: absolute; left: calc(100% + 6px); right: auto; top: 38%;
+  max-width: 34vw; overflow: hidden; text-overflow: ellipsis;
+}
+.bg-pos-r .bg-bidlbl {
+  position: absolute; right: calc(100% + 6px); left: auto; top: 38%;
+  max-width: 34vw; overflow: hidden; text-overflow: ellipsis;
+}
+/* STAGE 7 · P1-4: the دبل caller's pill — dark red, stacked under the call */
+.bg-bidlbl.dbl { background: #8c2f27; margin-top: 2px; }
+.bg-pos-l .bg-bidlbl.dbl, .bg-pos-r .bg-bidlbl.dbl { top: 68%; }
 @keyframes bg-pop { from { transform: scale(.4); opacity: 0; } }
 
 /* ---------- playing cards — programmatic SVG faces (STAGE 5) ---------- */
@@ -307,9 +320,12 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
   display: flex; justify-content: center; align-items: flex-end;
   padding: 18px 8px 4px; min-height: 206px;
 }
+/* STAGE 7 · P2-8: overlap is CAPPED so the full rank+suit index column
+   (the top-left ~25% of the face) of EVERY card stays visible — step =
+   card-width + 2×margin must stay ≥ 0.27 × card-width at every size. */
 .bg-handslot {                                 /* owns the fan-arc transform */
   transform-origin: 50% 130%;
-  margin: 0 -50px; position: relative;
+  margin: 0 -46px; position: relative;         /* 132px card → 40px visible */
 }
 .bg-hand .bg-pcard {
   width: 132px; height: 191px; border-radius: 12px; margin: 0;
@@ -335,13 +351,25 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
 /* STAGE 5: the SLOT owns the placement transform; the card inside is free
    for the FLIP fly-in / sweep animations (transform never fights CSS). */
 .bg-tslot { position: absolute; left: 50%; top: 50%; }
-/* STAGE 6: trick cards CLUSTER near the center with slight offsets and
-   rotations (Kamelna) instead of sitting far apart toward each seat */
-.bg-t-b { transform: translate(-54%, -24%) rotate(3deg); }
-.bg-t-t { transform: translate(-46%, -76%) rotate(-4deg); }
-.bg-t-l { transform: translate(-94%, -56%) rotate(-9deg); }
-.bg-t-r { transform: translate(-6%, -44%) rotate(8deg); }
+/* STAGE 7 · P2-7: each played card sits CLEARLY toward its owner's seat
+   (bigger seat-anchored offsets + owner-pointing tilt) so a full trick
+   reads at a glance instead of clustering into an unreadable pile */
+.bg-t-b { transform: translate(-50%, 8%) rotate(4deg); }
+.bg-t-t { transform: translate(-50%, -108%) rotate(-4deg); }
+.bg-t-l { transform: translate(-148%, -54%) rotate(-13deg); }
+.bg-t-r { transform: translate(48%, -46%) rotate(13deg); }
 .bg-tslot .bg-pcard { width: 72px; height: 104px; border-radius: 10px; }
+
+/* STAGE 7 · P2-7: small won-tricks pile chip per team (🂠 ×N) */
+.bg-pile {
+  position: absolute; z-index: 2;
+  direction: ltr; unicode-bidi: isolate;
+  font-size: 11px; font-weight: 800; color: #ffe9b0;
+  background: rgba(12, 15, 22, .72); border: 1px solid rgba(201, 164, 83, .55);
+  border-radius: 999px; padding: 2px 9px; pointer-events: none;
+}
+.bg-pile.us { bottom: 6%; right: 5%; }
+.bg-pile.them { top: 6%; left: 5%; }
 
 /* trick sweep FALLBACK (no WAAPI / reduced motion; class on .bg-center) */
 .bg-center[class*="bg-sweep-"] .bg-tslot { transition: transform .5s ease-in, opacity .5s ease-in; }
@@ -473,6 +501,13 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
 /* ===========================================================
    STAGE 2 — المشاريع
    =========================================================== */
+/* STAGE 7 · P1-5: the «مشروع» pill docks at the bid-bar level (left side),
+   OFF the hand fan — a tap can never fall through to a card. */
+.bg-projdock {
+  display: flex; justify-content: flex-start;
+  margin: 4px 14px 0; position: relative; z-index: 60;
+}
+.bg-projdock .bg-projpill { margin: 0; }
 .bg-projpill {
   display: block; margin: 0 auto 2px; border: none; cursor: pointer;
   background: linear-gradient(#f3d98c, #e0b95a); color: #5c430e;
@@ -680,10 +715,11 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
   .bg-name { max-width: 88px; }
   .bg-code { font-size: 24px; letter-spacing: 6px; }
   .bg-bid { min-height: 50px; font-size: 17px; }
-  /* hand fan: 8 HUGE cards fit 390px through heavy overlap */
-  .bg-hand { min-height: 200px; padding: 16px 6px 4px; }
-  .bg-handslot { margin: 0 -50px; }
-  .bg-hand .bg-pcard { width: 130px; height: 188px; }
+  /* hand fan: 8 big cards fit 390px with the index column of EVERY card
+     visible (STAGE 7 · P2-8: 118px card, 34px step ≥ index width) */
+  .bg-hand { min-height: 190px; padding: 16px 6px 4px; }
+  .bg-handslot { margin: 0 -42px; }
+  .bg-hand .bg-pcard { width: 118px; height: 171px; }
   .bg-tslot .bg-pcard { width: 68px; height: 99px; }
   .bg-flipwrap .bg-pcard { width: 80px; height: 116px; }
   .bg-fancard { width: 23px; height: 33px; margin-left: -11.5px; }
@@ -695,9 +731,9 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
 
 /* very narrow phones: shrink the fan a notch so 8 cards still fit */
 @media (max-width: 360px) {
-  .bg-hand { min-height: 178px; }
-  .bg-handslot { margin: 0 -46px; }
-  .bg-hand .bg-pcard { width: 116px; height: 168px; }
+  .bg-hand { min-height: 172px; }
+  .bg-handslot { margin: 0 -39px; }
+  .bg-hand .bg-pcard { width: 108px; height: 156px; }
 }
 
 /* ---------- shorter portrait phones: keep everything on screen ---------- */
@@ -705,7 +741,7 @@ body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
   .bg-board { min-height: 240px; }
   .bg-board .bg-felt { inset: 74px 8px 32px; }  /* game rug only, not the lobby's */
   .bg-hand { min-height: 158px; padding-top: 12px; }
-  .bg-handslot { margin: 0 -40px; }
+  .bg-handslot { margin: 0 -38px; }             /* STAGE 7: 30px step ≥ index */
   .bg-hand .bg-pcard { width: 106px; height: 154px; }
 }
 
