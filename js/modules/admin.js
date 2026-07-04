@@ -56,8 +56,12 @@
         adm_gift_import_btn: 'إضافة الأكواد', adm_gift_imported: 'تمت إضافة {n} كود ✓', adm_gift_dup: '({d} مكرر تم تجاهله)',
         adm_gift_none: 'لا توجد أكواد بعد — ألصق الأكواد ثم اضغط إضافة',
         adm_gift_distribute: '🎁 توزيع كود لكل عضو (رسالة خاصة)', adm_gift_dist_confirm: 'سيُرسَل كود واحد لكل عضو معتمد (عدا حساب المراجعة) برسالة خاصة رسمية. متابعة؟',
-        adm_gift_dist_done: 'تم: أُرسل {s} · مخصص بدون رسالة {p} · تخطّي {k}', adm_gift_notenough: 'الأكواد المتاحة أقل من عدد الأعضاء! المتاح: {a}، المطلوب: {n}',
-        adm_gift_available: 'متاح', adm_gift_assigned: 'أُرسل إلى', adm_gift_assigned_nodm: 'مخصص لـ (بدون رسالة — انسخه له)',
+        adm_gift_dist_done: 'تم إرسال {n} كود ✓', adm_gift_notenough: 'الأكواد المتاحة أقل من عدد الأعضاء! المتاح: {a}، المطلوب: {n}',
+        adm_gift_unreachable: 'لم يُرسل لهؤلاء لأنهم لم يفتحوا التطبيق بعد (اطلب منهم فتحه ثم أعد التوزيع): {names}',
+        adm_gift_pullback: 'سحب جميع الأكواد الموزّعة', adm_gift_pullback_confirm: 'سيتم حذف رسالة الكود من محادثة كل عضو وإرجاع جميع الأكواد إلى «متاح». متابعة؟',
+        adm_gift_pulledback: 'تم سحب {n} كود ✓ — الأكواد الآن متاحة',
+        adm_gift_give_nouid: 'العضو {name} لم يفتح التطبيق بعد، لا يمكن مراسلته. اطلب منه فتح التطبيق مرة ثم أعد المحاولة.',
+        adm_gift_available: 'متاح', adm_gift_assigned: 'أُرسل إلى',
         adm_gift_give: 'إعطاء لعضو', adm_gift_pick: 'اختر العضو', adm_gift_copy: 'نسخ', adm_gift_copied: 'نُسخ ✓',
         adm_gift_del: 'حذف هذا الكود؟', adm_gift_working: 'جارٍ التوزيع…',
         adm_gift_msg_head: 'طِرا لمدة شهر — Tira 1 month code', adm_gift_msg_body: '🎁 هديتك من الديوانية — كود الاشتراك:',
@@ -94,8 +98,12 @@
         adm_gift_import_btn: 'Add codes', adm_gift_imported: 'Added {n} codes ✓', adm_gift_dup: '({d} duplicates ignored)',
         adm_gift_none: 'No codes yet — paste codes then tap Add',
         adm_gift_distribute: '🎁 Send a code to every member (private DM)', adm_gift_dist_confirm: 'One code will be DM-ed to every approved member (except the review account). Continue?',
-        adm_gift_dist_done: 'Done: sent {s} · assigned without DM {p} · skipped {k}', adm_gift_notenough: 'Not enough available codes! Available: {a}, needed: {n}',
-        adm_gift_available: 'Available', adm_gift_assigned: 'Sent to', adm_gift_assigned_nodm: 'Assigned to (no DM — copy it for them)',
+        adm_gift_dist_done: 'Sent {n} codes ✓', adm_gift_notenough: 'Not enough available codes! Available: {a}, needed: {n}',
+        adm_gift_unreachable: 'Not sent to these (they haven\'t opened the app yet — ask them to, then distribute again): {names}',
+        adm_gift_pullback: 'Pull back all sent codes', adm_gift_pullback_confirm: 'The code message will be deleted from each member\'s chat and all codes reset to "available". Continue?',
+        adm_gift_pulledback: 'Pulled back {n} codes ✓ — now available',
+        adm_gift_give_nouid: '{name} hasn\'t opened the app yet, can\'t message them. Ask them to open it once, then try again.',
+        adm_gift_available: 'Available', adm_gift_assigned: 'Sent to',
         adm_gift_give: 'Give to member', adm_gift_pick: 'Pick the member', adm_gift_copy: 'Copy', adm_gift_copied: 'Copied ✓',
         adm_gift_del: 'Delete this code?', adm_gift_working: 'Distributing…',
         adm_gift_msg_head: 'طِرا لمدة شهر — Tira 1 month code', adm_gift_msg_body: '🎁 Your gift from Aldewaniah — subscription code:',
@@ -373,8 +381,11 @@
         wrap.innerHTML = '<div class="muted" style="text-align:center;padding:10px">…</div>';
         let rows = [];
         try {
-          const snap = await db.collection('giftcodes').orderBy('at', 'asc').get();
+          // NOTE: do NOT orderBy here — Firestore omits any doc missing the
+          // ordered field, which made codes "disappear". Fetch all, sort in JS.
+          const snap = await db.collection('giftcodes').get();
           snap.forEach((d) => rows.push(Object.assign({ id: d.id }, d.data())));
+          rows.sort((a, b) => ((a.at && a.at.seconds) || 0) - ((b.at && b.at.seconds) || 0));
         } catch (e) { wrap.innerHTML = '<div class="auth-err">' + (e.message || 'Error') + '</div>'; return; }
         wrap.innerHTML = '';
 
@@ -431,29 +442,24 @@
                 distMsg.textContent = I18n.t('adm_gift_notenough').replace('{a}', pool.length).replace('{n}', targets.length);
                 distBtn.disabled = false; return;
               }
-              let sent = 0, pend = 0, skip = 0, i = 0;
+              let sent = 0, i = 0; const unreachable = [];
               for (const t of targets) {
-                const codeDoc = pool[i++];
                 const uid = await uidForPhone(t.phone);
+                if (!uid) { unreachable.push(t.name || t.phone); continue; } // can't DM: no account yet — leave code available
+                const codeDoc = pool[i++];
                 try {
-                  if (uid) {
-                    await sendGiftDM(uid, t.name, giftMsgText(codeDoc.code));
-                    await db.collection('giftcodes').doc(codeDoc.id).update({
-                      status: 'assigned', toName: t.name, toPhone: t.phone, toUid: uid, sentDM: true,
-                      assignedAt: firebase.firestore.FieldValue.serverTimestamp() });
-                    sent++;
-                  } else {
-                    // member never signed in since uidmap existed → no DM possible;
-                    // still reserve the code for them, admin copies it manually
-                    await db.collection('giftcodes').doc(codeDoc.id).update({
-                      status: 'assigned', toName: t.name, toPhone: t.phone, sentDM: false,
-                      assignedAt: firebase.firestore.FieldValue.serverTimestamp() });
-                    pend++;
-                  }
-                } catch (e) { skip++; i--; }
-                distMsg.textContent = I18n.t('adm_gift_working') + ' ' + (sent + pend + skip) + '/' + targets.length;
+                  // create/open the private chat AND send the official code message
+                  await sendGiftDM(uid, t.name, giftMsgText(codeDoc.code));
+                  await db.collection('giftcodes').doc(codeDoc.id).update({
+                    status: 'assigned', toName: t.name, toPhone: t.phone, toUid: uid, sentDM: true,
+                    assignedAt: firebase.firestore.FieldValue.serverTimestamp() });
+                  sent++;
+                } catch (e) { i--; unreachable.push((t.name || t.phone) + ' ⚠️'); }
+                distMsg.textContent = I18n.t('adm_gift_working') + ' ' + sent + '/' + targets.length;
               }
-              distMsg.textContent = I18n.t('adm_gift_dist_done').replace('{s}', sent).replace('{p}', pend).replace('{k}', skip);
+              distMsg.textContent = I18n.t('adm_gift_dist_done').replace('{n}', sent)
+                + (unreachable.length ? '\n' + I18n.t('adm_gift_unreachable').replace('{names}', unreachable.join('، ')) : '');
+              distMsg.style.whiteSpace = 'pre-line';
             } catch (e) { distMsg.textContent = e.message || 'Error'; }
             distBtn.disabled = false;
             loadGifts(wrap);
@@ -501,6 +507,47 @@
           wrap.appendChild(rsMsg);
         }
 
+        /* PULL BACK all distributed codes: delete each gift message from the
+           member's private chat and reset the code back to "available". */
+        const assigned = rows.filter((r) => r.status === 'assigned');
+        if (assigned.length) {
+          const pbMsg = UI.el('div', { class: 'muted', style: 'font-size:.85rem;text-align:center;margin:6px 0' });
+          const pbBtn = UI.el('button', { class: 'btn btn-block', style: 'color:var(--maroon);border-color:var(--maroon)', onclick: async () => {
+            if (!window.confirm(I18n.t('adm_gift_pullback_confirm'))) return;
+            pbBtn.disabled = true;
+            const me = Auth.uid();
+            let done = 0;
+            for (const r of assigned) {
+              try {
+                if (r.toUid) {
+                  const tid = me < r.toUid ? me + '_' + r.toUid : r.toUid + '_' + me;
+                  try {
+                    const snap = await db.collection('dms').doc(tid).collection('msgs').orderBy('at', 'desc').limit(80).get();
+                    for (const d of snap.docs) {
+                      const t = (d.data() || {}).text || '';
+                      if (t.indexOf('Tira') >= 0 || t.indexOf('طِرا') >= 0 || t.indexOf(r.code) >= 0) await d.ref.delete();
+                    }
+                  } catch (e) {}
+                }
+                await db.collection('giftcodes').doc(r.id).update({
+                  status: 'available',
+                  toName: firebase.firestore.FieldValue.delete(),
+                  toPhone: firebase.firestore.FieldValue.delete(),
+                  toUid: firebase.firestore.FieldValue.delete(),
+                  sentDM: firebase.firestore.FieldValue.delete(),
+                  assignedAt: firebase.firestore.FieldValue.delete()
+                });
+                done++;
+              } catch (e) {}
+              pbMsg.textContent = I18n.t('adm_gift_working') + ' ' + done + '/' + assigned.length;
+            }
+            pbMsg.textContent = I18n.t('adm_gift_pulledback').replace('{n}', done);
+            loadGifts(wrap);
+          } }, '↩️ ' + I18n.t('adm_gift_pullback') + ' (' + assigned.length + ')');
+          wrap.appendChild(pbBtn);
+          wrap.appendChild(pbMsg);
+        }
+
         if (!rows.length) { wrap.appendChild(UI.el('p', { class: 'muted', style: 'text-align:center' }, I18n.t('adm_gift_none'))); return; }
 
         /* code list — the whole code block is ONE BIG tap-to-copy button
@@ -528,7 +575,7 @@
             UI.el('div', { class: 'flex-between', style: 'margin-top:6px;align-items:center' }, [
               UI.el('div', { class: 'card-meta', style: 'margin:0' },
                 isAvail ? ('✅ ' + I18n.t('adm_gift_available'))
-                        : ((r.sentDM ? '📨 ' + I18n.t('adm_gift_assigned') : '⚠️ ' + I18n.t('adm_gift_assigned_nodm')) + ' ' + (r.toName || r.toPhone || '—'))),
+                        : ('📨 ' + I18n.t('adm_gift_assigned') + ' ' + (r.toName || r.toPhone || '—'))),
               isAvail ? UI.el('div', null, [
                 UI.el('button', { class: 'btn btn-ghost', style: 'padding:8px 14px;font-size:.85rem',
                   onclick: () => giveTo(r) }, '🎁 ' + I18n.t('adm_gift_give')),
@@ -557,10 +604,11 @@
           members.forEach((t) => list.appendChild(UI.el('button', { class: 'dm-pick-row', onclick: async () => {
             bd.remove();
             const uid = await uidForPhone(t.phone);
+            if (!uid) { alert(I18n.t('adm_gift_give_nouid').replace('{name}', t.name)); return; } // can't DM without an account
             try {
-              if (uid) await sendGiftDM(uid, t.name, giftMsgText(codeDoc.code));
+              await sendGiftDM(uid, t.name, giftMsgText(codeDoc.code));   // create chat + send
               await db.collection('giftcodes').doc(codeDoc.id).update({
-                status: 'assigned', toName: t.name, toPhone: t.phone, toUid: uid || null, sentDM: !!uid,
+                status: 'assigned', toName: t.name, toPhone: t.phone, toUid: uid, sentDM: true,
                 assignedAt: firebase.firestore.FieldValue.serverTimestamp() });
             } catch (e) { alert(e.message || 'Error'); }
             loadGifts(wrap);

@@ -511,11 +511,309 @@
     return cheapest(legal, mode, trump);
   }
 
+  /* ======================================================================
+     STAGE 5 · CARD ARTWORK — cardSVG(rank, suit): one programmatic SVG
+     deck (32 faces + a back), cached as data-URIs once per session.
+       · number cards (7–10): REAL playing-card pip layouts, each pip a
+         radial-shaded suit glyph; corner indices top-left + bottom-right.
+       · courts J/Q/K: stylized GEOMETRIC Arabic-royal motifs (our own
+         identity, not fake French courts) — J «الولد» crossed swords +
+         turban, Q «البنت» ornate headdress + necklace, K «الشايب» crown +
+         falcon — symmetric, gold/maroon/navy, mirrored top/bottom.
+       · A: one large suit symbol inside a radiating gold filigree ring.
+       · back: navy field, sadu zig-zag border bands, gold dallah drawn
+         in SVG inside a gold ring (no external images → data-URI safe).
+     Pure string builders (no DOM) so a node test can validate the XML.
+     ====================================================================== */
+  var ART = { gold: '#c9a453', goldD: '#8a6a25', maroon: '#722F37',
+              navy: '#1A2744', cream: '#f3e6cf' };
+  var SUIT_INK = {
+    S: ['#3a4254', '#151a26'], C: ['#3a4254', '#151a26'],
+    H: ['#cf4738', '#8c1f18'], D: ['#cf4738', '#8c1f18']
+  };
+  // suit glyphs drawn in a ±30 box centred on 0,0 (fill inherited from #sG)
+  var SUIT_PATH = {
+    H: '<path d="M0 27 C-26 6 -32 -12 -19 -23 C-9 -31 0 -23 0 -14 C0 -23 9 -31 19 -23 C32 -12 26 6 0 27 Z"/>',
+    D: '<path d="M0 -29 C7 -18 13 -9 21 0 C13 9 7 18 0 29 C-7 18 -13 9 -21 0 C-13 -9 -7 -18 0 -29 Z"/>',
+    S: '<path d="M0 -28 C22 -6 30 3 18 14 C10 20 3 16 1 11 C2 20 5 24 9 28 L-9 28 C-5 24 -2 20 -1 11 C-3 16 -10 20 -18 14 C-30 3 -22 -6 0 -28 Z"/>',
+    C: '<circle cx="0" cy="-15" r="11.5"/><circle cx="-11" cy="4" r="11.5"/><circle cx="11" cy="4" r="11.5"/><path d="M0 0 C1 12 4 19 9 25 L-9 25 C-4 19 -1 12 0 0 Z"/>'
+  };
+  // authentic pip layouts on the 200×290 face; pips below centre flip 180°
+  var PIP_XY = {
+    '7': [[64, 82], [64, 145], [64, 208], [136, 82], [136, 145], [136, 208], [100, 113]],
+    '8': [[64, 82], [64, 145], [64, 208], [136, 82], [136, 145], [136, 208], [100, 113], [100, 177]],
+    '9': [[64, 78], [64, 123], [64, 167], [64, 212], [136, 78], [136, 123], [136, 167], [136, 212], [100, 145]],
+    '10': [[64, 78], [64, 123], [64, 167], [64, 212], [136, 78], [136, 123], [136, 167], [136, 212], [100, 100], [100, 190]]
+  };
+
+  /** The geometric court figure for the TOP half (mirrored by cardSVG). */
+  function courtFigure(rank) {
+    var g = ART.gold, gd = ART.goldD, mr = ART.maroon, nv = ART.navy, cr = ART.cream;
+    var f = '', i;
+    if (rank === 'J') {                    // «الولد»: crossed swords + turban
+      var sword = function (ang) {
+        return '<g transform="translate(100 106) rotate(' + ang + ')">' +
+          '<path d="M-3 -54 L0 -61 L3 -54 L3 9 L-3 9 Z" fill="' + nv + '" stroke="' + gd + '" stroke-width="0.6"/>' +
+          '<rect x="-13" y="9" width="26" height="6" rx="3" fill="' + g + '"/>' +
+          '<rect x="-3.5" y="15" width="7" height="15" rx="2.5" fill="' + mr + '"/>' +
+          '<circle cx="0" cy="34" r="4" fill="' + g + '"/></g>';
+      };
+      f = sword(-32) + sword(32) +
+        '<ellipse cx="100" cy="66" rx="24" ry="15" fill="' + mr + '" stroke="' + gd + '" stroke-width="0.8"/>' +
+        '<path d="M76 66 Q100 79 124 66" stroke="' + g + '" stroke-width="3" fill="none"/>' +
+        '<path d="M79 58 Q100 70 121 58" stroke="' + g + '" stroke-width="2" fill="none" opacity="0.85"/>' +
+        '<circle cx="100" cy="55" r="3.4" fill="' + g + '"/>';
+    } else if (rank === 'Q') {             // «البنت»: headdress + necklace
+      var coins = '';
+      for (i = 0; i < 7; i++) {
+        coins += '<circle cx="' + (Math.round((74 + i * 52 / 6) * 10) / 10) + '" cy="94" r="2.6" fill="' + g + '"/>';
+      }
+      var gems = '';
+      [[84, 130.5], [100, 134.5], [116, 130.5]].forEach(function (pt) {
+        gems += '<rect x="-4.4" y="-4.4" width="8.8" height="8.8" fill="' + mr + '" stroke="' + g + '" stroke-width="1" transform="translate(' + pt[0] + ' ' + pt[1] + ') rotate(45)"/>';
+      });
+      f = '<path d="M100 48 L130 90 L70 90 Z" fill="' + mr + '" stroke="' + gd + '" stroke-width="0.8"/>' +
+        '<path d="M78 84 L122 84" stroke="' + g + '" stroke-width="2.4"/>' +
+        '<circle cx="100" cy="46" r="4" fill="' + g + '"/>' + coins +
+        '<circle cx="100" cy="104" r="11" fill="' + cr + '" stroke="' + gd + '" stroke-width="0.8"/>' +
+        '<path d="M74 121 Q100 141 126 121" fill="none" stroke="' + g + '" stroke-width="2.2"/>' + gems;
+    } else {                               // «الشايب»: crown + falcon
+      var dots = '';
+      for (i = 0; i < 5; i++) dots += '<circle cx="' + (74 + i * 13) + '" cy="82.5" r="2.2" fill="' + cr + '"/>';
+      f = '<circle cx="71" cy="49" r="3" fill="' + g + '"/><circle cx="100" cy="43" r="3.4" fill="' + g + '"/><circle cx="129" cy="49" r="3" fill="' + g + '"/>' +
+        '<path d="M64 78 L71 52 L86 70 L100 46 L114 70 L129 52 L136 78 Z" fill="' + g + '" stroke="' + gd + '" stroke-width="1"/>' +
+        '<rect x="64" y="78" width="72" height="9" rx="3" fill="' + mr + '" stroke="' + gd + '" stroke-width="0.7"/>' + dots +
+        '<path d="M100 96 L58 112 L92 122 Z" fill="' + nv + '" stroke="' + gd + '" stroke-width="0.6"/>' +
+        '<path d="M100 96 L142 112 L108 122 Z" fill="' + nv + '" stroke="' + gd + '" stroke-width="0.6"/>' +
+        '<path d="M100 93 L110 114 L100 138 L90 114 Z" fill="' + nv + '" stroke="' + g + '" stroke-width="0.8"/>' +
+        '<circle cx="100" cy="96" r="7" fill="' + nv + '"/>' +
+        '<circle cx="97" cy="94" r="1.4" fill="' + g + '"/><circle cx="103" cy="94" r="1.4" fill="' + g + '"/>' +
+        '<path d="M100 101 L103.5 106 L96.5 106 Z" fill="' + g + '"/>';
+    }
+    return f;
+  }
+
+  /** One complete card face as an SVG string. */
+  function cardSVG(rank, suit) {
+    var ink = SUIT_INK[suit];
+    var s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 290">';
+    s += '<defs>' +
+      '<linearGradient id="bgG" x1="0" y1="0" x2="0.55" y2="1">' +
+        '<stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f5edda"/></linearGradient>' +
+      '<radialGradient id="sG" cx="0.36" cy="0.3" r="1">' +
+        '<stop offset="0" stop-color="' + ink[0] + '"/><stop offset="1" stop-color="' + ink[1] + '"/></radialGradient>' +
+      '<g id="p" fill="url(#sG)">' + SUIT_PATH[suit] + '</g>' +
+      '<g id="ix"><text x="25" y="43" text-anchor="middle" font-family="Georgia,serif" font-size="' +
+        (rank === '10' ? 29 : 34) + '" font-weight="700" fill="url(#sG)">' + rank + '</text>' +
+        '<use href="#p" transform="translate(25 63) scale(0.32)"/></g>' +
+      '</defs>';
+    // warm white body + thin double gold inner frame
+    s += '<rect x="1" y="1" width="198" height="288" rx="17" fill="url(#bgG)" stroke="#d9cdb2" stroke-width="1.5"/>' +
+         '<rect x="8" y="8" width="184" height="274" rx="12" fill="none" stroke="' + ART.gold + '" stroke-width="1.6" opacity="0.9"/>' +
+         '<rect x="12" y="12" width="176" height="266" rx="9" fill="none" stroke="' + ART.gold + '" stroke-width="0.6" opacity="0.5"/>' +
+         '<use href="#ix"/><use href="#ix" transform="rotate(180 100 145)"/>';
+    if (PIP_XY[rank]) {
+      PIP_XY[rank].forEach(function (xy) {
+        s += '<use href="#p" transform="translate(' + xy[0] + ' ' + xy[1] + ') scale(0.52)' +
+             (xy[1] > 146 ? ' rotate(180)' : '') + '"/>';
+      });
+    } else if (rank === 'A') {
+      s += '<g stroke="' + ART.gold + '" fill="none">' +
+           '<circle cx="100" cy="145" r="64" stroke-width="1.4" stroke-dasharray="3 5"/>' +
+           '<circle cx="100" cy="145" r="72" stroke-width="0.8" opacity="0.55"/></g>';
+      for (var i = 0; i < 12; i++) {
+        s += '<path d="M100 66 C104 72 104 78 100 83 C96 78 96 72 100 66 Z" fill="' + ART.gold +
+             '" opacity="0.9" transform="rotate(' + (i * 30) + ' 100 145)"/>';
+      }
+      s += '<use href="#p" transform="translate(100 145) scale(1.7)"/>';
+    } else {
+      s += '<rect x="32" y="38" width="136" height="214" rx="10" fill="#fbf5e6" stroke="' + ART.gold + '" stroke-width="1.4"/>' +
+           '<line x1="38" y1="145" x2="162" y2="145" stroke="' + ART.gold + '" stroke-width="0.8" opacity="0.6"/>' +
+           '<g id="ct">' + courtFigure(rank) +
+             '<use href="#p" transform="translate(51 59) scale(0.28)"/></g>' +
+           '<use href="#ct" transform="rotate(180 100 145)"/>';
+    }
+    return s + '</svg>';
+  }
+
+  /** The card back: navy + sadu zig-zag bands + gold dallah in a ring. */
+  function cardBackSVG() {
+    var g = '#C2A050', x, y;
+    var s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 290">' +
+      '<defs><linearGradient id="nB" x1="0" y1="0" x2="0.6" y2="1">' +
+      '<stop offset="0" stop-color="#22304f"/><stop offset="1" stop-color="#111a2e"/></linearGradient></defs>' +
+      '<rect x="1" y="1" width="198" height="288" rx="17" fill="url(#nB)" stroke="#e8dfc8" stroke-width="2"/>' +
+      '<rect x="9" y="9" width="182" height="272" rx="12" fill="none" stroke="' + g + '" stroke-width="1.2" opacity="0.9"/>';
+    for (x = 16; x < 184; x += 14) {                       // sadu bands: top + bottom
+      s += '<path d="M' + x + ' 30 L' + (x + 7) + ' 17 L' + (x + 14) + ' 30 Z" fill="' + g + '" opacity="0.9"/>' +
+           '<path d="M' + x + ' 260 L' + (x + 7) + ' 273 L' + (x + 14) + ' 260 Z" fill="' + g + '" opacity="0.9"/>';
+    }
+    for (y = 44; y < 246; y += 14) {                       // sadu bands: sides
+      s += '<path d="M30 ' + y + ' L17 ' + (y + 7) + ' L30 ' + (y + 14) + ' Z" fill="' + g + '" opacity="0.9"/>' +
+           '<path d="M170 ' + y + ' L183 ' + (y + 7) + ' L170 ' + (y + 14) + ' Z" fill="' + g + '" opacity="0.9"/>';
+    }
+    s += '<line x1="16" y1="34" x2="184" y2="34" stroke="' + g + '" stroke-width="1" opacity="0.5"/>' +
+         '<line x1="16" y1="256" x2="184" y2="256" stroke="' + g + '" stroke-width="1" opacity="0.5"/>' +
+         '<circle cx="100" cy="145" r="52" fill="none" stroke="' + g + '" stroke-width="2"/>' +
+         '<circle cx="100" cy="145" r="57" fill="none" stroke="' + g + '" stroke-width="0.8" opacity="0.6"/>' +
+         // dallah silhouette: finial, lid, neck, body, spout, handle, base
+         '<g fill="' + g + '" stroke="#8a6a25" stroke-width="0.8">' +
+         '<circle cx="100" cy="103" r="4"/>' +
+         '<path d="M91 121 Q100 107 109 121 Z"/>' +
+         '<path d="M93 121 L107 121 L105 133 L95 133 Z"/>' +
+         '<path d="M95 133 C80 138 76 152 80 165 C84 178 91 184 100 184 C109 184 116 178 120 165 C124 152 120 138 105 133 Z"/>' +
+         '<path d="M83 142 C72 134 67 124 72 119 C76 116 81 126 90 137 Z"/>' +
+         '<path d="M118 140 C132 144 132 164 120 168 L117 162 C125 159 125 148 115 146 Z"/>' +
+         '<path d="M88 184 L112 184 L115 190 L85 190 Z"/></g>';
+    return s + '</svg>';
+  }
+
+  var _artCache = {};
+  function svgURI(svg) {
+    return 'url("data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg) + '")';
+  }
+  function cardFaceURI(card) {
+    if (!_artCache[card]) _artCache[card] = svgURI(cardSVG(rankOf(card), suitOf(card)));
+    return _artCache[card];
+  }
+  function cardBackURI() {
+    if (!_artCache.__back) _artCache.__back = svgURI(cardBackSVG());
+    return _artCache.__back;
+  }
+
+  /* ======================================================================
+     STAGE 5 · SFX — tiny synthesized WebAudio effects, NO audio files.
+     The AudioContext is created/resumed only after a user gesture (a
+     capture-phase pointerdown). The mute toggle in the game HUD persists
+     in localStorage 'aldewaniah.balootGame.sound'.
+     ====================================================================== */
+  var Sfx = (function () {
+    var KEY = 'aldewaniah.balootGame.sound';
+    var on = true, ctx = null, noiseBuf = null;
+    try { if (typeof localStorage !== 'undefined') on = localStorage.getItem(KEY) !== '0'; } catch (e) {}
+    function ensure() {
+      if (!ctx) {
+        try {
+          var AC = (typeof window !== 'undefined') && (window.AudioContext || window.webkitAudioContext);
+          if (AC) ctx = new AC();
+        } catch (e) {}
+      }
+      if (ctx && ctx.state === 'suspended') { try { ctx.resume(); } catch (e) {} }
+    }
+    try { // unlock on the first (and every) tap — iOS re-suspends on background
+      if (typeof document !== 'undefined') {
+        document.addEventListener('pointerdown', ensure, { capture: true, passive: true });
+      }
+    } catch (e) {}
+    function env(gn, t0, a, peak, d) {
+      gn.gain.setValueAtTime(0.0001, t0);
+      gn.gain.linearRampToValueAtTime(peak, t0 + a);
+      gn.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    }
+    function tone(o) {
+      if (!on || !ctx || ctx.state !== 'running') return;
+      try {
+        var t0 = ctx.currentTime + (o.at || 0), d = o.d || 0.2;
+        var os = ctx.createOscillator(), gn = ctx.createGain();
+        os.type = o.type || 'sine';
+        os.frequency.setValueAtTime(o.f, t0);
+        if (o.f2) os.frequency.exponentialRampToValueAtTime(o.f2, t0 + d);
+        env(gn, t0, o.a || 0.008, o.v || 0.12, d);
+        os.connect(gn); gn.connect(ctx.destination);
+        os.start(t0); os.stop(t0 + d + 0.05);
+      } catch (e) {}
+    }
+    function noise(o) {
+      if (!on || !ctx || ctx.state !== 'running') return;
+      try {
+        if (!noiseBuf) {
+          noiseBuf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.5), ctx.sampleRate);
+          var data = noiseBuf.getChannelData(0);
+          for (var i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+        }
+        var t0 = ctx.currentTime + (o.at || 0), d = o.d || 0.15;
+        var src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+        var fl = ctx.createBiquadFilter(); fl.type = o.ft || 'bandpass';
+        fl.frequency.setValueAtTime(o.f || 1800, t0);
+        if (o.f2) fl.frequency.exponentialRampToValueAtTime(o.f2, t0 + d);
+        fl.Q.value = o.q || 1;
+        var gn = ctx.createGain(); env(gn, t0, o.a || 0.01, o.v || 0.1, d);
+        src.connect(fl); fl.connect(gn); gn.connect(ctx.destination);
+        src.start(t0); src.stop(t0 + d + 0.05);
+      } catch (e) {}
+    }
+    return {
+      enabled: function () { return on; },
+      toggle: function () {
+        on = !on;
+        try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (e) {}
+        if (on) ensure();
+        return on;
+      },
+      slide: function () { noise({ f: 2400, f2: 700, d: 0.12, v: 0.08 }); },                    // card swish
+      place: function () { tone({ f: 190, f2: 120, d: 0.09, v: 0.14 }); noise({ f: 900, d: 0.04, v: 0.05, ft: 'lowpass' }); }, // soft thock
+      tick: function (at) { noise({ f: 3200, d: 0.03, v: 0.04, at: at || 0, ft: 'highpass' }); }, // deal tick
+      sweep: function () { noise({ f: 500, f2: 2600, d: 0.32, v: 0.09, q: 0.8 }); },            // trick whoosh
+      chime: function () { tone({ f: 660, d: 0.18, v: 0.07, type: 'triangle' }); tone({ f: 880, d: 0.26, v: 0.07, at: 0.09, type: 'triangle' }); }, // your turn
+      drum: function () { tone({ f: 150, f2: 55, d: 0.28, v: 0.3 }); noise({ f: 300, d: 0.08, v: 0.12, ft: 'lowpass' }); },   // دبل hit
+      win: function () { [523, 659, 784, 1047].forEach(function (f, i) { tone({ f: f, d: 0.3, v: 0.1, at: i * 0.12, type: 'triangle' }); }); },
+      lose: function () { tone({ f: 220, f2: 130, d: 0.5, v: 0.1, type: 'sawtooth' }); }
+    };
+  })();
+
+  /* ======================================================================
+     STAGE 5 · MOTION — a tiny FLIP layer (transform/opacity only).
+     Callers batch their getBoundingClientRect READS first, then hand the
+     rects to flipFly which only WRITES (Web Animations API).
+     ====================================================================== */
+  var REDUCED = false;
+  try {
+    REDUCED = !!(typeof window !== 'undefined' && window.matchMedia &&
+                 window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  } catch (e) {}
+
+  /** FLIP: element sits at its FINAL spot; animate FROM `from` to rest,
+      with a small arc + overshoot settle. opts.to = precomputed rect. */
+  function flipFly(el, from, opts) {
+    opts = opts || {};
+    if (REDUCED || !el || !el.animate || !from) return;
+    var to = opts.to || el.getBoundingClientRect();
+    if (!to.width) return;
+    var dx = (from.left + from.width / 2) - (to.left + to.width / 2);
+    var dy = (from.top + from.height / 2) - (to.top + to.height / 2);
+    var sc = Math.max(0.3, Math.min(1.8, from.width / to.width));
+    el.animate([
+      { transform: 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px) scale(' + sc.toFixed(3) +
+        ') rotate(' + (opts.rot || 0) + 'deg)', opacity: 0.55 },
+      { transform: 'translate(' + (dx * -0.045).toFixed(1) + 'px,' + (dy * -0.045 - (opts.arc || 10)).toFixed(1) +
+        'px) scale(1.05) rotate(0deg)', opacity: 1, offset: 0.72 },
+      { transform: 'none', opacity: 1 }
+    ], { duration: opts.dur || 400, delay: opts.delay || 0,
+         easing: 'cubic-bezier(.22,.8,.3,1)', fill: 'backwards' });
+  }
+
+  /** Count a score number up/down smoothly (round-end «numbers count up»). */
+  function countUp(el, from, to) {
+    if (REDUCED || typeof requestAnimationFrame !== 'function' || from === to) {
+      el.textContent = String(to); return;
+    }
+    var t0 = null, dur = 650;
+    function step(t) {
+      if (t0 == null) t0 = t;
+      var k = Math.min(1, (t - t0) / dur);
+      el.textContent = String(Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3))));
+      if (k < 1 && el.isConnected) requestAnimationFrame(step);
+      else el.textContent = String(to);
+    }
+    requestAnimationFrame(step);
+  }
+
   // exposed for the /tmp node smoke test (harmless in the browser)
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = { newDeck: newDeck, shuffle: shuffle, legalMoves: legalMoves,
       winnerOf: winnerOf, scoreRound: scoreRound, findProjects: findProjects,
-      botBidChoice: botBidChoice, botPlayChoice: botPlayChoice, suitOf: suitOf };
+      botBidChoice: botBidChoice, botPlayChoice: botPlayChoice, suitOf: suitOf,
+      cardSVG: cardSVG, cardBackSVG: cardBackSVG };
   }
 
   /* ======================================================================
@@ -579,7 +877,9 @@
         bg_no_proj_yet: 'ما فيه مشاريع معلنة',
         bg_declared_proj: 'أعلن مشروع',
         bg_hidden_until2: 'تنكشف المشاريع مع بداية اللعبة الثانية',
-        bg_round_col: 'الجولة'
+        bg_round_col: 'الجولة',
+        // STAGE 5 — الإخراج الكامل
+        bg_sound: 'الصوت'
       },
       en: {
         bg_title: 'Baloot Online', bg_sub: 'Private Baloot tables — Kamelna rules',
@@ -622,7 +922,9 @@
         bg_no_proj_yet: 'No projects declared',
         bg_declared_proj: 'declared a project',
         bg_hidden_until2: 'Projects are revealed on trick 2',
-        bg_round_col: 'Round'
+        bg_round_col: 'Round',
+        // STAGE 5 — full-screen game feel
+        bg_sound: 'Sound'
       }
     },
 
@@ -672,7 +974,14 @@
         // STAGE 4: Kamelna look & feel
         modal: null,                          // 'scores' | 'projects' | 'emotes'
         saySig: '', sayShow: null, sayTimer: null, // تعابير speech bubbles
-        lastEmoteAt: 0, ringInt: null         // emote throttle + timer countdown
+        lastEmoteAt: 0, ringInt: null,        // emote throttle + timer countdown
+        // STAGE 5: full-screen stage + motion + sound bookkeeping
+        ov: null, ovBody: null, hashClose: null, // the fixed game overlay
+        playFrom: null,                       // FLIP origin rect of my tapped card
+        pendingFly: null,                     // table cards awaiting a FLIP-in
+        prevHandLen: 0, handRound: -1,        // deal-in reveal tracking
+        shownUs: null, shownThem: null,       // HUD score count-up
+        sfxMult: null, sfxPhase: null         // sound-cue edge detection
       };
 
       session = {
@@ -689,14 +998,42 @@
           clearTimeout(st.autoNextTimer); clearInterval(st.autoNextInt);
           clearTimeout(st.sayTimer); clearInterval(st.ringInt); // STAGE 4
           if (st.dealOv) { try { st.dealOv.remove(); } catch (e) {} st.dealOv = null; }
+          // STAGE 5: tear down the full-screen stage overlay + scroll lock
+          if (st.hashClose) {
+            try { window.removeEventListener('hashchange', st.hashClose); } catch (e) {}
+            st.hashClose = null;
+          }
+          if (st.ov) { try { st.ov.remove(); } catch (e) {} st.ov = null; st.ovBody = null; }
+          try { document.body.classList.remove('bg-lock'); } catch (e) {}
         }
       };
 
       /* ---------------- tiny helpers ---------------- */
+      /** STAGE 5: where the game paints — the full-screen stage when a
+          table is open, the section page otherwise. */
+      function stage() { return st.ovBody || root; }
+
+      /** STAGE 5: mount the full-screen game overlay (position:fixed over
+          the whole app, header and bottom nav included — like opening a
+          real game app). The app underneath stays mounted; navigating
+          away (hashchange) simply removes the overlay + subscriptions,
+          and localStorage lets the player rejoin the table later. */
+      function openStage() {
+        if (st.ov) return;
+        var ov = UI.el('div', { class: 'bg-stage' });
+        var body = UI.el('div', { class: 'bg-stagebody' });
+        ov.appendChild(body);
+        document.body.appendChild(ov);
+        document.body.classList.add('bg-lock'); // body scroll locked
+        st.ov = ov; st.ovBody = body;
+        st.hashClose = function () { session.close(); };
+        window.addEventListener('hashchange', st.hashClose);
+      }
+
       function toast(msg) {
         try {
           var t = UI.el('div', { class: 'bg-toast' }, msg);
-          root.appendChild(t);
+          (st.ov || root).appendChild(t);
           setTimeout(function () { try { t.remove(); } catch (e) {} }, 1900);
         } catch (e) {}
       }
@@ -751,14 +1088,14 @@
       function myTeamKey() { return 't' + (viewSeat() % 2); }
       function themTeamKey() { return 't' + (1 - viewSeat() % 2); }
 
-      /* ================= card DOM (pure CSS/SVG, no images) ================= */
+      /* ================= card DOM (STAGE 5: programmatic SVG deck) =========
+         One div per card; the whole face is a cached data-URI SVG from
+         cardSVG() — corner indices, true pip layouts, geometric Arabic-
+         royal courts. isRed/SUIT_CHAR stay for text labels elsewhere. */
       function cardEl(card, cls) {
-        var s = suitOf(card), r = rankOf(card);
-        return UI.el('div', { class: 'bg-pcard ' + (isRed(card) ? 'red' : 'black') + (cls ? ' ' + cls : '') }, [
-          UI.el('span', { class: 'bg-pc-corner' }, [UI.el('b', null, r), UI.el('i', null, SUIT_CHAR[s])]),
-          UI.el('span', { class: 'bg-pc-pip' }, SUIT_CHAR[s]),
-          UI.el('span', { class: 'bg-pc-corner flip' }, [UI.el('b', null, r), UI.el('i', null, SUIT_CHAR[s])])
-        ]);
+        var el = UI.el('div', { class: 'bg-pcard' + (cls ? ' ' + cls : '') });
+        el.style.backgroundImage = cardFaceURI(card);
+        return el;
       }
 
       /* ================= STAGE 4 · تعابير (emotes) =================
@@ -874,8 +1211,16 @@
         st.code = code;
         st.ref = db.collection('balootTables').doc(code);
         st.pub = null; st.hands = {}; st.privSubs = {}; st.guard = '';
+        // STAGE 5: the whole table (lobby AND game) lives in the
+        // full-screen stage; the section page keeps only a resume card.
+        openStage();
+        stage().innerHTML = '';
+        stage().appendChild(UI.el('p', { class: 'bg-stageload' }, I18n.t('bg_loading')));
         root.innerHTML = '';
-        root.appendChild(UI.el('p', { class: 'muted', style: 'text-align:center' }, I18n.t('bg_loading')));
+        root.appendChild(UI.el('div', { class: 'card' }, [
+          UI.el('button', { class: 'btn btn-green btn-block', onclick: function () { openTable(code); } },
+            I18n.t('bg_resume') + ' · ' + code)
+        ]));
 
         st.pubUnsub = st.ref.onSnapshot(function (doc) {
           try {
@@ -891,10 +1236,29 @@
             scheduleCollect();
             pacing();          // STAGE 3: bots + turn timers + auto-advance
             maybeSay();        // STAGE 4: تعابير speech bubbles
+            soundCues();       // STAGE 5: دبل drum / win / lose cues
             paint();
             dealAnimations();  // STAGE 3: needs the freshly painted felt
           } catch (e) { /* defensive: never let a paint error kill the stream */ }
         }, function () { toast(I18n.t('bg_err')); });
+      }
+
+      /** STAGE 5: sound cues driven by public-state EDGES (never repeats
+          on repaints; skips the first snapshot after a rejoin). */
+      function soundCues() {
+        var p = st.pub; if (!p) return;
+        var m = (p.mult === 'coffee') ? 9 : (p.mult || 1);
+        if (st.sfxMult != null && m > st.sfxMult) Sfx.drum();   // دبل/ثري/أربع/قهوة
+        st.sfxMult = m;
+        if (p.phase !== st.sfxPhase) {
+          var prev = st.sfxPhase; st.sfxPhase = p.phase;
+          if (p.phase === 'gameEnd' && prev && prev !== 'gameEnd') {
+            var t0 = (p.totals && p.totals.t0) || 0, t1 = (p.totals && p.totals.t1) || 0;
+            var winKey = t0 > t1 ? 't0' : 't1';
+            if (mySeat() >= 0 && winKey !== myTeamKey()) Sfx.lose();
+            else Sfx.win();
+          }
+        }
       }
 
       /** Listen to the private hand docs I'm allowed to read.
@@ -1236,10 +1600,7 @@
           // sweep animation toward the winner (everyone sees it locally)
           var win = winnerOf(p.table, p.mode, p.trump);
           st.sweepTimer = setTimeout(function () {
-            try {
-              var c = root.querySelector('.bg-center');
-              if (c) c.classList.add('bg-sweep-' + relPos(win.seat));
-            } catch (e) {}
+            try { sweepAnim(win.seat); } catch (e) {}
           }, 550);
 
           var delay = -1;
@@ -1359,6 +1720,8 @@
           st.turnSig = sig; st.turnStartAt = Date.now(); st.botTries = 0;
           clearTimeout(st.turnTimer); clearTimeout(st.backupTimer); clearTimeout(st.botTimer);
           var act = actorOf(p);
+          // STAGE 5: gentle chime the moment a turn becomes MINE
+          if (act >= 0 && controlsSeat(act) && (p.table || []).length < 4) Sfx.chime();
           if (act >= 0 && (p.table || []).length < 4) {
             if (isBotSeat(act)) {
               if (isHost()) {
@@ -1381,7 +1744,7 @@
             st.autoNextInt = setInterval(function () {
               var s = Math.max(0, Math.ceil((end - Date.now()) / 1000));
               try {
-                var b = root.querySelector('.bg-nextbtn');
+                var b = stage().querySelector('.bg-nextbtn');
                 if (b) b.textContent = I18n.t('bg_next_round') + ' · ' + s;
               } catch (e) {}
               if (s <= 0) clearInterval(st.autoNextInt);
@@ -1453,7 +1816,7 @@
       function runDealAnim(kind) {
         try {
           var p = st.pub; if (!p) return;
-          var felt = root.querySelector('.bg-felt'); if (!felt) return;
+          var felt = stage().querySelector('.bg-felt'); if (!felt) return;
           var rect = felt.getBoundingClientRect(); if (!rect.width) return;
           if (st.dealOv) { try { st.dealOv.remove(); } catch (e) {} }
           var ov = UI.el('div', { class: 'bg-dealov' });
@@ -1474,25 +1837,35 @@
               for (var j = 0; j < n; j++) plan.push(s);
             });
           }
+          // STAGE 5: transform-only flight with an arc + spin + stagger
+          // (WAAPI; falls back to an instant layout for reduced motion)
+          var x0 = rect.left + rect.width * from[0] - 20;
+          var y0 = rect.top + rect.height * from[1] - 29;
           plan.forEach(function (s, i) {
             var c = UI.el('div', { class: 'bg-dealcard' });
-            c.style.left = (rect.left + rect.width * from[0] - 19) + 'px';
-            c.style.top = (rect.top + rect.height * from[1] - 27) + 'px';
-            c.style.transitionDelay = (i * 60) + 'ms';
+            c.style.backgroundImage = cardBackURI();
+            c.style.left = x0 + 'px'; c.style.top = y0 + 'px';
             ov.appendChild(c);
-          });
-          requestAnimationFrame(function () { requestAnimationFrame(function () {
-            for (var i = 0; i < ov.children.length; i++) {
-              var to = POS[relPos(plan[i])];
-              ov.children[i].style.left = (rect.left + rect.width * to[0] - 19) + 'px';
-              ov.children[i].style.top = (rect.top + rect.height * to[1] - 27) + 'px';
-              ov.children[i].classList.add('go');
+            var to = POS[relPos(s)];
+            var dx = rect.width * (to[0] - from[0]);
+            var dy = rect.height * (to[1] - from[1]);
+            var rot = Math.random() * 50 - 25;
+            if (c.animate && !REDUCED) {
+              c.animate([
+                { transform: 'translate(0px,0px) rotate(0deg)', opacity: 0.95 },
+                { transform: 'translate(' + (dx * 0.5).toFixed(1) + 'px,' + (dy * 0.5 - 34).toFixed(1) +
+                  'px) rotate(' + (rot * 0.6).toFixed(1) + 'deg)', offset: 0.55, opacity: 1 },
+                { transform: 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px) rotate(' + rot.toFixed(1) + 'deg)', opacity: 0.9 }
+              ], { duration: 380, delay: i * 55, easing: 'cubic-bezier(.3,.7,.4,1)', fill: 'forwards' });
+              Sfx.tick(i * 0.055);
+            } else {
+              c.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px)';
             }
-          }); });
+          });
           setTimeout(function () {
             try { ov.remove(); } catch (e) {}
             if (st.dealOv === ov) st.dealOv = null;
-          }, plan.length * 60 + 900);
+          }, plan.length * 55 + 700);
         } catch (e) {}
       }
 
@@ -1645,9 +2018,17 @@
       }
 
       /* ---------------- lobby phase: pick seats ---------------- */
+      /* STAGE 5: the table lobby also lives inside the full-screen stage
+         (scrollable variant) — opening a table takes over the screen. */
       function paintLobby(p) {
-        root.innerHTML = '';
-        root.appendChild(UI.el('div', { class: 'bg-codecard' }, [
+        openStage();
+        st.ov.className = 'bg-stage bg-stage-lobby';
+        var m = stage();
+        m.innerHTML = '';
+        m.appendChild(UI.el('div', { class: 'bg-lobbybar' }, [
+          UI.el('button', { class: 'bg-hudbtn', onclick: exitView }, I18n.t('bg_exit'))
+        ]));
+        m.appendChild(UI.el('div', { class: 'bg-codecard' }, [
           UI.el('div', { class: 'bg-code-label' }, I18n.t('bg_share_code')),
           UI.el('button', { class: 'bg-code', onclick: copyCode }, st.code)
         ]));
@@ -1674,7 +2055,7 @@
           })(i);
         }
         felt.appendChild(UI.el('div', { class: 'bg-lobby-mid' }, I18n.t('bg_title')));
-        root.appendChild(felt);
+        m.appendChild(felt);
 
         var filled = (p.seats || []).filter(Boolean).length;
         if (isHost()) {
@@ -1684,15 +2065,15 @@
             UI.el('small', null, I18n.t('bg_practice_hint'))
           ]);
           if (p.practice) tgl.querySelector('input').checked = true;
-          root.appendChild(tgl);
+          m.appendChild(tgl);
 
           var canStart = p.practice ? mySeat() >= 0 : filled === 4;
           var startBtn = UI.el('button', { class: 'btn btn-green btn-block', onclick: startGame },
             canStart ? I18n.t('bg_start') : I18n.t('bg_need4'));
           if (!canStart) startBtn.setAttribute('disabled', 'true');
-          root.appendChild(startBtn);
+          m.appendChild(startBtn);
         } else {
-          root.appendChild(UI.el('p', { class: 'muted', style: 'text-align:center' },
+          m.appendChild(UI.el('p', { class: 'muted', style: 'text-align:center' },
             mySeat() >= 0 ? I18n.t('bg_need4') : (filled === 4 ? I18n.t('bg_full') : I18n.t('bg_sit'))));
         }
 
@@ -1702,39 +2083,52 @@
             UI.confirm(I18n.t('bg_end_confirm'), endTable);
           } }, I18n.t('bg_end_table')) : null
         ]);
-        root.appendChild(row);
+        m.appendChild(row);
       }
 
       /* ---------------- in-game paint ---------------- */
+      /* STAGE 5: full-screen stage column — HUD on top, the sadu rug
+         filling the middle edge-to-edge, bid bar docked right above the
+         big hand fan, dark action bar at the bottom (Kamelna frame). */
       function paintGame(p) {
         clearInterval(st.ringInt);                     // STAGE 4: countdown rebuilt below
-        root.innerHTML = '';
-        root.appendChild(topBar(p));
+        openStage();
+        st.ov.className = 'bg-stage';
+        var m = stage();
+        m.innerHTML = '';
+        m.appendChild(topBar(p));
 
+        var board = UI.el('div', { class: 'bg-board' });
         var felt = UI.el('div', { class: 'bg-felt' });
         for (var i = 0; i < 4; i++) felt.appendChild(seatChip(p, i));
         felt.appendChild(centerArea(p));
-        root.appendChild(felt);
+        board.appendChild(felt);
+        m.appendChild(board);
 
         // STAGE 4: Kamelna-style INLINE bid/دبل bar docked above the hand
         // (replaces the old covering bottom-sheet — same logic & guards)
-        if (p.phase === 'bidding' && p.turn >= 0 && controlsSeat(p.turn)) root.appendChild(bidSheet(p));
+        if (p.phase === 'bidding' && p.turn >= 0 && controlsSeat(p.turn)) m.appendChild(bidSheet(p));
         if (p.phase === 'doubling' && p.doubleTurn != null && controlsSeat(p.doubleTurn)) {
-          root.appendChild(doubleSheet(p));            // STAGE 2: دبل chain
+          m.appendChild(doubleSheet(p));               // STAGE 2: دبل chain
         }
 
-        root.appendChild(handArea(p));
-        root.appendChild(actionBar(p));                // STAGE 4: قيدها/المشاريع/تعابير
+        m.appendChild(handArea(p));
+        m.appendChild(actionBar(p));                   // STAGE 4: قيدها/المشاريع/تعابير
 
         var reveal = projectOverlay(p);                // STAGE 2: trick-2 showdown
-        if (reveal) root.appendChild(reveal);
-        if (st.modal === 'scores') root.appendChild(scoreSheetModal(p));       // STAGE 4
-        else if (st.modal === 'projects') root.appendChild(projectsModal(p));  // STAGE 4
-        else if (st.modal === 'emotes') root.appendChild(emoteModal(p));       // STAGE 4
-        if (p.phase === 'roundEnd') root.appendChild(roundEndModal(p));
-        if (p.phase === 'gameEnd') root.appendChild(gameEndModal(p));
+        if (reveal) m.appendChild(reveal);
+        if (st.modal === 'scores') m.appendChild(scoreSheetModal(p));       // STAGE 4
+        else if (st.modal === 'projects') m.appendChild(projectsModal(p));  // STAGE 4
+        else if (st.modal === 'emotes') m.appendChild(emoteModal(p));       // STAGE 4
+        if (p.phase === 'roundEnd') m.appendChild(roundEndModal(p));
+        if (p.phase === 'gameEnd') m.appendChild(gameEndModal(p));
+
+        runTableAnims();                               // STAGE 5: FLIP the new trick cards
       }
 
+      /* STAGE 5: the floating game HUD — dark chips like Kamelna's top
+         row: خروج/إنهاء · 🔊 · mode/دبل chips · the لنا/لهم score unit
+         with «جلسة <code>» under it (tap = copy). Scores count up. */
       function topBar(p) {
         var us = (p.totals && p.totals[myTeamKey()]) || 0;
         var them = (p.totals && p.totals[themTeamKey()]) || 0;
@@ -1751,23 +2145,31 @@
         if (p.mult === 'coffee') multChip = UI.el('span', { class: 'bg-chip bg-chip-mult' }, '☕ ' + I18n.t('bg_qahwa'));
         else if (p.mult >= 2) multChip = UI.el('span', { class: 'bg-chip bg-chip-mult' }, '×' + p.mult);
 
-        // STAGE 4: Kamelna top bar — لنا/لهم pills + «جلسة <code>» chip
-        return UI.el('div', { class: 'bg-topbar' }, [
-          UI.el('span', { class: 'bg-scorepill us' }, [
-            UI.el('small', null, I18n.t('bg_us')), UI.el('b', null, String(us))
-          ]),
-          UI.el('span', { class: 'bg-scorepill them' }, [
-            UI.el('small', null, I18n.t('bg_them')), UI.el('b', null, String(them))
-          ]),
-          modeChip,
-          multChip,
-          UI.el('button', { class: 'bg-chip bg-chip-code', onclick: copyCode },
-            I18n.t('bg_session') + ' ' + st.code),
-          UI.el('span', { class: 'bg-topgrow' }),
-          isHost() ? UI.el('button', { class: 'bg-chip bg-danger', onclick: function () {
+        var usB = UI.el('b', { class: 'us' }, String(us));
+        var themB = UI.el('b', { class: 'them' }, String(them));
+        if (st.shownUs != null && st.shownUs !== us) countUp(usB, st.shownUs, us);
+        if (st.shownThem != null && st.shownThem !== them) countUp(themB, st.shownThem, them);
+        st.shownUs = us; st.shownThem = them;
+
+        return UI.el('div', { class: 'bg-hud' }, [
+          UI.el('button', { class: 'bg-hudbtn', onclick: exitView }, I18n.t('bg_exit')),
+          isHost() ? UI.el('button', { class: 'bg-hudbtn danger', onclick: function () {
             UI.confirm(I18n.t('bg_end_confirm'), endTable);
           } }, I18n.t('bg_end_table')) : null,
-          UI.el('button', { class: 'bg-chip', onclick: exitView }, I18n.t('bg_exit'))
+          UI.el('button', { class: 'bg-hudbtn', title: I18n.t('bg_sound'), onclick: function () {
+            Sfx.toggle(); paint();
+          } }, Sfx.enabled() ? '🔊' : '🔇'),
+          UI.el('span', { class: 'bg-hudgrow' }),
+          modeChip,
+          multChip,
+          UI.el('button', { class: 'bg-hudscore', onclick: copyCode }, [
+            UI.el('span', { class: 'bg-hudrow' }, [
+              UI.el('small', null, I18n.t('bg_us')), usB,
+              UI.el('span', { class: 'bg-hudsep' }),
+              UI.el('small', null, I18n.t('bg_them')), themB
+            ]),
+            UI.el('span', { class: 'bg-hudsess' }, I18n.t('bg_session') + ' ' + st.code)
+          ])
         ]);
       }
 
@@ -1779,6 +2181,7 @@
         var spread = 12, start = -((n - 1) * spread) / 2;
         for (var k = 0; k < n; k++) {
           var c = UI.el('div', { class: 'bg-fancard' });
+          c.style.backgroundImage = cardBackURI();     // STAGE 5: SVG back
           c.style.transform = 'rotate(' + (start + k * spread) + 'deg)';
           f.appendChild(c);
         }
@@ -1909,23 +2312,81 @@
               : I18n.t('bg_turn_of') + ' ' + seatName(p.doubleTurn)));
           return c;
         }
-        // trick cards, positioned toward each seat; new cards slide in
+        // trick cards, positioned toward each seat. STAGE 5: each card sits
+        // inside a POSITIONING slot (the slot owns the CSS transform, the
+        // card animates freely) and new cards FLIP-fly in from their seat —
+        // or, for MY card, from the exact fan card I tapped.
         var cards = (p.table || []).map(function (t) { return t.card; });
         var sig = cards.join(',');
         var animFrom = 0;
         if (st.prevSig && sig.indexOf(st.prevSig) === 0 && sig !== st.prevSig) animFrom = st.prevCount;
         else if (sig === st.prevSig) animFrom = cards.length; // repaint: no re-animation
         st.prevSig = sig; st.prevCount = cards.length;
+        st.pendingFly = [];
         (p.table || []).forEach(function (t, idx) {
           var pos = relPos(t.seat);
-          var el = cardEl(t.card, 'bg-tcard bg-t-' + pos + (idx >= animFrom ? ' bg-in-' + pos : ''));
-          c.appendChild(el);
+          var card = cardEl(t.card);
+          var slot = UI.el('div', { class: 'bg-tslot bg-t-' + pos }, [card]);
+          if (idx >= animFrom) st.pendingFly.push({ el: card, seat: t.seat, card: t.card });
+          c.appendChild(slot);
         });
         if (p.phase === 'playing' && p.turn >= 0 && !(p.table || []).length) {
           c.appendChild(UI.el('div', { class: 'bg-turnhint soft' },
             controlsSeat(p.turn) ? I18n.t('bg_your_turn') : I18n.t('bg_turn_of') + ' ' + seatName(p.turn)));
         }
         return c;
+      }
+
+      /** STAGE 5: FLIP the freshly painted trick cards (batched reads →
+          batched writes, transform/opacity only). */
+      function runTableAnims() {
+        var list = st.pendingFly; st.pendingFly = null;
+        if (!list || !list.length || REDUCED) return;
+        requestAnimationFrame(function () {
+          var jobs = [];
+          list.forEach(function (it) {                 // READ phase
+            if (!it.el.isConnected || !it.el.animate) return;
+            var from = null, rot = 0;
+            if (st.playFrom && st.playFrom.card === it.card && (Date.now() - st.playFrom.t) < 1800) {
+              from = st.playFrom.rect; st.playFrom = null;   // my tapped card lifts & arcs over
+            } else {
+              var seatEl = stage().querySelector('.bg-seat.bg-pos-' + relPos(it.seat) + ' .bg-avwrap');
+              if (seatEl) { from = seatEl.getBoundingClientRect(); rot = 14; }
+            }
+            if (from) jobs.push({ el: it.el, from: from, to: it.el.getBoundingClientRect(), rot: rot });
+          });
+          jobs.forEach(function (j) {                  // WRITE phase
+            flipFly(j.el, j.from, { to: j.to, rot: j.rot, arc: 16, dur: 400 });
+          });
+          if (jobs.length) Sfx.place();
+        });
+      }
+
+      /** STAGE 5: trick sweep — the 4 cards gather, rotate toward the
+          winner and shrink-fly to their pile (WAAPI; class fallback). */
+      function sweepAnim(winSeat) {
+        var c = stage().querySelector('.bg-center'); if (!c) return;
+        var cardsEls = Array.prototype.slice.call(c.querySelectorAll('.bg-tslot .bg-pcard'));
+        if (!cardsEls.length) return;
+        Sfx.sweep();
+        var pos = relPos(winSeat);
+        if (REDUCED || !cardsEls[0].animate) { c.classList.add('bg-sweep-' + pos); return; }
+        var tgt = stage().querySelector('.bg-seat.bg-pos-' + pos + ' .bg-avwrap');
+        if (!tgt) { c.classList.add('bg-sweep-' + pos); return; }
+        var tr = tgt.getBoundingClientRect();                       // READ phase
+        var reads = cardsEls.map(function (el) { return el.getBoundingClientRect(); });
+        cardsEls.forEach(function (el, i) {                         // WRITE phase
+          var r = reads[i];
+          var dx = (tr.left + tr.width / 2) - (r.left + r.width / 2);
+          var dy = (tr.top + tr.height / 2) - (r.top + r.height / 2);
+          el.animate([
+            { transform: 'none', opacity: 1 },
+            { transform: 'translate(' + (dx * 0.12).toFixed(1) + 'px,' + (dy * 0.12).toFixed(1) +
+              'px) rotate(' + (i * 7 - 10) + 'deg) scale(0.95)', offset: 0.4, opacity: 1 },
+            { transform: 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) +
+              'px) rotate(' + (i * 16 - 24) + 'deg) scale(0.3)', opacity: 0 }
+          ], { duration: 560, easing: 'cubic-bezier(.45,.05,.7,.4)', fill: 'forwards' });
+        });
       }
 
       /* Bottom hand fan — legal cards lift & play on tap; illegal ones dim. */
@@ -1952,12 +2413,34 @@
             wrap.appendChild(pill);
           }
         }
+        // STAGE 5: big ARCHED fan (Kamelna proportions) — each card sits in
+        // a slot that owns the arc rotation (the card itself stays free for
+        // the lift/flip animations). New deals flip-reveal with a stagger.
         var fan = UI.el('div', { class: 'bg-hand' });
-        hand.forEach(function (card) {
+        var n = hand.length, mid = (n - 1) / 2;
+        if (st.handRound !== p.roundNo) { st.handRound = p.roundNo; st.prevHandLen = 0; }
+        var newDeal = n > st.prevHandLen;
+        st.prevHandLen = n;
+        hand.forEach(function (card, i) {
           var ok = canAct && legal.indexOf(card) >= 0;
           var el = cardEl(card, ok ? 'playable' : (canAct ? 'dim' : ''));
-          if (ok) el.onclick = function () { el.onclick = null; playCard(act, card); };
-          fan.appendChild(el);
+          if (ok) el.onclick = function () {
+            el.onclick = null;
+            // FLIP origin: the exact card I tapped, measured pre-repaint
+            st.playFrom = { card: card, rect: el.getBoundingClientRect(), t: Date.now() };
+            Sfx.slide();
+            playCard(act, card);
+          };
+          if (newDeal && !REDUCED) {
+            el.classList.add('bg-deal-in');
+            el.style.animationDelay = (i * 45) + 'ms';
+          }
+          var slot = UI.el('div', { class: 'bg-handslot' }, [el]);
+          var rot = (mid - i) * (n > 6 ? 3.2 : 4.2);          // RTL: first card sits right
+          var lift = Math.pow(Math.abs(i - mid), 2) * (n > 6 ? 1.35 : 2.2);
+          slot.style.transform = 'rotate(' + rot.toFixed(2) + 'deg) translateY(' + lift.toFixed(1) + 'px)';
+          slot.style.zIndex = String(10 + i);
+          fan.appendChild(slot);
         });
         wrap.appendChild(fan);
         return wrap;

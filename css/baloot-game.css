@@ -2,9 +2,14 @@
    بلوت أونلاين (Baloot Online) — all styles for baloot-game.js
    Every class is prefixed bg- so nothing clashes with the
    baloot CALCULATOR (.blt) or any other module.
+
+   STAGE 5: the game is a FULL-SCREEN TAKEOVER (.bg-stage) over
+   the whole app — its own HUD, an edge-to-edge sadu rug, a big
+   arched hand fan and a dark action bar. Cards are programmatic
+   SVG faces/backs injected as background-images from the JS.
    =========================================================== */
 
-/* ---------- header / chips ---------- */
+/* ---------- section page (only the lobby entry lives here) ---------- */
 .bg-head { display: flex; align-items: center; gap: 8px; }
 .bg-beta {
   display: inline-block; background: var(--maroon); color: #fff;
@@ -17,13 +22,45 @@
   position: fixed; bottom: calc(var(--nav-h) + 18px); left: 50%;
   transform: translateX(-50%);
   background: rgba(20, 24, 32, .92); color: #fff; font-size: 13px;
-  padding: 9px 16px; border-radius: 999px; z-index: 120;
+  padding: 9px 16px; border-radius: 999px; z-index: 1600; /* above the stage */
   box-shadow: 0 4px 18px rgba(0, 0, 0, .3);
   animation: bg-toast-in .2s ease;
 }
 @keyframes bg-toast-in { from { opacity: 0; transform: translate(-50%, 8px); } }
 
-/* ---------- lobby ---------- */
+/* ===========================================================
+   STAGE 5 — the full-screen game stage
+   =========================================================== */
+body.bg-lock { overflow: hidden; }           /* body scroll locked while open */
+
+.bg-stage {
+  position: fixed; inset: 0; z-index: 1500;  /* over header + bottom nav */
+  background:
+    radial-gradient(120% 55% at 50% 0, rgba(255, 255, 255, .18), transparent 60%),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, .03) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, #dbc89c, #cdb684 55%, #bfa76e); /* Kamelna sand */
+}
+.bg-stagebody {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  padding-top: 8px;                                     /* fallback */
+  padding-top: max(env(safe-area-inset-top), 8px);      /* iOS notch */
+}
+/* table-lobby variant: normal scrolling page inside the stage */
+.bg-stage-lobby .bg-stagebody {
+  display: block; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 14px 14px 24px;                              /* fallback */
+  padding: calc(max(env(safe-area-inset-top), 8px) + 6px) 14px
+           calc(env(safe-area-inset-bottom) + 24px);
+}
+.bg-stage-lobby .bg-stagebody > * { margin: 0 0 10px; }
+.bg-lobbybar { display: flex; justify-content: flex-start; }
+.bg-stageload {
+  text-align: center; color: #6b5a33; font-weight: 800;
+  padding-top: 42vh; margin: 0;
+}
+
+/* ---------- lobby entry cards (section page + table lobby) ---------- */
 .bg-codecard {
   background: var(--card); border-radius: var(--radius);
   box-shadow: var(--shadow); padding: 12px; text-align: center;
@@ -45,15 +82,59 @@
 .bg-lobby-actions { display: flex; gap: 10px; justify-content: center; }
 .bg-danger { color: #b03030 !important; }
 
-/* ---------- the table: a sadu Bedouin rug (STAGE 4, pure CSS) ----------
+/* ---------- STAGE 5: the floating game HUD ---------- */
+.bg-hud {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 4px 10px 6px;
+}
+.bg-hudbtn {
+  border: none; cursor: pointer; font: inherit;
+  min-height: 34px; padding: 5px 11px; border-radius: 11px;
+  background: linear-gradient(#3d424b, #23262c); color: #f2ead6;
+  font-size: 12px; font-weight: 800;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 2px 5px rgba(0, 0, 0, .25);
+  transition: transform .1s ease;
+}
+.bg-hudbtn:active { transform: scale(.94); }
+.bg-hudbtn.danger { color: #ffb4a6; }
+.bg-hudgrow { flex: 1; }
+.bg-hudscore {
+  border: none; cursor: pointer; font: inherit;
+  display: inline-flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 4px 13px; border-radius: 13px;
+  background: linear-gradient(#3d424b, #23262c); color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 2px 5px rgba(0, 0, 0, .25);
+}
+.bg-hudrow { display: inline-flex; align-items: baseline; gap: 6px; }
+.bg-hudrow small { font-size: 10px; font-weight: 800; color: rgba(255, 255, 255, .75); }
+.bg-hudrow b { font-size: 16px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.bg-hudrow b.us { color: #ffe9b0; }
+.bg-hudrow b.them { color: #ffb9ab; }
+.bg-hudsep { width: 1px; height: 12px; background: rgba(255, 255, 255, .28); align-self: center; }
+.bg-hudsess { font-size: 9px; font-weight: 700; color: rgba(255, 255, 255, .72); letter-spacing: 1.5px; }
+
+/* mode / دبل chips (they sit on the sand backdrop) */
+.bg-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #efe9da; color: var(--ink); border: none; cursor: pointer;
+  font-size: 12px; font-weight: 800; border-radius: 999px; padding: 5px 11px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .18);
+}
+.bg-chip-sun { background: linear-gradient(#f3d98c, #e0b95a); color: #5c430e; }
+.bg-chip-hokum { background: linear-gradient(#3f9c68, #1e6b47); color: #fff; }
+.bg-chip-hokum.redsuit { text-shadow: 0 0 2px #fff; }
+.bg-chip-ashkal { background: linear-gradient(#5b8fdf, #2b5aa8); color: #fff; }
+.bg-chip-mult { background: linear-gradient(#d4574a, #8c2f27); color: #fff; }
+
+/* ---------- the board: sadu rug fills the middle, edge-to-edge ----------
    Maroon wool base + three woven bands. Each band is a pair of conic-
    gradient triangle strips (down-pointing over up-pointing, offset half a
    tile) so the two colours interlock into the classic sadu zig-zag,
    flanked by thin beige/teal weft lines. ::after draws the framed border. */
+.bg-board { position: relative; flex: 1 1 auto; min-height: 230px; }
 .bg-felt {
-  position: relative;
-  height: clamp(300px, 46vh, 440px);
-  border-radius: 14px;
+  position: absolute; inset: 4px 0;          /* full width under the HUD */
+  border-radius: 10px;
   background:
     /* faint horizontal weave texture over everything */
     repeating-linear-gradient(0deg, rgba(0, 0, 0, .05) 0 1px, transparent 1px 3px),
@@ -89,33 +170,35 @@
     inset 0 0 0 12px #8a6844,
     inset 0 0 0 14px rgba(58, 42, 26, .55);
 }
-.bg-felt-lobby { height: clamp(260px, 38vh, 340px); }
+/* table-lobby rug: back in normal flow */
+.bg-felt-lobby { position: relative; inset: auto; height: clamp(260px, 38vh, 340px); border-radius: 14px; }
 .bg-lobby-mid {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   color: rgba(255, 255, 255, .28); font-weight: 800; font-size: 20px;
   letter-spacing: .06em; pointer-events: none;
 }
 
-/* ---------- seats (bottom = you, counter-clockwise order) ---------- */
+/* ---------- seats — sitting ON the rug border (bottom = you) ---------- */
 .bg-seat {
   position: absolute; z-index: 5;
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   background: none; border: none; padding: 0; font: inherit;
 }
 .bg-seat-empty { cursor: pointer; }
-.bg-pos-b { bottom: 8px; left: 50%; transform: translateX(-50%); }
-.bg-pos-t { top: 8px; left: 50%; transform: translateX(-50%); }
-.bg-pos-l { left: 8px; top: 50%; transform: translateY(-50%); }
-.bg-pos-r { right: 8px; top: 50%; transform: translateY(-50%); }
+.bg-pos-b { bottom: 2px; left: 50%; transform: translateX(-50%); }
+.bg-pos-t { top: 2px; left: 50%; transform: translateX(-50%); }
+.bg-pos-l { left: 2px; top: 50%; transform: translateY(-50%); }
+.bg-pos-r { right: 2px; top: 50%; transform: translateY(-50%); }
 
 .bg-avatar {
-  width: 46px; height: 46px; border-radius: 50%;
+  width: 52px; height: 52px; border-radius: 50%;
   background: linear-gradient(#24365c, #131d33); color: #f2ead6;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 16px;
-  border: 2px solid rgba(255, 255, 255, .35);
+  font-weight: 800; font-size: 17px;
+  border: 2px solid rgba(255, 255, 255, .4);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, .4);
   transition: box-shadow .2s, border-color .2s;
-  position: relative; z-index: 2; /* STAGE 4: above the card-back fan */
+  position: relative; z-index: 2; /* above the card-back fan */
 }
 .bg-avatar.empty {
   background: rgba(255, 255, 255, .1); color: #fff; font-size: 24px;
@@ -141,92 +224,77 @@
   background: var(--gold); border-radius: 999px; padding: 1px 8px;
 }
 .bg-tag.dealer { background: #e9e2d0; }
-/* (.bg-count removed in STAGE 4 — replaced by the card-back fan) */
+.bg-tag.proj { background: #f3d98c; }
 .bg-bidlbl {
   font-size: 11px; font-weight: 800; color: #ffe9b0;
   background: rgba(0, 0, 0, .35); border-radius: 999px; padding: 2px 9px;
-  animation: bg-toast-in .25s ease;
+  animation: bg-pop .32s cubic-bezier(.3, 1.6, .5, 1); /* STAGE 5: spring pop */
 }
+@keyframes bg-pop { from { transform: scale(.4); opacity: 0; } }
 
-/* ---------- playing cards (pure CSS, no images) ---------- */
+/* ---------- playing cards — programmatic SVG faces (STAGE 5) ---------- */
 .bg-pcard {
-  width: 58px; height: 84px; border-radius: 9px;
-  background: linear-gradient(160deg, #ffffff 70%, #f3efe4 100%);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, .32), inset 0 0 0 1px rgba(0, 0, 0, .07);
+  width: 64px; height: 93px; border-radius: 8px;   /* 200:290 face */
+  background-color: #fdfaf1;
+  background-size: 100% 100%; background-repeat: no-repeat;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .32);
   position: relative; user-select: none; -webkit-user-select: none;
-  direction: ltr; /* rank corners always LTR even in the RTL app */
   flex: 0 0 auto;
 }
-.bg-pcard.red { color: #c0392b; }
-.bg-pcard.black { color: #23252a; }
-.bg-pc-corner {
-  position: absolute; top: 4px; left: 5px;
-  display: flex; flex-direction: column; align-items: center;
-  line-height: 1; font-size: 13px; font-weight: 800;
-}
-.bg-pc-corner b { font-style: normal; }
-.bg-pc-corner i { font-style: normal; font-size: 11px; }
-.bg-pc-corner.flip { top: auto; left: auto; bottom: 4px; right: 5px; transform: rotate(180deg); }
-.bg-pc-pip {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 32px;
-}
+.bg-pcard.mini { width: 34px; height: 49px; border-radius: 5px; }
 
-/* ---------- my hand: overlapping fan ---------- */
-.bg-handarea { min-height: 116px; }
+/* ---------- my hand: big ARCHED fan (Kamelna proportions) ---------- */
+.bg-handarea { padding: 2px 0 0; }
 .bg-banner {
   text-align: center; font-size: 13px; font-weight: 700; color: #6b4d12;
   background: #f6ecd2; border: 1px solid #e5d5a8; border-radius: 10px;
-  padding: 6px 10px; margin-bottom: 6px;
+  padding: 6px 10px; margin: 6px 12px;
 }
-.bg-banner.tight { margin: 4px 0; }
+.bg-banner.tight { margin: 4px 12px; }
 .bg-hand {
   display: flex; justify-content: center; align-items: flex-end;
-  padding: 12px 8px 6px; min-height: 104px;
+  padding: 16px 10px 6px; min-height: 138px;
+}
+.bg-handslot {                                 /* owns the fan-arc transform */
+  transform-origin: 50% 130%;
+  margin: 0 -23px; position: relative;
 }
 .bg-hand .bg-pcard {
-  width: 62px; height: 92px; margin: 0 -15px;
+  width: 86px; height: 125px; border-radius: 10px; margin: 0;
+  box-shadow: 0 3px 9px rgba(0, 0, 0, .35);
   transition: transform .16s ease, opacity .16s ease, box-shadow .16s ease;
 }
 .bg-hand .bg-pcard.playable { cursor: pointer; }
 .bg-hand .bg-pcard.playable:hover,
 .bg-hand .bg-pcard.playable:active {
-  transform: translateY(-16px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, .3), inset 0 0 0 2px var(--gold);
-  z-index: 8;
+  transform: translateY(-20px);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, .35), 0 0 0 2px var(--gold);
 }
+.bg-handslot:hover { z-index: 40 !important; }
 .bg-hand .bg-pcard.dim { opacity: .42; pointer-events: none; }
+/* deal reveal: staggered flip-in (delay set inline per card) */
+.bg-deal-in { animation: bg-flipin .42s cubic-bezier(.25, .8, .3, 1) both; }
+@keyframes bg-flipin {
+  from { transform: perspective(600px) rotateY(115deg) translateY(14px); opacity: 0; }
+}
 
 /* ---------- center trick area ---------- */
 .bg-center { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
-.bg-tcard { position: absolute; left: 50%; top: 50%; }
-/* STAGE 4: Kamelna shows BIG ornate cards in the middle (~1.35×) */
-.bg-pcard.bg-tcard { width: 78px; height: 114px; border-radius: 11px; }
-.bg-tcard .bg-pc-pip { font-size: 42px; }
-.bg-tcard .bg-pc-corner { font-size: 15px; }
-.bg-tcard .bg-pc-corner i { font-size: 13px; }
-.bg-flipwrap .bg-pcard { width: 80px; height: 117px; border-radius: 11px; }
-.bg-flipwrap .bg-pc-pip { font-size: 44px; }
-.bg-t-b { transform: translate(-50%, -8%); }
-.bg-t-t { transform: translate(-50%, -92%); }
-.bg-t-l { transform: translate(-128%, -50%) rotate(-6deg); }
-.bg-t-r { transform: translate(28%, -50%) rotate(6deg); }
-.bg-in-b { animation: bg-in-b .28s ease; }
-.bg-in-t { animation: bg-in-t .28s ease; }
-.bg-in-l { animation: bg-in-l .28s ease; }
-.bg-in-r { animation: bg-in-r .28s ease; }
-@keyframes bg-in-b { from { transform: translate(-50%, 140%); opacity: .4; } to { transform: translate(-50%, -8%); } }
-@keyframes bg-in-t { from { transform: translate(-50%, -240%); opacity: .4; } to { transform: translate(-50%, -92%); } }
-@keyframes bg-in-l { from { transform: translate(-320%, -50%); opacity: .4; } to { transform: translate(-128%, -50%) rotate(-6deg); } }
-@keyframes bg-in-r { from { transform: translate(220%, -50%); opacity: .4; } to { transform: translate(28%, -50%) rotate(6deg); } }
+/* STAGE 5: the SLOT owns the placement transform; the card inside is free
+   for the FLIP fly-in / sweep animations (transform never fights CSS). */
+.bg-tslot { position: absolute; left: 50%; top: 50%; }
+.bg-t-b { transform: translate(-50%, -6%); }
+.bg-t-t { transform: translate(-50%, -94%); }
+.bg-t-l { transform: translate(-128%, -50%) rotate(-7deg); }
+.bg-t-r { transform: translate(28%, -50%) rotate(7deg); }
+.bg-tslot .bg-pcard { width: 78px; height: 113px; border-radius: 10px; }
 
-/* trick sweep toward the winner (class set on .bg-center) */
-.bg-center[class*="bg-sweep-"] .bg-tcard { transition: transform .5s ease-in, opacity .5s ease-in; }
-.bg-sweep-b .bg-tcard { transform: translate(-50%, 260%) scale(.55) !important; opacity: 0; }
-.bg-sweep-t .bg-tcard { transform: translate(-50%, -380%) scale(.55) !important; opacity: 0; }
-.bg-sweep-l .bg-tcard { transform: translate(-480%, -50%) scale(.55) !important; opacity: 0; }
-.bg-sweep-r .bg-tcard { transform: translate(380%, -50%) scale(.55) !important; opacity: 0; }
+/* trick sweep FALLBACK (no WAAPI / reduced motion; class on .bg-center) */
+.bg-center[class*="bg-sweep-"] .bg-tslot { transition: transform .5s ease-in, opacity .5s ease-in; }
+.bg-sweep-b .bg-tslot { transform: translate(-50%, 260%) scale(.55) !important; opacity: 0; }
+.bg-sweep-t .bg-tslot { transform: translate(-50%, -380%) scale(.55) !important; opacity: 0; }
+.bg-sweep-l .bg-tslot { transform: translate(-480%, -50%) scale(.55) !important; opacity: 0; }
+.bg-sweep-r .bg-tslot { transform: translate(380%, -50%) scale(.55) !important; opacity: 0; }
 
 /* flip card + hints in the center */
 .bg-flipwrap {
@@ -237,9 +305,8 @@
   font-size: 12px; font-weight: 800; color: #ffe9b0;
   background: rgba(0, 0, 0, .3); border-radius: 999px; padding: 2px 12px;
 }
+.bg-flipwrap .bg-pcard { width: 82px; height: 119px; border-radius: 10px; }
 .bg-flipcard { box-shadow: 0 4px 18px rgba(0, 0, 0, .45), 0 0 0 2px var(--gold); }
-.bg-flipcard.big { width: 74px; height: 108px; }
-.bg-flipcard.big .bg-pc-pip { font-size: 40px; }
 .bg-turnhint {
   position: absolute; left: 50%; bottom: 22%; transform: translateX(-50%);
   color: #fff; font-size: 13px; font-weight: 800; white-space: nowrap;
@@ -247,38 +314,18 @@
 }
 .bg-turnhint.soft { background: rgba(0, 0, 0, .22); bottom: 30%; }
 
-/* ---------- in-game top bar ---------- */
-.bg-topbar {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  background: var(--card); border-radius: 14px; box-shadow: var(--shadow);
-  padding: 8px 10px;
-}
-/* STAGE 4: Kamelna-style لنا/لهم score pills */
-.bg-scorepill {
-  display: inline-flex; align-items: center; gap: 6px;
-  border-radius: 999px; padding: 3px 11px; color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .18), 0 1px 3px rgba(0, 0, 0, .18);
-}
-.bg-scorepill small { font-size: 10px; font-weight: 800; opacity: .85; }
-.bg-scorepill b { font-size: 15px; line-height: 1; }
-.bg-scorepill.us { background: linear-gradient(#2c4070, var(--navy)); }
-.bg-scorepill.them { background: linear-gradient(#8a3b44, var(--maroon)); }
-.bg-topgrow { flex: 1; }
-.bg-chip {
-  display: inline-flex; align-items: center; gap: 4px;
-  background: #efe9da; color: var(--ink); border: none; cursor: pointer;
-  font-size: 12px; font-weight: 800; border-radius: 999px; padding: 4px 11px;
-}
-.bg-chip-sun { background: linear-gradient(#f3d98c, #e0b95a); color: #5c430e; }
-.bg-chip-hokum { background: linear-gradient(#3f9c68, #1e6b47); color: #fff; }
-.bg-chip-hokum.redsuit { text-shadow: 0 0 2px #fff; }
-/* STAGE 4: «جلسة 1234» chip — Arabic word + code, so lighter letter-spacing */
-.bg-chip-code { letter-spacing: 1px; border: 1.5px dashed var(--gold); background: none; }
+/* the مشترى flying from the center to whoever receives it (dealRest) */
+.bg-fly-b { animation: bg-flyb .65s ease-in .35s forwards; }
+.bg-fly-t { animation: bg-flyt .65s ease-in .35s forwards; }
+.bg-fly-l { animation: bg-flyl .65s ease-in .35s forwards; }
+.bg-fly-r { animation: bg-flyr .65s ease-in .35s forwards; }
+@keyframes bg-flyb { to { transform: translate(-50%, 200%) scale(.5); opacity: 0; } }
+@keyframes bg-flyt { to { transform: translate(-50%, -280%) scale(.5); opacity: 0; } }
+@keyframes bg-flyl { to { transform: translate(-420%, -50%) scale(.5); opacity: 0; } }
+@keyframes bg-flyr { to { transform: translate(320%, -50%) scale(.5); opacity: 0; } }
 
-/* ---------- STAGE 4: INLINE bid/دبل bar (Kamelna style) ----------
-   In-flow dark bar docked between the felt and the hand — it no longer
-   covers the hand the way the old fixed bottom-sheet did. */
-.bg-bidbar { display: flex; justify-content: center; margin: 6px 0 2px; }
+/* ---------- STAGE 4/5: INLINE bid/دبل bar docked above the fan ---------- */
+.bg-bidbar { display: flex; justify-content: center; margin: 6px 10px 0; }
 .bg-bidbar-in {
   width: min(100%, 460px);
   background: linear-gradient(#33373e, #1e2126);
@@ -292,19 +339,25 @@
   color: #ffe9b0; margin-bottom: 8px;
 }
 .bg-bidbar .bg-suitbtn { background: #f7f2e4; border-color: transparent; }
-.bg-bidbar .btn-ghost { color: #f2ead6; }
 .bg-bidrow { display: flex; gap: 8px; }
 .bg-bid {
   flex: 1; min-height: 52px; border: none; border-radius: 14px;
   font: inherit; font-size: 18px; font-weight: 800; cursor: pointer;
   display: flex; align-items: center; justify-content: center; gap: 6px;
   transition: transform .1s ease, filter .1s ease;
+  animation: bg-pop .3s cubic-bezier(.3, 1.6, .5, 1) backwards; /* spring in */
 }
+.bg-bidrow .bg-bid:nth-child(2) { animation-delay: .05s; }
+.bg-bidrow .bg-bid:nth-child(3) { animation-delay: .1s; }
+.bg-bidrow .bg-bid:nth-child(4) { animation-delay: .15s; }
 .bg-bid:active { transform: scale(.96); }
-.bg-bid.sun { background: linear-gradient(#e3bd63, #b98f3e); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
-.bg-bid.hokum { background: linear-gradient(#2f8f5b, #1e6b47); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.bg-bid.sun { background: linear-gradient(#e3bd63, #b98f3e); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
+.bg-bid.hokum { background: linear-gradient(#2f8f5b, #1e6b47); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
 .bg-bid.hokum b { font-size: 22px; }
 .bg-bid.hokum b.redsuit { color: #ffb3a7; }
+.bg-bid.ashkal { background: linear-gradient(#4a7fd4, #2b5aa8); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
+.bg-bid.dbl { background: linear-gradient(#d4574a, #a83a2b); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
+.bg-bid.dbl b { font-size: 20px; }
 .bg-bid.pass { background: #e7e2d6; color: #5a564d; }
 .bg-bid[disabled] { opacity: .4; cursor: default; }
 .bg-suitrow { display: flex; gap: 8px; margin-bottom: 10px; }
@@ -320,13 +373,13 @@
 
 /* ---------- round-end / game-end modals ---------- */
 .bg-modalbd {
-  position: fixed; inset: 0; z-index: 100;
+  position: fixed; inset: 0; z-index: 100;   /* inside the stage's context */
   background: rgba(15, 25, 20, .55); backdrop-filter: blur(2px);
   display: flex; align-items: center; justify-content: center; padding: 18px;
 }
 .bg-modal {
   width: min(94vw, 420px);
-  max-height: 82vh; overflow-y: auto; /* STAGE 4: long قيدها sheets scroll */
+  max-height: 82vh; overflow-y: auto;        /* long قيدها sheets scroll */
   background: var(--card); border-radius: 20px;
   box-shadow: 0 12px 44px rgba(0, 0, 0, .35);
   padding: 18px; animation: bg-sheet-up .25s ease;
@@ -337,7 +390,13 @@
 .bg-resrow {
   display: grid; grid-template-columns: 1.2fr 1fr 1fr;
   padding: 8px 12px; font-size: 14px; text-align: center;
+  animation: bg-rowin .35s ease backwards;   /* STAGE 5: staggered slide-up */
 }
+.bg-resrow:nth-child(2) { animation-delay: .06s; }
+.bg-resrow:nth-child(3) { animation-delay: .12s; }
+.bg-resrow:nth-child(4) { animation-delay: .18s; }
+.bg-resrow:nth-child(5) { animation-delay: .24s; }
+@keyframes bg-rowin { from { transform: translateY(10px); opacity: 0; } }
 .bg-resrow .lbl { text-align: start; color: var(--ink-soft); font-size: 13px; }
 .bg-resrow:nth-child(even) { background: #faf6ec; }
 .bg-resrow.head { background: var(--navy); color: #fff; font-weight: 800; }
@@ -357,19 +416,8 @@
 @keyframes bg-win { from { transform: scale(1); } to { transform: scale(1.06); } }
 
 /* ===========================================================
-   STAGE 2 — أشكل, الدبل, المشاريع
+   STAGE 2 — المشاريع
    =========================================================== */
-
-/* أشكل bid button + mode chip (blue family) */
-.bg-bid.ashkal { background: linear-gradient(#4a7fd4, #2b5aa8); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
-.bg-chip-ashkal { background: linear-gradient(#5b8fdf, #2b5aa8); color: #fff; }
-
-/* دبل/تربل/كورة/قهوة buttons (red gradient) + the ×N chip */
-.bg-bid.dbl { background: linear-gradient(#d4574a, #a83a2b); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
-.bg-bid.dbl b { font-size: 20px; }
-.bg-chip-mult { background: linear-gradient(#d4574a, #8c2f27); color: #fff; }
-
-/* «مشروع» pill above the hand (trick 1 only) */
 .bg-projpill {
   display: block; margin: 0 auto 2px; border: none; cursor: pointer;
   background: linear-gradient(#f3d98c, #e0b95a); color: #5c430e;
@@ -381,10 +429,7 @@
 @keyframes bg-pillpulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
 .bg-projpill[disabled] { opacity: .5; animation: none; cursor: default; }
 
-/* seat chip: this player declared a project */
-.bg-tag.proj { background: #f3d98c; }
-
-/* trick-2 reveal overlay */
+/* trick-2 reveal overlay + المشاريع modal rows */
 .bg-projbd { cursor: pointer; }
 .bg-projmodal h3 { margin-bottom: 10px; }
 .bg-projrow {
@@ -399,11 +444,6 @@
 .bg-projwho span { color: var(--ink-soft); font-size: 12px; font-weight: 700; }
 .bg-projcards { display: flex; direction: ltr; padding-left: 12px; }
 .bg-projcards .bg-pcard.mini { margin-left: -12px; }
-.bg-pcard.mini { width: 34px; height: 50px; border-radius: 6px; }
-.bg-pcard.mini .bg-pc-pip { font-size: 16px; }
-.bg-pcard.mini .bg-pc-corner { font-size: 9px; top: 2px; left: 3px; }
-.bg-pcard.mini .bg-pc-corner i { font-size: 8px; }
-.bg-pcard.mini .bg-pc-corner.flip { display: none; }
 .bg-projhint { text-align: center; color: var(--ink-soft); font-size: 12px; margin: 8px 0 0; }
 
 /* round-end: one line per declared project */
@@ -412,7 +452,7 @@
 .bg-projlines .cancelled { text-decoration: line-through; opacity: .6; }
 
 /* ===========================================================
-   STAGE 3 — bots, turn timers, deal & buy animations
+   STAGE 3 — turn timers, deal & buy animations
    =========================================================== */
 
 /* avatar wrapper: carries the timer ring + the dealer's question bubble */
@@ -420,7 +460,7 @@
 .bg-avatar.bot { font-size: 20px; }
 
 /* shrinking turn-timer ring (duration mirrors TURN_MS = 20s in the JS) */
-.bg-ring { position: absolute; inset: -6px; pointer-events: none; }
+.bg-ring { position: absolute; inset: -6px; pointer-events: none; z-index: 3; }
 .bg-ring svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
 .bg-ring circle { fill: none; stroke-width: 3.5; }
 .bg-ring .track { stroke: rgba(0, 0, 0, .3); }
@@ -431,75 +471,66 @@
 }
 @keyframes bg-ringout { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 150.8; } }
 
+/* numeric countdown inside the turn-timer ring */
+.bg-ringnum {
+  position: absolute; inset: 0; z-index: 4; pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: rgba(10, 14, 22, .5);
+  color: #ffd977; font-weight: 800; font-size: 17px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+}
+
 /* «أول؟ / ثاني؟ / دبل؟» — the dealer's question on the current bidder */
 .bg-ask {
-  position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+  position: absolute; top: -22px; left: 50%;
   background: #fff; color: #1c2b22; font-size: 12px; font-weight: 800;
   border-radius: 10px; padding: 3px 10px; white-space: nowrap;
   box-shadow: 0 2px 8px rgba(0, 0, 0, .35); z-index: 7;
-  animation: bg-askpop .25s ease;
+  animation: bg-askpop .3s cubic-bezier(.3, 1.6, .5, 1); /* STAGE 5: spring */
+  transform: translateX(-50%);
 }
 .bg-ask::after {
   content: ''; position: absolute; bottom: -4px; left: 50%;
   transform: translateX(-50%) rotate(45deg);
   width: 8px; height: 8px; background: #fff;
 }
-@keyframes bg-askpop { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
+@keyframes bg-askpop {
+  from { opacity: 0; transform: translateX(-50%) scale(.4); }
+  to   { transform: translateX(-50%) scale(1); }
+}
 /* top seat: the bubble drops BELOW the avatar so the felt doesn't clip it */
 .bg-pos-t .bg-ask { top: auto; bottom: -24px; }
 .bg-pos-t .bg-ask::after { bottom: auto; top: -4px; }
 
-/* the مشترى flying from the center to whoever receives it (dealRest) */
-.bg-fly-b { animation: bg-flyb .65s ease-in .35s forwards; }
-.bg-fly-t { animation: bg-flyt .65s ease-in .35s forwards; }
-.bg-fly-l { animation: bg-flyl .65s ease-in .35s forwards; }
-.bg-fly-r { animation: bg-flyr .65s ease-in .35s forwards; }
-@keyframes bg-flyb { to { transform: translate(-50%, 200%) scale(.5); opacity: 0; } }
-@keyframes bg-flyt { to { transform: translate(-50%, -280%) scale(.5); opacity: 0; } }
-@keyframes bg-flyl { to { transform: translate(-420%, -50%) scale(.5); opacity: 0; } }
-@keyframes bg-flyr { to { transform: translate(320%, -50%) scale(.5); opacity: 0; } }
-
-/* dealing animation: card backs flying dealer → seats (overlay on body) */
-.bg-dealov { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+/* dealing animation: SVG card backs flying dealer → seats (fixed overlay) */
+.bg-dealov { position: fixed; inset: 0; pointer-events: none; z-index: 1600; }
 .bg-dealcard {
-  position: absolute; width: 38px; height: 54px; border-radius: 6px;
-  background:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, .14) 0 4px, transparent 4px 8px),
-    linear-gradient(160deg, #7d2c3b, #5a1f2b);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, .35), inset 0 0 0 2px rgba(255, 255, 255, .55);
+  position: absolute; width: 40px; height: 58px; border-radius: 5px;
+  background-color: #16223c;
+  background-size: 100% 100%; background-repeat: no-repeat;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .35);
   opacity: .96;
-  transition: left .34s ease, top .34s ease;
 }
 
 /* ===========================================================
-   STAGE 4 — Kamelna look & feel
+   STAGE 4/5 — Kamelna look & feel
    =========================================================== */
 
 /* ----- opponents' card-back fans (by each avatar, live count ≤ 8) ----- */
 .bg-fan {
   position: absolute; left: 50%; bottom: calc(100% - 16px);
-  width: 0; height: 38px; pointer-events: none; z-index: 1;
+  width: 0; height: 40px; pointer-events: none; z-index: 1;
 }
 /* top seat: no room above (felt edge) → mirror the fan below the avatar */
 .bg-pos-t .bg-fan { bottom: auto; top: calc(100% - 16px); transform: scaleY(-1); }
 .bg-fancard {
   position: absolute; left: 50%; bottom: 0;
-  width: 26px; height: 38px; margin-left: -13px;
-  border-radius: 4px; border: 2px solid #f4efe2;
+  width: 27px; height: 39px; margin-left: -13.5px;
+  border-radius: 4px;
+  background-color: #16223c;
+  background-size: 100% 100%; background-repeat: no-repeat;
   transform-origin: 50% 92%; /* JS adds rotate(…deg) inline per card */
-  background:
-    url("../assets/icon-192.png") center / 14px 14px no-repeat,
-    linear-gradient(160deg, #24365c, #131d33);
-  box-shadow: inset 0 0 0 1px var(--gold), 0 1px 3px rgba(0, 0, 0, .4);
-}
-
-/* ----- numeric countdown inside the existing turn-timer ring ----- */
-.bg-ringnum {
-  position: absolute; inset: 0; z-index: 3; pointer-events: none;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 50%; background: rgba(10, 14, 22, .5);
-  color: #ffd977; font-weight: 800; font-size: 17px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, .6);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .4);
 }
 
 /* ----- تعابير speech bubbles (transient, 3s, fixed phrase list) ----- */
@@ -527,11 +558,14 @@
 .bg-pos-r .bg-say { left: auto; right: 0; transform: none; }
 .bg-pos-r .bg-say::after { left: auto; right: 16px; transform: rotate(45deg); }
 
-/* ----- bottom action bar: قيدها · المشاريع · تعابير + my chip ----- */
+/* ----- bottom action bar: قيدها · المشاريع · تعابير + my chip -----
+   Sits under the fan with iOS safe-area breathing room. */
 .bg-actionbar {
   display: flex; align-items: center; gap: 8px;
   background: linear-gradient(#33373e, #1e2126);
   border-radius: 16px; padding: 8px 10px;
+  margin: 6px 8px 8px;                                  /* fallback */
+  margin: 6px 8px calc(env(safe-area-inset-bottom) + 8px);
   box-shadow: 0 3px 12px rgba(0, 0, 0, .25), inset 0 1px 0 rgba(255, 255, 255, .08);
 }
 .bg-abtn {
@@ -591,27 +625,44 @@
 }
 .bg-emote:active { background: #f3d98c; }
 
-/* ---------- mobile portrait tuning (thumb-size targets) ---------- */
+/* ---------- mobile portrait tuning (390px is the primary target) ---------- */
 @media (max-width: 430px) {
-  .bg-felt { height: clamp(280px, 42vh, 380px); }
-  .bg-pcard { width: 50px; height: 74px; }
-  .bg-pc-pip { font-size: 26px; }
-  .bg-hand .bg-pcard { width: 56px; height: 84px; margin: 0 -17px; }
-  .bg-avatar { width: 42px; height: 42px; font-size: 14px; }
+  .bg-hudbtn { min-height: 32px; padding: 4px 9px; font-size: 11px; }
+  .bg-hudrow b { font-size: 14px; }
+  .bg-chip { font-size: 11px; padding: 4px 9px; }
+  .bg-board { min-height: 200px; }
+  .bg-pcard { width: 56px; height: 81px; }
+  .bg-avatar { width: 46px; height: 46px; font-size: 15px; }
   .bg-name { max-width: 78px; font-size: 11px; }
   .bg-code { font-size: 24px; letter-spacing: 6px; }
   .bg-bid { min-height: 48px; font-size: 16px; }
-  .bg-topbar { font-size: 12px; }
-  /* STAGE 4 sizes at 390px: nothing may overflow */
-  .bg-pcard.bg-tcard { width: 66px; height: 97px; }
-  .bg-tcard .bg-pc-pip { font-size: 34px; }
-  .bg-flipwrap .bg-pcard { width: 68px; height: 100px; }
-  .bg-flipwrap .bg-pc-pip { font-size: 36px; }
-  .bg-fancard { width: 22px; height: 32px; margin-left: -11px; background-size: 12px 12px, 100%; }
-  .bg-fan { height: 32px; bottom: calc(100% - 14px); }
+  /* hand fan: 8 cards must fit 390px with the arc */
+  .bg-hand { min-height: 122px; padding: 14px 6px 4px; }
+  .bg-handslot { margin: 0 -20px; }
+  .bg-hand .bg-pcard { width: 74px; height: 107px; }
+  .bg-tslot .bg-pcard { width: 68px; height: 99px; }
+  .bg-flipwrap .bg-pcard { width: 70px; height: 102px; }
+  .bg-fancard { width: 23px; height: 33px; margin-left: -11.5px; }
+  .bg-fan { height: 33px; bottom: calc(100% - 14px); }
   .bg-pos-t .bg-fan { bottom: auto; top: calc(100% - 14px); }
-  .bg-scorepill b { font-size: 14px; }
-  .bg-abtn { font-size: 13px; }
+  .bg-abtn { font-size: 13px; min-height: 42px; }
   .bg-mename { max-width: 56px; }
   .bg-say { max-width: 130px; font-size: 11px; }
+}
+
+/* ---------- short viewports (landscape phones): allow scrolling ---------- */
+@media (max-height: 560px) {
+  .bg-stagebody { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .bg-board { min-height: 190px; }
+  .bg-hand { min-height: 110px; }
+}
+
+/* ---------- prefers-reduced-motion: calm everything down ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .bg-deal-in, .bg-bidlbl, .bg-ask, .bg-say, .bg-bid,
+  .bg-seat.turn .bg-avatar, .bg-projpill, .bg-winbanner.us,
+  .bg-resrow, .bg-modal, .bg-bidbar-in, .bg-toast,
+  .bg-fly-b, .bg-fly-t, .bg-fly-l, .bg-fly-r { animation: none !important; }
+  .bg-center[class*="bg-sweep-"] .bg-tslot,
+  .bg-hand .bg-pcard, .bg-dealcard { transition: none !important; }
 }
