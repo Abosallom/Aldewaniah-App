@@ -281,7 +281,10 @@
          codes stay here so the admin can give them to new joiners. ---- */
       const REVIEWER_PHONE = '+966555555555';
       function giftMsgText(code) {
-        return I18n.t('adm_gift_msg_head') + '\n\n' + I18n.t('adm_gift_msg_body') + '\n' + code;
+        // Exact gift wording chosen by Aziz (2026-07-04), bilingual:
+        return 'اشتراك طِرا لمدة شهر مقدمة من تطبيق طِرا بقيادة إبراهيم الحامد\n'
+             + 'A month subscription for Tira App, powered by Ebrahim Alhamed\n\n'
+             + '🎁 كود الاشتراك / Your code:\n' + code;
       }
       // Send an official admin DM (same data model as js/modules/dm.js)
       async function sendGiftDM(toUid, toName, text) {

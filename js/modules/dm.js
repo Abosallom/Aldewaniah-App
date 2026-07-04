@@ -26,7 +26,8 @@
       dm_ph: 'اكتب رسالة…', dm_send: 'إرسال', dm_back: 'رجوع', dm_you: 'أنت',
       dm_official: 'الإدارة', dm_photo: 'صورة', dm_msg_empty: 'ابدأ المحادثة 👋',
       dm_report: 'إبلاغ', dm_block: 'حظر هذا العضو', dm_cancel: 'إلغاء',
-      dm_reported: 'تم الإبلاغ، شكرًا لك ✅', dm_report_fail: 'تعذّر الإبلاغ، حاول لاحقًا'
+      dm_reported: 'تم الإبلاغ، شكرًا لك ✅', dm_report_fail: 'تعذّر الإبلاغ، حاول لاحقًا',
+      dm_as_admin: 'إرسال كإدارة', dm_as_admin_on: 'كإدارة ✓'
     },
     en: {
       dm_title: 'Private messages', dm_new: '✉️ New message', dm_pick: 'Pick a member',
@@ -34,7 +35,8 @@
       dm_ph: 'Type a message…', dm_send: 'Send', dm_back: 'Back', dm_you: 'You',
       dm_official: 'Admin', dm_photo: 'Photo', dm_msg_empty: 'Say hi 👋',
       dm_report: 'Report', dm_block: 'Block this member', dm_cancel: 'Cancel',
-      dm_reported: 'Reported, thank you ✅', dm_report_fail: 'Could not report, try later'
+      dm_reported: 'Reported, thank you ✅', dm_report_fail: 'Could not report, try later',
+      dm_as_admin: 'Send as Admin', dm_as_admin_on: 'As Admin ✓'
     }
   });
 
@@ -216,6 +218,20 @@
     ]);
     screen.appendChild(head);
 
+    // Admins choose per message: send as THEMSELVES (normal bubble) or as
+    // الإدارة (official maroon/gold bubble). Default = personal.
+    let officialMode = false;
+    let officialBtn = null;
+    if (isAdmin()) {
+      officialBtn = UI.el('button', { class: 'chat-bell dm-official-toggle',
+        title: I18n.t('dm_as_admin'), onclick: () => {
+          officialMode = !officialMode;
+          officialBtn.classList.toggle('on', officialMode);
+          officialBtn.textContent = officialMode ? '★ ' + I18n.t('dm_as_admin_on') : '☆ ' + I18n.t('dm_as_admin');
+        } }, '☆ ' + I18n.t('dm_as_admin'));
+      head.appendChild(officialBtn);
+    }
+
     const list = UI.el('div', { class: 'chat-list' });
     screen.appendChild(list);
     list.addEventListener('scroll', () => { atBottom = (list.scrollHeight - list.scrollTop - list.clientHeight) < 90; });
@@ -237,7 +253,9 @@
       const t = snap.exists ? (snap.data() || {}) : {};
       otherName = (t.names && t.names[other]) || '—';
       officialThread = !!(t.admins && t.admins[other]);
-      nameEl.textContent = otherName + (officialThread ? ' · ★ ' + I18n.t('dm_official') : '');
+      // Header shows the PERSON's name only — "الإدارة" appears on the
+      // individual official messages, not on the whole conversation.
+      nameEl.textContent = otherName;
       markRead();
     }).catch(() => {});
     function markRead() { tRef.set({ unread: { [me]: 0 } }, { merge: true }).catch(() => {}); }
@@ -302,14 +320,15 @@
 
     async function sendMsg(payload) {
       const msg = Object.assign({ text: '', uid: me, name: myName(), at: firebase.firestore.FieldValue.serverTimestamp() }, payload);
-      if (isAdmin()) msg.admin = true;                    // official style (verified in rules)
+      // Official style ONLY when the admin chose "as الإدارة" (verified in rules).
+      if (isAdmin() && officialMode) msg.admin = true;
       const meta = {
         members: [me, other].sort(),
         names: { [me]: myName() },
         last: { text: msg.text || '📷', at: firebase.firestore.FieldValue.serverTimestamp(), uid: me },
         unread: { [other]: firebase.firestore.FieldValue.increment(1) }
       };
-      if (isAdmin()) meta.admins = { [me]: true };
+      if (isAdmin() && officialMode) meta.admins = { [me]: true };
       try {
         await tRef.collection('msgs').add(msg);
         await tRef.set(meta, { merge: true });

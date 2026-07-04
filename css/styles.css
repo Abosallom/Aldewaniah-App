@@ -1017,11 +1017,19 @@ html{ scroll-behavior:smooth; }
 .dm-pick-row:hover{ background:var(--cream); }
 .dm-pick-name{ font-weight:700; color:var(--navy); }
 
-/* Official (admin) message bubble — distinct from member bubbles */
-.chat-bubble.official{ background:linear-gradient(160deg,var(--maroon),#5a252c); color:#fff;
+/* Official (admin) message bubble — distinct from member bubbles.
+   The .chat-row.* selectors are needed to BEAT the mine/theirs bubble
+   backgrounds in specificity (was: white text on cream = unreadable). */
+.chat-bubble.official,
+.chat-row.mine .chat-bubble.official,
+.chat-row.theirs .chat-bubble.official{
+  background:linear-gradient(160deg,var(--maroon),#5a252c); color:#fff;
   border:1.5px solid var(--gold); box-shadow:0 4px 16px rgba(114,47,55,.35); }
 .chat-bubble.official .chat-text{ color:#fff; }
+.chat-bubble.official .chat-name{ color:var(--gold); }
 .chat-bubble.official .chat-time{ color:rgba(255,255,255,.75); }
+/* admin's "send as الإدارة" toggle in the DM header */
+.dm-official-toggle.on{ background:var(--maroon); color:var(--gold); border-color:var(--gold); }
 .dm-official-tag{ font-size:.68rem; font-weight:800; color:var(--gold); letter-spacing:.4px;
   margin-bottom:2px; }
 
