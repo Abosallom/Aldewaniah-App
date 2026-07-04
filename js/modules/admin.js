@@ -60,7 +60,9 @@
         adm_gift_available: 'متاح', adm_gift_assigned: 'أُرسل إلى', adm_gift_assigned_nodm: 'مخصص لـ (بدون رسالة — انسخه له)',
         adm_gift_give: 'إعطاء لعضو', adm_gift_pick: 'اختر العضو', adm_gift_copy: 'نسخ', adm_gift_copied: 'نُسخ ✓',
         adm_gift_del: 'حذف هذا الكود؟', adm_gift_working: 'جارٍ التوزيع…',
-        adm_gift_msg_head: 'طِرا لمدة شهر — Tira 1 month code', adm_gift_msg_body: '🎁 هديتك من الديوانية — كود الاشتراك:'
+        adm_gift_msg_head: 'طِرا لمدة شهر — Tira 1 month code', adm_gift_msg_body: '🎁 هديتك من الديوانية — كود الاشتراك:',
+        adm_gift_resend: 'إعادة إرسال برسالة محدّثة', adm_gift_resend_confirm: 'سيتم حذف رسالة الهدية القديمة من محادثة كل عضو وإرسال نفس الكود برسالة جديدة. متابعة؟',
+        adm_gift_resent: 'تمت إعادة الإرسال لـ {n} عضو ✓'
       },
       en: {
         adm_title: 'Admin panel', adm_sub: 'Manage members and join requests', adm_version: 'App version:',
@@ -95,7 +97,9 @@
         adm_gift_available: 'Available', adm_gift_assigned: 'Sent to', adm_gift_assigned_nodm: 'Assigned to (no DM — copy it for them)',
         adm_gift_give: 'Give to member', adm_gift_pick: 'Pick the member', adm_gift_copy: 'Copy', adm_gift_copied: 'Copied ✓',
         adm_gift_del: 'Delete this code?', adm_gift_working: 'Distributing…',
-        adm_gift_msg_head: 'طِرا لمدة شهر — Tira 1 month code', adm_gift_msg_body: '🎁 Your gift from Aldewaniah — subscription code:'
+        adm_gift_msg_head: 'طِرا لمدة شهر — Tira 1 month code', adm_gift_msg_body: '🎁 Your gift from Aldewaniah — subscription code:',
+        adm_gift_resend: 'Resend with updated message', adm_gift_resend_confirm: 'The old gift message will be removed from each member\'s chat and the same code re-sent with the new wording. Continue?',
+        adm_gift_resent: 'Re-sent to {n} members ✓'
       }
     },
 
@@ -400,6 +404,45 @@
           } }, I18n.t('adm_gift_distribute') + ' (' + avail.length + ')');
           wrap.appendChild(distBtn);
           wrap.appendChild(distMsg);
+        }
+
+        /* resend already-delivered codes with the UPDATED gift wording:
+           removes the old gift message from each member's private chat,
+           then sends a fresh official DM with the same code + new text */
+        const delivered = rows.filter((r) => r.status === 'assigned' && r.sentDM && r.toUid);
+        if (delivered.length) {
+          const rsMsg = UI.el('div', { class: 'muted', style: 'font-size:.85rem;text-align:center;margin:6px 0' });
+          const rsBtn = UI.el('button', { class: 'btn btn-block', onclick: async () => {
+            if (!window.confirm(I18n.t('adm_gift_resend_confirm'))) return;
+            rsBtn.disabled = true;
+            const me = Auth.uid();
+            let done = 0, fail = 0;
+            for (const r of delivered) {
+              try {
+                const tid = me < r.toUid ? me + '_' + r.toUid : r.toUid + '_' + me;
+                // delete the previously sent gift message(s) in this thread
+                try {
+                  const snap = await db.collection('dms').doc(tid).collection('msgs')
+                    .orderBy('at', 'desc').limit(60).get();
+                  for (const d of snap.docs) {
+                    const t = (d.data() || {}).text || '';
+                    if (t.indexOf('Tira 1 month code') >= 0 || t.indexOf('Tira App') >= 0) {
+                      await d.ref.delete();
+                    }
+                  }
+                } catch (e) {}
+                await sendGiftDM(r.toUid, r.toName, giftMsgText(r.code));
+                await db.collection('giftcodes').doc(r.id).update({
+                  resentAt: firebase.firestore.FieldValue.serverTimestamp() });
+                done++;
+              } catch (e) { fail++; }
+              rsMsg.textContent = I18n.t('adm_gift_working') + ' ' + (done + fail) + '/' + delivered.length;
+            }
+            rsMsg.textContent = I18n.t('adm_gift_resent').replace('{n}', done) + (fail ? ' · ✗ ' + fail : '');
+            rsBtn.disabled = false;
+          } }, '🔁 ' + I18n.t('adm_gift_resend') + ' (' + delivered.length + ')');
+          wrap.appendChild(rsBtn);
+          wrap.appendChild(rsMsg);
         }
 
         if (!rows.length) { wrap.appendChild(UI.el('p', { class: 'muted', style: 'text-align:center' }, I18n.t('adm_gift_none'))); return; }
