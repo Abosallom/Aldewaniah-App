@@ -1046,3 +1046,8 @@ html{ scroll-behavior:smooth; }
   word-break:break-all; text-align:left; user-select:all; -webkit-user-select:all; }
 .gift-code-hint{ flex:0 0 auto; font-size:.72rem; font-weight:700; color:var(--ink-soft); white-space:nowrap; }
 .gift-code.copied .gift-code-hint{ color:#2e7d4f; }
+
+/* DM: admin's per-message "send as" chooser */
+.dm-ask-title{ text-align:center; font-weight:800; color:var(--navy); padding:10px 0 4px; }
+.chat-sheet-it.dm-ask-admin{ background:linear-gradient(160deg,var(--maroon),#5a252c); color:#fff;
+  border-color:var(--gold); font-weight:800; }

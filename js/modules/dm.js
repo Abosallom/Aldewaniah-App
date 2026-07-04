@@ -27,7 +27,8 @@
       dm_official: 'الإدارة', dm_photo: 'صورة', dm_msg_empty: 'ابدأ المحادثة 👋',
       dm_report: 'إبلاغ', dm_block: 'حظر هذا العضو', dm_cancel: 'إلغاء',
       dm_reported: 'تم الإبلاغ، شكرًا لك ✅', dm_report_fail: 'تعذّر الإبلاغ، حاول لاحقًا',
-      dm_as_admin: 'إرسال كإدارة', dm_as_admin_on: 'كإدارة ✓'
+      dm_as_admin: 'إرسال كإدارة', dm_as_admin_on: 'كإدارة ✓',
+      dm_send_as_q: 'إرسال الرسالة بصفة…', dm_send_admin: 'الإدارة (رسالة رسمية)', dm_send_member: '{name} (عضو)'
     },
     en: {
       dm_title: 'Private messages', dm_new: '✉️ New message', dm_pick: 'Pick a member',
@@ -36,7 +37,8 @@
       dm_official: 'Admin', dm_photo: 'Photo', dm_msg_empty: 'Say hi 👋',
       dm_report: 'Report', dm_block: 'Block this member', dm_cancel: 'Cancel',
       dm_reported: 'Reported, thank you ✅', dm_report_fail: 'Could not report, try later',
-      dm_as_admin: 'Send as Admin', dm_as_admin_on: 'As Admin ✓'
+      dm_as_admin: 'Send as Admin', dm_as_admin_on: 'As Admin ✓',
+      dm_send_as_q: 'Send this message as…', dm_send_admin: 'Admin (official message)', dm_send_member: '{name} (member)'
     }
   });
 
@@ -218,18 +220,23 @@
     ]);
     screen.appendChild(head);
 
-    // Admins choose per message: send as THEMSELVES (normal bubble) or as
-    // الإدارة (official maroon/gold bubble). Default = personal.
-    let officialMode = false;
-    let officialBtn = null;
-    if (isAdmin()) {
-      officialBtn = UI.el('button', { class: 'chat-bell dm-official-toggle',
-        title: I18n.t('dm_as_admin'), onclick: () => {
-          officialMode = !officialMode;
-          officialBtn.classList.toggle('on', officialMode);
-          officialBtn.textContent = officialMode ? '★ ' + I18n.t('dm_as_admin_on') : '☆ ' + I18n.t('dm_as_admin');
-        } }, '☆ ' + I18n.t('dm_as_admin'));
-      head.appendChild(officialBtn);
+    // Admins choose ON EVERY SEND: as الإدارة (official maroon/gold bubble)
+    // or as themselves (normal member bubble). A small sheet asks each time.
+    function askHow() {
+      return new Promise((resolve) => {
+        if (!isAdmin()) { resolve('member'); return; }
+        const close = (val) => { bd.remove(); resolve(val); };
+        const sheet = UI.el('div', { class: 'chat-sheet' }, [
+          UI.el('div', { class: 'dm-ask-title' }, I18n.t('dm_send_as_q')),
+          UI.el('button', { class: 'chat-sheet-it dm-ask-admin', onclick: () => close('admin') },
+            '★  ' + I18n.t('dm_send_admin')),
+          UI.el('button', { class: 'chat-sheet-it', onclick: () => close('member') },
+            '👤  ' + I18n.t('dm_send_member').replace('{name}', myName())),
+          UI.el('button', { class: 'chat-sheet-it cancel', onclick: () => close(null) }, I18n.t('dm_cancel'))
+        ]);
+        const bd = UI.el('div', { class: 'chat-sheet-bd', onclick: (e) => { if (e.target === bd) close(null); } }, [sheet]);
+        document.body.appendChild(bd);
+      });
     }
 
     const list = UI.el('div', { class: 'chat-list' });
@@ -318,17 +325,17 @@
       }, () => { list.innerHTML = '<div class="auth-err" style="text-align:center">—</div>'; });
     } catch (e) {}
 
-    async function sendMsg(payload) {
+    async function sendMsg(payload, asAdmin) {
       const msg = Object.assign({ text: '', uid: me, name: myName(), at: firebase.firestore.FieldValue.serverTimestamp() }, payload);
-      // Official style ONLY when the admin chose "as الإدارة" (verified in rules).
-      if (isAdmin() && officialMode) msg.admin = true;
+      // Official style ONLY when the admin chose "كإدارة" for THIS message.
+      if (isAdmin() && asAdmin) msg.admin = true;
       const meta = {
         members: [me, other].sort(),
         names: { [me]: myName() },
         last: { text: msg.text || '📷', at: firebase.firestore.FieldValue.serverTimestamp(), uid: me },
         unread: { [other]: firebase.firestore.FieldValue.increment(1) }
       };
-      if (isAdmin() && officialMode) meta.admins = { [me]: true };
+      if (isAdmin() && asAdmin) meta.admins = { [me]: true };
       try {
         await tRef.collection('msgs').add(msg);
         await tRef.set(meta, { merge: true });
@@ -337,13 +344,17 @@
           title: '✉️ رسالة خاصة — ' + myName(), body: msg.text || '📷 صورة' });
       } catch (e) { if (payload.text) input.value = payload.text; }
     }
-    function sendText() {
+    async function sendText() {
       const text = (input.value || '').trim();
       if (!text) return;
+      const how = await askHow();               // admin picks كإدارة / كعضو
+      if (!how) { input.focus(); return; }      // cancelled — keep the text
       input.value = ''; input.focus();
-      sendMsg({ text: text });
+      sendMsg({ text: text }, how === 'admin');
     }
-    function sendPhoto(f) {
+    async function sendPhoto(f) {
+      const how = await askHow();
+      if (!how) return;
       photoBtn.classList.add('busy');
       UI.resizeImage(f, 1100, 0.72, async (data) => {
         try {
@@ -355,7 +366,7 @@
           });
           if (!res.ok) throw new Error('upload failed');
           const out = await res.json();
-          if (out && out.key) sendMsg({ imageKey: out.key });
+          if (out && out.key) sendMsg({ imageKey: out.key }, how === 'admin');
         } catch (e) { alert((e && e.message) || 'Error'); }
         photoBtn.classList.remove('busy');
       });
