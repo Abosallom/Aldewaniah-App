@@ -1,0 +1,47 @@
+name: Deploy to GitHub Pages
+
+# Reliable replacement for the legacy "Deploy from a branch" pipeline,
+# whose deploy step kept failing on GitHub's side ("Deployment failed,
+# try again later") and emailed a failure each time. This uses the
+# official Pages actions, which retry the Pages API on transient errors.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # lets you re-run a deploy by hand if ever needed
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time. Don't cancel a deploy that's already running
+# (avoids leaving Pages half-updated); newer pushes simply queue.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'   # the site lives at the repo root (index.html + CNAME)
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        with:
+          timeout: 600000     # wait up to 10 min for GitHub to finish
+          error_count: 15     # tolerate more transient API errors before failing
