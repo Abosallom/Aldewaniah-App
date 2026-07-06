@@ -45,6 +45,7 @@
       auth_signin: 'تسجيل الدخول', auth_forgot: 'نسيت كلمة المرور؟',
       auth_reset_sent: 'أرسلنا رابط إعادة التعيين إلى بريدك ✅',
       auth_email_bad: 'بريد أو كلمة مرور غير صحيحة (٦ أحرف على الأقل)',
+      auth_email_net: 'تعذّر تسجيل الدخول (مشكلة اتصال). تأكّد من الإنترنت وحاول مجددًا.',
       auth_account: 'حسابي', auth_link_email: 'اربط بريدًا إلكترونيًا لتسجيل الدخول به لاحقًا:',
       auth_link_btn: 'ربط البريد', auth_linked_as: 'البريد المرتبط',
       auth_reset_pw: 'إعادة تعيين كلمة المرور', auth_no_email: 'لا يوجد بريد مرتبط بعد',
@@ -71,6 +72,7 @@
       auth_signin: 'Sign in', auth_forgot: 'Forgot password?',
       auth_reset_sent: 'We sent a reset link to your email ✅',
       auth_email_bad: 'Wrong email or password (min 6 chars)',
+      auth_email_net: 'Could not sign in (connection issue). Check your internet and try again.',
       auth_account: 'My account', auth_link_email: 'Link an email to sign in with later:',
       auth_link_btn: 'Link email', auth_linked_as: 'Linked email',
       auth_reset_pw: 'Reset password', auth_no_email: 'No email linked yet',
@@ -125,7 +127,8 @@
           // member login, so ignore it (don't reset member state or re-render,
           // which would kick them out of whatever screen they're on).
           if (user && user.isAnonymous) return;
-          if (user && user.phoneNumber) await resolve(user.phoneNumber);
+          const phone = user ? await memberPhoneOf(user) : null;
+          if (phone) await resolve(phone);
           else reset();
           Auth.renderBox();
           if (window.App && App.refresh) App.refresh();
@@ -166,7 +169,12 @@
       const body = UI.el('div');
       // Inside the native iOS/Android shell (Capacitor) SMS/reCAPTCHA is unreliable,
       // so default to email login there; the website keeps phone login as default.
-      const inApp = !!(window.Capacitor && (typeof Capacitor.isNativePlatform === 'function' ? Capacitor.isNativePlatform() : Capacitor.isNativePlatform));
+      // Robust native detection: the Capacitor bridge OR the capacitor:// origin
+      // (Native.isNative() covers both, so the iOS shell always defaults to the
+      // reliable email login even if the bridge object isn't ready yet).
+      const inApp = (window.Native && Native.isNative && Native.isNative())
+        || !!(window.Capacitor && (typeof Capacitor.isNativePlatform === 'function' ? Capacitor.isNativePlatform() : Capacitor.isNativePlatform))
+        || (location.protocol === 'capacitor:');
       const tabPhone = UI.el('button', { class: 'auth-tab' + (inApp ? '' : ' active') }, I18n.t('auth_mode_phone'));
       const tabEmail = UI.el('button', { class: 'auth-tab' + (inApp ? ' active' : '') }, I18n.t('auth_mode_email'));
       tabPhone.onclick = () => { tabPhone.classList.add('active'); tabEmail.classList.remove('active'); phoneStep(body, close); };
@@ -213,6 +221,37 @@
         })
       }).catch(function () {});
     } catch (e) {}
+  }
+
+  /**
+   * The member key (E.164 phone) for a signed-in Firebase user.
+   *
+   * Members are keyed by phone, but the App Review demo account signs in with
+   * EMAIL/PASSWORD (SMS + reCAPTCHA is unreliable inside the iOS WKWebView).
+   * In a webview, `user.phoneNumber` is frequently NOT populated on the first
+   * onAuthStateChanged tick even though a phone provider is linked — so we
+   * recover the number from the linked provider data, then the ID-token claim,
+   * then a profile reload. Without this, an email login authenticates but never
+   * resolves to its member doc, and the app looks like "sign-in failed".
+   */
+  async function memberPhoneOf(user) {
+    if (!user) return null;
+    if (user.phoneNumber) return user.phoneNumber;
+    try {
+      const fromProvider = (user.providerData || [])
+        .map(function (p) { return p && p.phoneNumber; }).filter(Boolean)[0];
+      if (fromProvider) return fromProvider;
+    } catch (e) {}
+    try {
+      const tok = await user.getIdTokenResult();
+      if (tok && tok.claims && tok.claims.phone_number) return tok.claims.phone_number;
+    } catch (e) {}
+    try { await user.reload(); if (user.phoneNumber) return user.phoneNumber; } catch (e) {}
+    try {
+      const u2 = fbAuth && fbAuth.currentUser;
+      if (u2 && u2.phoneNumber) return u2.phoneNumber;
+    } catch (e) {}
+    return null;
   }
 
   async function resolve(phone) {
@@ -356,7 +395,15 @@
       try {
         await fbAuth.signInWithEmailAndPassword((email.value || '').trim(), pass.value || '');
         close(); // onAuthStateChanged resolves the member + refreshes the app
-      } catch (e) { err.textContent = I18n.t('auth_email_bad'); btn.disabled = false; btn.textContent = I18n.t('auth_signin'); }
+      } catch (e) {
+        // Show a clearer message for a blocked/again-network case vs a real
+        // wrong-password, so misconfigurations surface instead of hiding as
+        // "wrong password".
+        const code = (e && (e.code || e.message || '')) + '';
+        err.textContent = /referer|network|blocked|api-key|operation-not-allowed/i.test(code)
+          ? I18n.t('auth_email_net') : I18n.t('auth_email_bad');
+        btn.disabled = false; btn.textContent = I18n.t('auth_signin');
+      }
     };
     forgot.onclick = async () => {
       err.textContent = ''; ok.textContent = '';
