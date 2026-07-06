@@ -280,6 +280,66 @@
     try { if (recaptcha) { recaptcha.clear(); recaptcha = null; } } catch (e) {}
   }
 
+  /**
+   * The native Firebase Authentication plugin, ONLY when we're in the iOS/Android
+   * shell AND the plugin is actually installed. In the native app, Google's
+   * reCAPTCHA (which the web signInWithPhoneNumber requires) cannot run, so SMS
+   * login is impossible via the web SDK. This plugin verifies the device via
+   * Apple Push (APNs) / Play Integrity instead — no reCAPTCHA — then we finish
+   * the sign-in on the web SDK with the phone credential so the rest of the app
+   * (which uses the web SDK everywhere) sees the member as signed in.
+   * Returns null on the website / anywhere the plugin isn't present → web path.
+   */
+  function nativePhoneAuthPlugin() {
+    try {
+      const isNative = (window.Native && Native.isNative && Native.isNative())
+        || (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform())
+        || (location.protocol === 'capacitor:');
+      const plugin = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.FirebaseAuthentication;
+      return (isNative && plugin) ? plugin : null;
+    } catch (e) { return null; }
+  }
+
+  /**
+   * Start phone verification and return a { confirm(code) -> userCredential }
+   * object, identical in shape to what web signInWithPhoneNumber returns — so
+   * codeStep() works unchanged for BOTH the native and the web paths.
+   */
+  async function startPhoneVerification(phone) {
+    const FA = nativePhoneAuthPlugin();
+    if (FA) {
+      // ---- Native path (APNs silent-push verification, no reCAPTCHA) ----
+      return await new Promise(function (resolve, reject) {
+        let sentHandle = null, failHandle = null;
+        const cleanup = function () {
+          try { if (sentHandle && sentHandle.remove) sentHandle.remove(); } catch (e) {}
+          try { if (failHandle && failHandle.remove) failHandle.remove(); } catch (e) {}
+        };
+        FA.addListener('phoneCodeSent', function (event) {
+          const verificationId = event && event.verificationId;
+          cleanup();
+          resolve({
+            confirm: async function (code) {
+              const credential = firebase.auth.PhoneAuthProvider.credential(verificationId, (code || '').trim());
+              return await fbAuth.signInWithCredential(credential);
+            }
+          });
+        }).then(function (h) { sentHandle = h; });
+        FA.addListener('phoneVerificationFailed', function (event) {
+          cleanup();
+          reject(new Error((event && (event.message || event.code)) || 'verification failed'));
+        }).then(function (h) { failHandle = h; });
+        // skipNativeAuth keeps the plugin from signing into the *native* SDK;
+        // we complete on the web SDK above so the app's session stays on one SDK.
+        FA.signInWithPhoneNumber({ phoneNumber: phone }).catch(function (e) { cleanup(); reject(e); });
+      });
+    }
+    // ---- Web path (unchanged): invisible reCAPTCHA ----
+    cleanupRecaptcha();
+    recaptcha = new firebase.auth.RecaptchaVerifier('recaptcha-container', { size: 'invisible' });
+    return await fbAuth.signInWithPhoneNumber(phone, recaptcha);
+  }
+
   function phoneStep(body, close) {
     body.innerHTML = '';
     const input = UI.el('input', { class: 'fld', type: 'tel', inputmode: 'numeric',
@@ -293,9 +353,7 @@
       const phone = normalizePhone(input.value);
       btn.disabled = true; btn.textContent = '…';
       try {
-        cleanupRecaptcha();
-        recaptcha = new firebase.auth.RecaptchaVerifier('recaptcha-container', { size: 'invisible' });
-        confirmation = await fbAuth.signInWithPhoneNumber(phone, recaptcha);
+        confirmation = await startPhoneVerification(phone);
         codeStep(body, close, phone);
       } catch (e) {
         err.textContent = e.message || 'Error';
