@@ -139,18 +139,27 @@
 
     renderBox() {
       const box = document.getElementById('authBox');
+      // The animated Dynamic-Island-style login pill in the header.
+      const island = document.getElementById('islandLogin');
+      if (island && !island._wired) {
+        island._wired = true;
+        island.onclick = () => Auth.openLogin();
+      }
       if (!box) return;
       box.innerHTML = '';
       if (_status === 'approved') {
         const name = (_member && (_member.name || _member.phone)) || I18n.t('auth_welcome');
         box.appendChild(UI.el('button', { class: 'auth-btn', onclick: () => Auth.openAccount() },
           I18n.pick(name)));
+        if (island) island.hidden = true;
       } else if (_status === 'pending') {
         box.appendChild(UI.el('button', { class: 'auth-btn auth-btn-pending', onclick: () => Auth.logout() },
           I18n.t('auth_pending') + ' · ' + I18n.t('auth_logout')));
+        if (island) island.hidden = true;
       } else {
-        box.appendChild(UI.el('button', { class: 'auth-btn', onclick: () => Auth.openLogin() },
-          I18n.t('auth_login')));
+        // Signed out: the animated island pill IS the login call-to-action,
+        // so keep the header corner clear to avoid a duplicate button.
+        if (island) island.hidden = false;
       }
     },
 

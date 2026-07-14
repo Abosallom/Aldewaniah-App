@@ -2,14 +2,12 @@
   "appId": "com.aldewaniah.app",
   "appName": "الديوانية",
   "webDir": "www",
+  "server": {
+    "url": "https://app.aldewaniah.com",
+    "cleartext": false
+  },
   "ios": {
     "contentInset": "always",
     "backgroundColor": "#1A2744"
-  },
-  "plugins": {
-    "FirebaseAuthentication": {
-      "skipNativeAuth": true,
-      "providers": ["phone"]
-    }
   }
 }

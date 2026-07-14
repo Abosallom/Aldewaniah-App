@@ -63,6 +63,38 @@ a { color: var(--maroon); }
 }
 .lang-toggle:active { transform: scale(.96); }
 
+/* ---------- Dynamic-Island-style login pill (signed-out only) ---------- */
+.island-login {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  display: inline-flex; align-items: center; gap: 7px; z-index: 5;
+  background: #05070d; color: #fff;
+  border: 1px solid rgba(194, 160, 80, .55); border-radius: 999px;
+  padding: 6px 15px; font: inherit; font-weight: 700; font-size: .82rem;
+  white-space: nowrap; cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .4);
+  animation: islandBreathe 3.4s ease-in-out infinite;
+}
+.island-login[hidden] { display: none; }
+.island-login .island-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--gold); box-shadow: 0 0 6px var(--gold);
+  animation: islandDot 1.8s ease-in-out infinite;
+}
+.island-login:active { transform: translate(-50%, -50%) scale(.95); }
+@keyframes islandBreathe {
+  0%, 100% { transform: translate(-50%, -50%) scale(1);
+             box-shadow: 0 4px 16px rgba(0, 0, 0, .4), 0 0 0 0 rgba(194, 160, 80, .45); }
+  50%      { transform: translate(-50%, -50%) scale(1.05);
+             box-shadow: 0 6px 22px rgba(0, 0, 0, .45), 0 0 18px 2px rgba(194, 160, 80, .38); }
+}
+@keyframes islandDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .5; transform: scale(1.35); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .island-login, .island-login .island-dot { animation: none; }
+}
+
 /* ---------- View ---------- */
 .view { max-width: 720px; margin: 0 auto; padding: 16px; }
 .page-title { font-size: 1.4rem; font-weight: 700; margin: 4px 0 16px; color: var(--navy); }
