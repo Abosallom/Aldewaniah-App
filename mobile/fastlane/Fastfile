@@ -115,10 +115,16 @@ platform :ios do
     increment_build_number(build_number: next_build, xcodeproj: "ios/App/App.xcodeproj")
 
     # Marketing version: a fresh `cap add ios` templates 1.0, which is behind
-    # the shipped 1.2. Default to the live App Store version unless the operator
-    # passed an explicit IOS_APP_VERSION (e.g. cutting a new 1.3).
+    # the shipped 1.2. Reusing the live version verbatim fails outright once
+    # it's shipped -- Apple permanently closes a version's TestFlight
+    # "pre-release train" the moment it's released to the App Store (confirmed
+    # live: run #3 failed with "Invalid Pre-Release Train ... '1.2' is closed
+    # for new build submissions"). So blank means auto-bump the live version's
+    # last segment (1.2 -> 1.2.1) unless the operator passed an explicit
+    # IOS_APP_VERSION (e.g. cutting a deliberate 1.3).
     live_version = lane_context[SharedValues::LATEST_VERSION]
-    version = (ENV["IOS_APP_VERSION"].to_s.strip.empty? ? live_version : ENV["IOS_APP_VERSION"])
+    bumped_version = live_version.split(".").tap { |p| p[-1] = (p[-1].to_i + 1).to_s }.join(".")
+    version = (ENV["IOS_APP_VERSION"].to_s.strip.empty? ? bumped_version : ENV["IOS_APP_VERSION"])
     increment_version_number(version_number: version, xcodeproj: "ios/App/App.xcodeproj")
 
     # 7. Archive + export a signed App Store ipa.
