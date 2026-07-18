@@ -85,7 +85,9 @@ Adding a feature = 1 new file + 1 `<script>` line + (if it stores data) a rules 
 - CORS allowlist on both: `app.aldewaniah.com`, `abosallom.github.io`, `capacitor://localhost`, `https://localhost`, `http://localhost`.
 
 ### 3.5 Delivery channel #3: iOS native shell (`mobile/`)
-Capacitor 6, appId `com.aldewaniah.app`, `webDir: www` (bundled copy of the static app via `sync-web.sh`). Manual signing ("Aldewaniah App Store" profile, Team 84U5WFJU67). ASC app id 6785237885. Reviewer demo account: `reviewer@aldewaniah.com` / email login (documented in review notes).
+Capacitor 6, appId `com.aldewaniah.app`. Manual signing ("Aldewaniah App Store" profile, Team 84U5WFJU67). ASC app id 6785237885. Reviewer demo account: `reviewer@aldewaniah.com` / email login (documented in review notes).
+
+**Update (2026-07-18):** `mobile/capacitor.config.json` now sets `server.url: "https://app.aldewaniah.com"` — the shipped iOS app is a thin native wrapper that loads the **live site directly**, not a bundled `www` copy synced at build time. Practical effect: a pure web/JS/CSS fix (like §8 below) goes out to the iOS app the moment it's live on the web — no new Xcode archive/App Store build needed. A new build is only required for changes to native config itself (permissions, plugins, entitlements, the Capacitor config).
 
 **App Store strategy (the rejection fixes):**
 1. **4.2 Minimum functionality** (web-wrapper concern): `js/native.js` removes every "website tell" inside the shell — install banners, add-to-home-screen guides, SW update reloads. The app already behaves natively (full-height chat, press-and-hold voice notes, haptic patterns, offline shell, glass UI). V2 adds **private DMs**, deepening app-only functionality. Review notes explicitly walk the reviewer through member-only features with the demo account.
@@ -129,6 +131,18 @@ Capacitor 6, appId `com.aldewaniah.app`, `webDir: www` (bundled copy of the stat
 
 - No framework/bundler (owner must be able to read every file).
 - No Firebase Storage return (R2 is cheaper and Google-independent — owner's explicit choice).
+
+## 8. 2026-07-18 — join-flow + directory bug fixes
+
+**Reported symptoms:** new people couldn't join; members added by the admin didn't show up in the member directory; the admin's member list and the public directory disagreed; no admin/co-admin badges in the directory; the Apple review account showed up like a real member.
+
+**Root cause #1 (the actual "can't join" bug):** `index.html` loads `js/auth.js` — which calls `firebase.initializeApp()`, but only after `DOMContentLoaded` — *before* `js/notify.js`, `js/chat-notify.js`, and `js/push.js`, which each call `firebase.auth()` at their own `<script>` parse time (i.e. *during* initial HTML parsing, while `document.readyState` is still `'loading'`, well before `DOMContentLoaded` fires). Every page load threw `Firebase: No Firebase App '[DEFAULT]' has been created`, permanently killing those modules' listeners for the rest of the page session — most importantly `notify.js`'s real-time admin badge/notification for new join requests. Join requests were actually being submitted and reaching `pending` status fine; the admin simply never found out one existed unless they happened to open the Admin tab and look. **Fix:** `js/auth.js` now calls `Auth.init()` immediately instead of deferring to `DOMContentLoaded` — `firebase.initializeApp()` has no DOM dependency, and `renderBox()`'s DOM queries already no-op safely if the elements aren't in the DOM yet (and get retried from the async `onAuthStateChanged` callback regardless).
+
+**Root cause #2 (directory mismatch):** `members` (phone-keyed, admin-managed, gates login) and `directory` (uid-keyed, self-service — a member only gets a `directory` doc once *they themselves* open the Members section) are independent collections with no code path syncing them. An admin-approved or admin-added member who hasn't opened the app yet correctly has no `directory` entry — by design, just not a design anyone had told the admin about. **Fix:** admin actions (`approve`, `openAdd`, `openEdit` in `js/modules/admin.js`) now also seed/update a placeholder `directory` doc keyed by **phone** (`role`, `name`, `placeholder:true`). `js/modules/profile.js`'s `ensureMine()` migrates that placeholder into the member's real uid-keyed doc the first time they open the app (and deletes the placeholder — `firestore.rules`' `directory` delete rule now also allows `uid == ph()` for this self-cleanup). The public directory (`profile.js`) already just reads the whole `directory` collection, so placeholders show up immediately with no separate query.
+
+**Role badges + reviewer exclusion:** the directory card/brief now render an Admin/Co-Admin badge (`roleBadge()` in `profile.js`, mirroring `admin.js`'s own `badgeFor()`); plain members show none. The App Review demo account (`REVIEWER_PHONE = '+966555555555'`, same constant already used for gift-code exclusion in `admin.js`) is tagged `role:'reviewer'` wherever a directory doc for it is created, and `profile.js` filters those out of the public list — it also proactively deletes its own directory doc if the currently signed-in user resolves to that phone.
+
+SW bumped to v95.
 - No push notifications yet (needs APNs + a sender — the only piece that genuinely wants a server; revisit if Apple demands more "native" justification).
 - Group chat keeps its 150-message window (Firestore read economics).
 - `whitelabel/` template unaffected; V2 changes should be ported there separately.

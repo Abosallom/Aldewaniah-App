@@ -10,6 +10,9 @@
    =========================================================== */
 (function () {
   const COLL = 'directory';
+  // The App Review demo account (same constant as js/modules/admin.js's
+  // gift-code exclusion) — never shown in the member-facing directory.
+  const REVIEWER_PHONE = '+966555555555';
 
   Sections.add({
     id: 'profile',
@@ -27,7 +30,8 @@
         pr_no_info: 'لم يضِف هذا العضو معلومات بعد', pr_close: 'إغلاق',
         pr_edit_one: 'تعديل', pr_delete: 'حذف', pr_del_confirm: 'حذف ملف هذا العضو؟',
         pr_report: 'إبلاغ', pr_reported: 'تم الإبلاغ، شكرًا لك ✅', pr_report_fail: 'تعذّر الإبلاغ، حاول لاحقًا',
-        pr_msg: 'مراسلة', pr_ai_bio: 'اكتب نبذة'
+        pr_msg: 'مراسلة', pr_ai_bio: 'اكتب نبذة',
+        pr_role_admin: 'مشرف', pr_role_coadmin: 'مشرف مساعد'
       },
       en: {
         pr_title: 'Members', pr_sub: 'Meet the Dewaniah members', pr_mine: 'My profile',
@@ -38,7 +42,8 @@
         pr_no_info: "This member hasn't added any info yet", pr_close: 'Close',
         pr_edit_one: 'Edit', pr_delete: 'Delete', pr_del_confirm: "Delete this member's profile?",
         pr_report: 'Report', pr_reported: 'Reported, thank you ✅', pr_report_fail: 'Could not report, try later',
-        pr_msg: 'Message', pr_ai_bio: 'Write a bio'
+        pr_msg: 'Message', pr_ai_bio: 'Write a bio',
+        pr_role_admin: 'Admin', pr_role_coadmin: 'Co-Admin'
       }
     },
 
@@ -67,17 +72,36 @@
       async function ensureMine() {
         if (!myUid) return;
         const memberName = ((Auth.member && Auth.member()) || {}).name || '';
+        const myRole = (Auth.role && Auth.role()) || 'member';
+        const isReviewer = (Auth.phone && Auth.phone()) === REVIEWER_PHONE;
         try {
           const ref = db.collection(COLL).doc(myUid);
+          if (isReviewer) {
+            // The App Review demo account never appears in the member-facing
+            // directory (it's not a real diwaniya member) — remove any entry.
+            try { await ref.delete(); } catch (e) {}
+            return;
+          }
           const snap = await ref.get();
           if (!snap.exists) {
-            await ref.set({ name: memberName, createdAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+            const seed = { name: memberName, role: myRole, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+            // Migrate an admin-seeded placeholder (id == my phone, created before
+            // I ever opened the app) into my real uid-keyed doc, then remove it.
+            const myPhone = Auth.phone && Auth.phone();
+            if (myPhone) {
+              try {
+                const ph = await db.collection(COLL).doc(myPhone).get();
+                if (ph.exists) { await ph.ref.delete(); }
+              } catch (e) {}
+            }
+            await ref.set(seed, { merge: true });
           } else {
             const d = snap.data() || {};
+            const patch = {};
             // follow the admin name unless the member picked a custom one (nameSrc==='self')
-            if (d.nameSrc !== 'self' && memberName && d.name !== memberName) {
-              await ref.set({ name: memberName }, { merge: true });
-            }
+            if (d.nameSrc !== 'self' && memberName && d.name !== memberName) patch.name = memberName;
+            if (d.role !== myRole) patch.role = myRole;
+            if (Object.keys(patch).length) await ref.set(patch, { merge: true });
           }
         } catch (e) { /* non-fatal */ }
       }
@@ -90,9 +114,18 @@
           snap.forEach((d) => rows.push(Object.assign({ id: d.id }, d.data())));
         } catch (e) { grid.innerHTML = '<div class="auth-err" style="grid-column:1/-1">' + (e.message || 'Error') + '</div>'; return; }
         grid.innerHTML = '';
+        rows = rows.filter((p) => p.role !== 'reviewer'); // never show the App Review demo account
         if (!rows.length) { grid.appendChild(UI.el('div', { style: 'grid-column:1/-1' }, [UI.empty(I18n.t('pr_empty'))])); return; }
         rows.sort((a, b) => (a.id === myUid ? -1 : b.id === myUid ? 1 : (a.name || '').localeCompare(b.name || '', 'ar')));
         rows.forEach((p) => grid.appendChild(card(p)));
+      }
+
+      // Admin/Co-Admin badge (same look as the admin panel's memberCard); plain
+      // members get none, matching admin.js's own badgeFor().
+      function roleBadge(p) {
+        if (p.role === 'admin') return UI.el('span', { class: 'chip' }, I18n.t('pr_role_admin'));
+        if (p.role === 'coadmin') return UI.el('span', { class: 'chip chip-blue' }, I18n.t('pr_role_coadmin'));
+        return null;
       }
 
       function card(p) {
@@ -102,6 +135,7 @@
         return UI.el('div', { class: 'prof-card', onclick: () => openBrief(p) }, [
           avatar,
           UI.el('div', { class: 'prof-name' }, (p.name || '—') + (p.id === myUid ? ' (' + I18n.t('pr_you') + ')' : '')),
+          roleBadge(p),
           p.saying ? UI.el('div', { class: 'prof-saying' }, '“' + p.saying + '”') : null,
           p.hobbies ? UI.el('div', { class: 'prof-line' }, '🎯 ' + p.hobbies) : null,
           p.bio ? UI.el('div', { class: 'prof-bio' }, p.bio) : null
@@ -133,6 +167,7 @@
         const box = UI.el('div', { class: 'modal prof-brief' }, [
           avatar,
           UI.el('div', { class: 'prof-brief-name' }, (p.name || '—') + (isMe ? ' (' + I18n.t('pr_you') + ')' : '')),
+          roleBadge(p),
           UI.el('div', { class: 'prof-brief-body' }, rows),
           actions
         ]);

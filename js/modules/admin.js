@@ -392,6 +392,7 @@
       /* ---- Updates log: the app's story since v1 (static, newest first) ---- */
       function loadChangelog(wrap) {
         const LOG = [
+          ['v95', '2026-07-18', 'إصلاح: طلبات الانضمام الجديدة كانت تُرسَل بنجاح لكن تنبيه المشرف كان معطّلاً بالكامل بسبب خطأ تهيئة (فايربيز) — الآن يعمل. + الأعضاء الذين يضيفهم المشرف يظهرون في دليل الأعضاء فورًا (بدل انتظار فتحهم للتطبيق) مع شارة الدور (مشرف/مشرف مساعد)، وحساب مراجعة آبل لا يظهر في الدليل.', 'Fix: new join requests were actually being submitted fine, but the admin alert was completely broken by a Firebase init-order bug — now works. + Members added by the admin now appear in the member directory immediately (instead of waiting for them to open the app), with a role badge (Admin/Co-Admin), and the Apple review account no longer appears in the directory.'],
           ['v90', '2026-07-04', 'مراقبة ذكية لصحة التطبيق: «صندوق أسود» يسجّل الأخطاء تلقائيًا + لوحة «صحة التطبيق» في الإدارة (تجميع الأخطاء وبلاغات الأعضاء مع تشخيص بالذكاء الاصطناعي) + فحص يومي تلقائي', 'AI health monitoring: an error "black box" logs issues automatically + an admin "App Health" panel (grouped errors + member bug reports with AI diagnosis) + a daily automatic check'],
           ['v89', '2026-07-04', 'الذكاء الاصطناعي في كل التطبيق: مساعد موحّد + «المدرّب» داخل لعبة البلوت يقترح أفضل مناداة/ورقة + اقتراحات ذكية في التصويت والتقويم والملف الشخصي والرسائل', 'AI across the whole app: a unified helper + an in-game Baloot "coach" that suggests the best bid/card + smart suggestions in polls, calendar, profile & messages'],
           ['v88', '2026-07-04', 'محرّك بلوت جديد بالكامل: قواعد دقيقة وذكاء اصطناعي قوي + وضع «لعب فردي» فوري بدون إنترنت (بلا تعليق أو تأخير)', 'A brand-new Baloot engine: precise rules + a strong AI + an instant offline "solo" mode (no freezes or lag)'],
@@ -940,7 +941,18 @@
             ]),
             UI.el('div', { class: 'row', style: 'gap:8px' }, [
               UI.el('button', { class: 'btn', style: 'padding:8px 14px', onclick: async () => {
-                await db.collection('members').doc(m.phone).update({ status: 'approved' }); load();
+                await db.collection('members').doc(m.phone).update({ status: 'approved' });
+                // Seed a directory placeholder (id = phone) so the new member shows up
+                // in the public directory immediately, before they've ever opened the
+                // app themselves (directory/profile.js migrates this into their real
+                // uid-keyed doc on first login).
+                try {
+                  await db.collection('directory').doc(m.phone).set({
+                    name: m.name || '', role: m.phone === REVIEWER_PHONE ? 'reviewer' : 'member',
+                    placeholder: true, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                  }, { merge: true });
+                } catch (e) {}
+                load();
               } }, I18n.t('adm_approve')),
               UI.el('button', { class: 'btn btn-ghost', style: 'padding:8px 14px;color:var(--maroon);border-color:var(--maroon)',
                 onclick: () => UI.confirm(I18n.t('adm_confirm_decline'), async () => { await db.collection('members').doc(m.phone).delete(); load(); }) },
@@ -998,6 +1010,14 @@
           else if (data.role === 'coadmin') { rec.admin = false; rec.perms = { requests: data.p_requests === 'yes' }; }
           else { rec.admin = false; rec.perms = {}; }
           await db.collection('members').doc(phone).set(rec);
+          // Seed a directory placeholder (id = phone) so this member shows up in
+          // the public directory right away, before they've opened the app.
+          try {
+            await db.collection('directory').doc(phone).set({
+              name: data.name, role: phone === REVIEWER_PHONE ? 'reviewer' : data.role,
+              placeholder: true, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+          } catch (e) {}
           load();
         });
       }
@@ -1019,13 +1039,16 @@
           else if (data.role === 'coadmin') { patch.admin = false; patch.perms = { requests: data.p_requests === 'yes' }; }
           else { patch.admin = false; patch.perms = {}; }
           await db.collection('members').doc(m.phone).update(patch);
-          // Push the new name straight to this member's directory card (instant),
-          // using the private phone->uid map. (Falls back to the member's own
-          // on-open sync if no map entry exists yet.)
+          // Push the new name/role straight to this member's directory card
+          // (instant): the real uid-keyed doc if they've opened the app at least
+          // once (via the private phone->uid map), otherwise their phone-keyed
+          // placeholder.
           try {
             const map = await db.collection('uidmap').doc(m.phone).get();
             const uid = map.exists && map.data() && map.data().uid;
-            if (uid) await db.collection('directory').doc(uid).set({ name: data.name }, { merge: true });
+            const role = m.phone === REVIEWER_PHONE ? 'reviewer' : data.role;
+            const target = uid ? db.collection('directory').doc(uid) : db.collection('directory').doc(m.phone);
+            await target.set({ name: data.name, role: role }, { merge: true });
           } catch (e) {}
           load();
         });

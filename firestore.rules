@@ -61,10 +61,13 @@ service cloud.firestore {
     }
 
     // ---------- directory (phone-free profiles, keyed by uid) ----------
+    // Admin-seeded placeholders (id == phone, before the member has ever
+    // opened the app) are also created here by isAdmin(); a member migrating
+    // their own placeholder into their real uid-keyed doc needs to delete it.
     match /directory/{uid} {
       allow read: if approved();
       allow create, update: if (approved() && uid == me()) || isAdmin();
-      allow delete: if isAdmin() || (signedIn() && uid == me());
+      allow delete: if isAdmin() || (signedIn() && (uid == me() || uid == ph()));
     }
 
     // ---------- profiles (legacy, orphaned) ----------

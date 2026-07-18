@@ -563,6 +563,14 @@
   }
 
   window.Auth = Auth;
-  if (document.readyState !== 'loading') Auth.init();
-  else document.addEventListener('DOMContentLoaded', () => Auth.init());
+  // Run immediately (not deferred to DOMContentLoaded): firebase.initializeApp()
+  // has no DOM dependency, and later <script> tags (notify.js, chat-notify.js,
+  // push.js) call firebase.auth() at their own parse time, right after this
+  // one runs. Deferring this to DOMContentLoaded left those scripts calling
+  // firebase.auth() before any app was initialized -> "No Firebase App
+  // '[DEFAULT]' has been created", permanently killing their listeners (most
+  // importantly notify.js's admin join-request badge/alert). renderBox()
+  // already no-ops safely if #authBox/#islandLogin aren't in the DOM yet, and
+  // gets called again from the async onAuthStateChanged callback regardless.
+  Auth.init();
 })();
