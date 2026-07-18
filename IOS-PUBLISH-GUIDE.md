@@ -143,3 +143,7 @@ Connect → Upload**. Then in App Store Connect attach the build to the version 
 ## Quick status
 - ✅ In-app **account deletion**, **Privacy Policy + Terms**, **report/block + admin reports**, manifest, icons — all done & live.
 - ⏳ Needs you: Apple account approval, then run §1–§3, give me the go to do §4.1 (Worker CORS), create the demo account for §6, fill §5, then §7.
+
+---
+
+Mac-free CI alternative: see [`mobile/fastlane/README-CI.md`](mobile/fastlane/README-CI.md).

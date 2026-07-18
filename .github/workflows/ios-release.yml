@@ -1,0 +1,79 @@
+name: iOS TestFlight release
+
+# Mac-free TestFlight pipeline for the iOS shell (com.aldewaniah.app).
+# Builds the Capacitor app on GitHub's macOS cloud and uploads it to the
+# TestFlight internal group "Diwaniya Testers" — it NEVER submits for App
+# Store review. Fully independent of deploy.yml (GitHub Pages): that workflow
+# fires on pushes to main; this one runs only on manual dispatch or an
+# "ios-v*" tag, so the two never overlap. See mobile/fastlane/README-CI.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_version:
+        description: "Marketing version (blank = current App Store version)"
+        required: false
+        default: ""
+  push:
+    tags:
+      - "ios-v*"   # deploy.yml filters branches:[main], so tags never trigger it
+
+# One release at a time; don't cancel an in-flight upload.
+concurrency:
+  group: ios-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-upload:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Set up Ruby + Fastlane (bundler cache)
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: true
+          working-directory: mobile
+
+      - name: Decode signing secrets
+        env:
+          BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          echo -n "$PROVISIONING_PROFILE_BASE64" | base64 --decode > "$RUNNER_TEMP/AldewaniahAppStore.mobileprovision"
+          echo "P12_PATH=$RUNNER_TEMP/dist.p12" >> "$GITHUB_ENV"
+          echo "PROFILE_PATH=$RUNNER_TEMP/AldewaniahAppStore.mobileprovision" >> "$GITHUB_ENV"
+
+      - name: Build and upload to TestFlight
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          IOS_APP_VERSION: ${{ github.event.inputs.app_version }}
+        run: bundle exec fastlane beta
+
+      - name: Clean up keychain and temp files
+        if: always()
+        run: |
+          security delete-keychain aldewaniah-ci-db 2>/dev/null || security delete-keychain aldewaniah-ci 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/dist.p12" "$RUNNER_TEMP/AldewaniahAppStore.mobileprovision"
+          rm -f ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision || true

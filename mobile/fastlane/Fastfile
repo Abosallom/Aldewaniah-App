@@ -1,0 +1,158 @@
+# Fastfile — Mac-free TestFlight pipeline for الديوانية (com.aldewaniah.app).
+#
+# Runs on GitHub Actions (macos-latest); see .github/workflows/ios-release.yml
+# and mobile/fastlane/README-CI.md. Fastlane's working directory is mobile/
+# (the Fastfile lives in mobile/fastlane/), so every Xcode path below is
+# relative to mobile/ (ios/App/...), and shell steps that need the mobile/
+# root wrap themselves in Dir.chdir("..") { ... }.
+#
+# The lane is written to work from a *fresh checkout* where mobile/ios/ is not
+# committed: it generates the native project with `npx cap add ios` and then
+# deterministically re-applies the three things a pristine Capacitor template
+# loses (permission strings, real app icon, manual signing) before archiving.
+
+ASC_APP_ID = "6785237885"       # App Store Connect app id (pilot `apple_id`)
+BUNDLE_ID  = "com.aldewaniah.app"
+TEAM_ID    = "84U5WFJU67"
+PROFILE_NAME = "Aldewaniah App Store"
+KEYCHAIN_NAME = "aldewaniah-ci"
+
+default_platform(:ios)
+
+platform :ios do
+  lane :beta do
+    # 1. Build the web bundle and generate/refresh the native iOS project.
+    #    cap sync runs `pod install` (CocoaPods is preinstalled on macos-latest).
+    Dir.chdir("..") do
+      sh("npm ci")
+      sh("npm run sync-web")
+      sh("test -d ios || npx cap add ios")
+      sh("npx cap sync ios")
+    end
+
+    # 2. Re-apply the Info.plist usage descriptions Apple requires (a fresh
+    #    `cap add ios` ships none). Idempotent: safe when ios/ already exists.
+    #    Text is the exact bilingual copy from IOS-PUBLISH-GUIDE.md §2.
+    plist = "ios/App/App/Info.plist"
+    set_info_plist_value(path: plist, key: "NSCameraUsageDescription",
+      value: "لالتقاط الصور والفيديو لمشاركتها في الدردشة. / To take photos and videos to share in chat.")
+    set_info_plist_value(path: plist, key: "NSMicrophoneUsageDescription",
+      value: "لتسجيل الرسائل الصوتية ومقاطع الفيديو. / To record voice and video notes.")
+    set_info_plist_value(path: plist, key: "NSPhotoLibraryUsageDescription",
+      value: "لاختيار صورة لملفك الشخصي أو المعرض. / To choose a photo for your profile or the gallery.")
+    set_info_plist_value(path: plist, key: "NSLocationWhenInUseUsageDescription",
+      value: "للتحقق من وجودك في الديوانية عند تسجيل الحضور فقط. / Only to verify you are at the Dewaniah when checking in.")
+
+    # 3. Real app icon (a pristine template ships Apple's rejected placeholder,
+    #    RESUBMIT-GUIDE.md §2.3.8). Rather than add a node toolchain dependency
+    #    (@capacitor/assets), we commit a complete AppIcon.appiconset under
+    #    mobile/ios-resources/ (the real 1024×1024 dallah icon in Capacitor 6's
+    #    single-size format) and copy it over the generated one. Deterministic
+    #    and idempotent — it fully overwrites whatever cap add produced.
+    Dir.chdir("..") do
+      sh("rm -rf ios/App/App/Assets.xcassets/AppIcon.appiconset")
+      sh("cp -R ios-resources/AppIcon.appiconset ios/App/App/Assets.xcassets/AppIcon.appiconset")
+    end
+
+    # 4. App Store Connect API key (from env; key content is base64, never
+    #    written to disk). This is the only auth mechanism — no Apple ID / 2FA.
+    api_key = app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
+      key_content: ENV["APP_STORE_CONNECT_API_KEY_CONTENT"],
+      is_key_content_base64: true,
+      in_house: false
+    )
+
+    # 5. Signing assets. The workflow pre-decodes the .p12 and .mobileprovision
+    #    to files under $RUNNER_TEMP and passes their paths via env. Manual
+    #    signing mirrors the hand-configured Xcode setup (ARCHITECTURE-V2 §3.5).
+    create_keychain(
+      name: KEYCHAIN_NAME,
+      password: ENV["KEYCHAIN_PASSWORD"],
+      default_keychain: true,
+      unlock: true,
+      timeout: 21600,
+      lock_when_sleeps: false
+    )
+    import_certificate(
+      certificate_path: ENV["P12_PATH"],
+      certificate_password: ENV["P12_PASSWORD"],
+      keychain_name: KEYCHAIN_NAME,
+      keychain_password: ENV["KEYCHAIN_PASSWORD"]
+    )
+    install_provisioning_profile(path: ENV["PROFILE_PATH"])
+    update_code_signing_settings(
+      path: "ios/App/App.xcodeproj",
+      use_automatic_signing: false,
+      team_id: TEAM_ID,
+      targets: ["App"],
+      bundle_identifier: BUNDLE_ID,
+      code_sign_identity: "Apple Distribution",
+      profile_name: PROFILE_NAME
+    )
+
+    # 6. Version + build number, read straight from ASC so a fresh checkout with
+    #    no local build history is still correct. app_store_build_number also
+    #    populates lane_context[LATEST_VERSION] with the live marketing version.
+    live_build = app_store_build_number(
+      api_key: api_key,
+      app_identifier: BUNDLE_ID,
+      live: true
+    )
+    tf_build = latest_testflight_build_number(
+      api_key: api_key,
+      app_identifier: BUNDLE_ID,
+      initial_build_number: 0
+    )
+    next_build = [live_build, tf_build].max + 1
+    increment_build_number(build_number: next_build, xcodeproj: "ios/App/App.xcodeproj")
+
+    # Marketing version: a fresh `cap add ios` templates 1.0, which is behind
+    # the shipped 1.2. Default to the live App Store version unless the operator
+    # passed an explicit IOS_APP_VERSION (e.g. cutting a new 1.3).
+    live_version = lane_context[SharedValues::LATEST_VERSION]
+    version = (ENV["IOS_APP_VERSION"].to_s.strip.empty? ? live_version : ENV["IOS_APP_VERSION"])
+    increment_version_number(version_number: version, xcodeproj: "ios/App/App.xcodeproj")
+
+    # 7. Archive + export a signed App Store ipa.
+    build_app(
+      workspace: "ios/App/App.xcworkspace",
+      scheme: "App",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "build",
+      output_name: "Aldewaniah.ipa",
+      export_options: {
+        signingStyle: "manual",
+        teamID: TEAM_ID,
+        provisioningProfiles: { BUNDLE_ID => PROFILE_NAME }
+      }
+    )
+
+    # 8. Upload to TestFlight — internal group only. This NEVER submits for App
+    #    Store review; distribute_external:false also avoids TestFlight beta
+    #    review. Promoting a build to the store stays a manual ASC action.
+    upload_to_testflight(
+      api_key: api_key,
+      apple_id: ASC_APP_ID,
+      app_identifier: BUNDLE_ID,
+      ipa: "build/Aldewaniah.ipa",
+      distribute_external: false,
+      groups: ["Diwaniya Testers"],
+      notify_external_testers: false,
+      skip_waiting_for_build_processing: false,
+      changelog: "CI build #{next_build}"
+    )
+  end
+
+  # The workflow owns cleanup (an `if: always()` step deletes the keychain and
+  # temp files), but on a lane failure also tear the keychain down here so a
+  # self-hosted or re-run environment is never left with a stale default
+  # keychain. Guarded so it never errors when the keychain was never created.
+  error do |lane, exception|
+    if File.exist?(File.expand_path("~/Library/Keychains/#{KEYCHAIN_NAME}-db"))
+      delete_keychain(name: KEYCHAIN_NAME)
+    end
+  end
+end

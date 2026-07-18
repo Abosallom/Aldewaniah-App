@@ -1,0 +1,7 @@
+app_identifier("com.aldewaniah.app")
+team_id("84U5WFJU67")
+
+# No apple_id(login email) on purpose: this pipeline authenticates to App Store
+# Connect exclusively via the ASC API key (see the Fastfile), which avoids any
+# 2FA prompt on CI. The ASC app id (6785237885) is not an Appfile field — it
+# lives as a constant in the Fastfile and is passed to pilot as `apple_id`.
