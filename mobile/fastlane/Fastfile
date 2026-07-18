@@ -22,12 +22,18 @@ default_platform(:ios)
 platform :ios do
   lane :beta do
     # 1. Build the web bundle and generate/refresh the native iOS project.
-    #    cap sync runs `pod install` (CocoaPods is preinstalled on macos-latest).
-    Dir.chdir("..") do
-      sh("npm ci")
-      sh("npm run sync-web")
-      sh("test -d ios || npx cap add ios")
-      sh("npx cap sync ios")
+    #    cap sync runs `pod install`, which itself shells out to Ruby/Bundler —
+    #    running that nested inside `bundle exec fastlane`'s own Bundler env
+    #    makes it try to resolve fastlane's own gems as if they were pod
+    #    install's, and fail with Bundler::GemNotFound. with_original_env
+    #    restores a clean (non-bundler) environment for this block only.
+    Bundler.with_original_env do
+      Dir.chdir("..") do
+        sh("npm ci")
+        sh("npm run sync-web")
+        sh("test -d ios || npx cap add ios")
+        sh("npx cap sync ios")
+      end
     end
 
     # 2. Re-apply the Info.plist usage descriptions Apple requires (a fresh
